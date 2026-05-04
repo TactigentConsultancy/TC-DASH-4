@@ -117,17 +117,18 @@ let _authToken = SB_ANON;
 const setAuthToken = (t) => { _authToken = t || SB_ANON; };
 
 const sbFetch = async (path, opts={}) => {
-const res = await fetch(`${SB_URL}${path}`, {
-...opts,
-headers: {
+const headers = {
 "apikey": SB_ANON,
 "Authorization": `Bearer ${_authToken}`,
 "Content-Type": "application/json",
-"Prefer": opts.prefer || "",
 ...(opts.headers||{}),
-},
-});
-if (!res.ok) { const e = await res.json().catch(()=>({message:res.statusText})); throw new Error(e.message||e.error_description||res.statusText); }
+};
+if(opts.prefer) headers["Prefer"] = opts.prefer;
+const res = await fetch(`${SB_URL}${path}`, { ...opts, headers });
+if (!res.ok) {
+  const e = await res.json().catch(()=>({message:res.statusText}));
+  throw new Error(e.error_description||e.message||e.msg||res.statusText);
+}
 return res.status === 204 ? null : res.json();
 };
 
@@ -4614,12 +4615,27 @@ try{
 const {data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password:pw});
 if(error){setErr(error.message==="Invalid login credentials"?"Onjuist e-mailadres of wachtwoord.":error.message);setLoading(false);return;}
 // Profile fetch — indexed on id, single row, fast
-const {data:profile,error:pErr}=await supabase
-  .from('user_profiles')
-  .select('id,full_name,email,role,department,company_id,title,avatar_initials,language')
-  .eq('id',data.user.id)
-  .single();
-if(pErr||!profile){setErr("Profiel niet gevonden. Neem contact op met uw beheerder.");setLoading(false);return;}
+let profile=null, pErr=null;
+try{
+  const pr = await supabase
+    .from('user_profiles')
+    .select('id,full_name,email,role,department,company_id,title,avatar_initials,language')
+    .eq('id',data.user.id)
+    .single();
+  profile=pr.data; pErr=pr.error;
+}catch(pe){ pErr=pe; }
+if(pErr||!profile){
+  // Try email fallback
+  try{
+    const pr2 = await supabase
+      .from('user_profiles')
+      .select('id,full_name,email,role,department,company_id,title,avatar_initials,language')
+      .eq('email',data.user.email)
+      .single();
+    profile=pr2.data; pErr=pr2.error;
+  }catch(pe2){ pErr=pe2; }
+}
+if(!profile){setErr("Profiel niet gevonden. Neem contact op met uw beheerder.");setLoading(false);return;}
 onLogin({
 id:profile.id, name:profile.full_name, email:profile.email,
 role:profile.role, dept:profile.department, company_id:profile.company_id,
