@@ -746,7 +746,7 @@ return(
 </>}
 {(isTC||isFF||isBOTH)&&<>
 <SideSection label="Documentbeheer"/>
-<SideBtn icon={ClipboardList} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")}/>
+<SideBtn icon={FolderOpen} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")}/>
 </>}
 <SideSection label={t("crmLeads")}/>
 <SideBtn icon={Users} label={t("crm")} isActive={view==="crm"} onClick={()=>setView("crm")}/>
@@ -778,7 +778,7 @@ return(
 <SideSection label="Communicatie"/>
 <SideBtn icon={Send} label={t("messages")} isActive={view==="c_messages"} onClick={()=>setView("c_messages")}/>
 <SideSection label="Account"/>
-<SideBtn icon={Info} label={t("support")} isActive={false} onClick={()=>{}}/>
+<SideBtn icon={HelpCircle} label={t("support")} isActive={false} onClick={()=>{}}/>
 <SideBtn icon={LogOut} label={t("logout")} isActive={false} onClick={onLogout} danger/>
 </>}
 </nav>
@@ -4943,17 +4943,19 @@ return (
 
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
 export default function App(){
-const DEFAULT_USER={
-  id:"dcd12534-e878-4edf-8689-e9d265c9a350",
-  name:"Admin",
-  email:"info@tactigentconsultancy.com",
-  role:"super_admin",
-  dept:"BOTH",
-  avatar:"AD",
-  title:"Super Administrator",
-  language:"NL"
-};
-const [user,setUser]=useState(DEFAULT_USER);
+const [user,setUser]=useState(null);
 const [language,setLanguage]=useState("NL");
-return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={()=>setUser(DEFAULT_USER)}/>;
+const [onboarded,setOnboarded]=useState({});
+
+const handleLogin=(u)=>{
+setUser(u);
+};
+
+// New client users see onboarding first
+if(user && user.role==="client" && !onboarded[user.id]){
+return <ClientOnboarding user={user} onComplete={()=>setOnboarded(o=>({...o,[user.id]:true}))}/>;
+}
+
+if(!user) return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage}/>;
+return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{await supabase.auth.signOut();setUser(null);}}/>;
 }
