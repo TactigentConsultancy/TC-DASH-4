@@ -6,7 +6,7 @@ CheckCircle, Lock, Mail, Search, Download,
 ChevronLeft, Users, CheckSquare, Upload, X, Shield, Clock,
 Send, Layers, Receipt, RefreshCw, Check, Info, ImageOff,
 Activity, FileSpreadsheet, FileType, Pen,
-ScanSearch, ClipboardList, Scale, BookOpen,
+ScanSearch, ClipboardList, Scale, BookOpen, FolderOpen, HelpCircle,
 Building, LayoutDashboard
 } from "lucide-react";
 
@@ -134,11 +134,16 @@ return res.status === 204 ? null : res.json();
 const supabase = {
 auth: {
 signInWithPassword: async ({email,password}) => {
+try {
 const data = await sbFetch("/auth/v1/token?grant_type=password", {
 method:"POST", body: JSON.stringify({email,password}),
 });
+if(!data?.access_token) return { data:null, error:{message:"Invalid login credentials"} };
 setAuthToken(data.access_token);
 return { data: { user: data.user, session: data }, error: null };
+} catch(e) {
+return { data:null, error:{message: e.message.includes("Invalid")||e.message.includes("invalid")?"Invalid login credentials":e.message} };
+}
 },
 signOut: async () => { setAuthToken(null); return {error:null}; },
 },
@@ -746,7 +751,7 @@ return(
 </>}
 {(isTC||isFF||isBOTH)&&<>
 <SideSection label="Documentbeheer"/>
-<SideBtn icon={FolderOpen} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")}/>
+<SideBtn icon={ClipboardList} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")}/>
 </>}
 <SideSection label={t("crmLeads")}/>
 <SideBtn icon={Users} label={t("crm")} isActive={view==="crm"} onClick={()=>setView("crm")}/>
@@ -778,7 +783,7 @@ return(
 <SideSection label="Communicatie"/>
 <SideBtn icon={Send} label={t("messages")} isActive={view==="c_messages"} onClick={()=>setView("c_messages")}/>
 <SideSection label="Account"/>
-<SideBtn icon={HelpCircle} label={t("support")} isActive={false} onClick={()=>{}}/>
+<SideBtn icon={Info} label={t("support")} isActive={false} onClick={()=>{}}/>
 <SideBtn icon={LogOut} label={t("logout")} isActive={false} onClick={onLogout} danger/>
 </>}
 </nav>
@@ -4946,16 +4951,10 @@ export default function App(){
 const [user,setUser]=useState(null);
 const [language,setLanguage]=useState("NL");
 const [onboarded,setOnboarded]=useState({});
-
-const handleLogin=(u)=>{
-setUser(u);
-};
-
-// New client users see onboarding first
-if(user && user.role==="client" && !onboarded[user.id]){
-return <ClientOnboarding user={user} onComplete={()=>setOnboarded(o=>({...o,[user.id]:true}))}/>;
+const handleLogin=(u)=>{ setUser(u); };
+if(user&&user.role==="client"&&!onboarded[user.id]){
+  return <ClientOnboarding user={user} onComplete={()=>setOnboarded(o=>({...o,[user.id]:true}))}/>;
 }
-
 if(!user) return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage}/>;
-return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{await supabase.auth.signOut();setUser(null);}}/>;
+return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setUser(null);}}/>;
 }
