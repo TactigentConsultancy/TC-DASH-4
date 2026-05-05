@@ -633,16 +633,7 @@ const STATUS_BG={Actief:C.greenBg,Prioriteit:C.crimsonFaint,Geblokkeerd:C.redBg,
 
 const ENGAGEMENTS_INIT=[];
 const TASKS_BY_ENG={};
-const CLIENT_ACTIONS_BY_ENG={
-"1":[
-{id:"ca1",title:"Jaarrekening 2024 Uploaden",type:"upload",deadline:"30 Apr 2025",status:"pending",desc:"Upload gecertificeerde jaarrekening voor projectdossier."},
-{id:"ca2",title:"Projectvoorstel Fase 2 Goedkeuren",type:"approve",deadline:"02 Mei 2025",status:"pending",desc:"Beoordeel en onderteken het projectvoorstel voor fase 2."},
-],
-"2":[
-{id:"ca3",title:"KYC Documentatie Aanleveren",type:"upload",deadline:"22 Apr 2025",status:"overdue",desc:"Vereiste identificatiedocumenten zijn achterstallig."},
-{id:"ca4",title:"Auditrapport Ondertekenen",type:"sign",deadline:"28 Apr 2025",status:"pending",desc:"Onderteken het interne auditrapport voor bestuursvergadering."},
-],
-};
+const CLIENT_ACTIONS_BY_ENG={};
 const MESSAGES_INIT={"1":[
 {id:"m1",author:"Adviseur TC",avatar:"MR",time:"10:24",body:"Goedemorgen, de eerste fase van de IT-audit is afgerond.",visible:false},
 {},
@@ -661,38 +652,18 @@ const TRANSACTIONS=[
 {id:"tr2",desc:"Belastingreservering Q1",dept:"FF",amount:-8500,dir:"out",status:"In Afwachting",date:"25 Mrt"},
 {id:"tr3",desc:"Fernandes Retainer Apr",dept:"FF",amount:38400,dir:"in",status:"Afgerond",date:"12 Apr"},
 ];
-const NOTIFICATIONS_INIT=[
-{},
-{},
-{},
-{},
-];
+const NOTIFICATIONS_INIT=[];
 const LEADS=[
 {id:"1",name:"VSH United N.V.",dept:"TC",stage:"proposal",value:485000,rep:"MR"},
 {id:"2",name:"FKP Suriname",dept:"FF",stage:"strategy_review",value:620000,rep:"PS"},
 {id:"3",name:"Bruynzeel Suriname",dept:"TC",stage:"new",value:145000,rep:"MR"},
 {},
 ];
-const MARKETING_CAMPAIGNS=[
-{id:"1",name:"Kwartaalnieuwsbrief Q2 2025",type:"newsletter",status:"sent",recipients:342,openRate:"68%",date:"01 Apr 2025",dept:"TC"},
-{id:"2",name:"Fiscale Tips — Suriname Ondernemers",type:"newsletter",status:"draft",recipients:0,openRate:"—",date:"10 Apr 2025",dept:"FF"},
-{id:"3",name:"Tactigent — Strategische Groeikansen",type:"newsletter",status:"scheduled",recipients:218,openRate:"—",date:"02 Mei 2025",dept:"TC"},
-{id:"4",name:"Jaarplan Webinar Uitnodiging",type:"newsletter",status:"sent",recipients:503,openRate:"72%",date:"15 Mrt 2025",dept:"BOTH"},
-];
-const SOCIAL_CHANNELS=[
-{id:"1",name:"LinkedIn — Tactigent Consultancy",handle:"@tactigent.sr",platform:"linkedin",followers:"4.2K",lastPost:"2 dagen geleden",connected:true,dept:"TC"},
-{id:"2",name:"LinkedIn — Fiscal Fuse",handle:"@fiscalfuse.sr",platform:"linkedin",followers:"2.8K",lastPost:"5 dagen geleden",connected:true,dept:"FF"},
-{id:"3",name:"Instagram — The Client Portal",handle:"@glasexec",platform:"instagram",followers:"1.1K",lastPost:"1 week geleden",connected:true,dept:"BOTH"},
-{id:"4",name:"Facebook — Tactigent",handle:"Tactigent Consultancy SR",platform:"facebook",followers:"3.6K",lastPost:"3 dagen geleden",connected:false,dept:"TC"},
-{id:"5",name:"X (Twitter)",handle:"@glasexec_sr",platform:"x",followers:"890",lastPost:"—",connected:false,dept:"BOTH"},
-];
+const MARKETING_CAMPAIGNS=[];
+const SOCIAL_CHANNELS=[];
 
 const REVIEW_DOCS=[];
-const CLIENT_PORTAL_ACTIONS=[
-{id:"1",title:"Jaarrekening 2024 Uploaden",desc:"Upload uw gecertificeerde jaarrekening. Termijn: 30 apr 2025.",type:"upload",urgency:"high"},
-{id:"2",title:"Projectvoorstel Goedkeuren",desc:"Beoordeel en onderteken het voorstel voor de bestuursvergadering.",type:"approve",urgency:"medium"},
-{id:"3",title:"Openstaande Factuur SRD 14.750",desc:"INV-2025-042 is verschuldigd. Neem contact op voor betaling.",type:"review",urgency:"low"},
-];
+const CLIENT_PORTAL_ACTIONS=[];
 const CLIENT_THREADS=[
 {id:"t1",subject:"Oliesector Digitalisering — Update",from:"Adviseur TC",avatar:"MR",preview:"Het projectplan voor Q3 is klaar.",time:"14:32",unread:true,messages:[
 {id:"m1",author:"Adviseur TC",avatar:"MR",body:"Goedemiddag, het projectplan voor Q3 is bijgewerkt en klaar voor uw goedkeuring.",time:"14:32",fromMe:false},
@@ -1852,15 +1823,7 @@ return(
 }
 
 // ─── CLIENT ACTIONS VIEW (STAFF) ──────────────────────────────────────────────
-const ALL_CLIENT_ACTIONS_DATA=[
-{},
-{},
-{},
-{},
-{},
-{},
-{id:"ca7",title:"Fiscale Aanslagbiljet Goedkeuren",type:"approve",deadline:"18 Apr 2025",status:"overdue",desc:"Goedkeuring vereist voor indiening bij belastingdienst.",dept:"FF",client:"Fernandes Groep",engagement:"FF-2204-SR"},
-];
+const ALL_CLIENT_ACTIONS_DATA=[];
 function ClientActionsView({dept,showToast}){
 const t=useT();
 const [actions,setActions]=useState(ALL_CLIENT_ACTIONS_DATA.filter(a=>a.dept===dept));
@@ -2636,7 +2599,7 @@ for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
 const heat=(r+c)/(GRID*2-2);
 cells.push({r,c,heat});
 }
-const sectors=[{l:"Cybersecurity",v:94,red:true},{l:"Financieel Recht",v:82,red:true},{l:"Publieke Sector",v:45},{l:"Infrastructuur",v:31}];
+const sectors=[];
 return(
 <div>
 <PageHeader kicker="Intelligence" title="Strategische Risicomatrix"/>
@@ -2654,9 +2617,15 @@ return(
 ))}
 </div>
 </div>
+<div style={{display:"flex",gap:10,alignItems:"center"}}>
+{/* Y-axis label */}
+<div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",height:340,paddingTop:4,paddingBottom:4,flexShrink:0}}>
+  <span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",writingMode:"vertical-rl",transform:"rotate(180deg)"}}>HOGE IMPACT</span>
+  <span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",writingMode:"vertical-rl",transform:"rotate(180deg)"}}>LAGE IMPACT</span>
+</div>
+<div style={{flex:1}}>
 <div style={{position:"relative",aspectRatio:"1",maxHeight:340}}>
-{/* Y-axis label — IMPACT */}
-<div style={{position:"absolute",left:-38,top:"50%",transform:"translateY(-50%) rotate(-90deg)",fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",whiteSpace:"nowrap"}}>← HOGE IMPACT · LAGE IMPACT →</div>
+
 <div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gridTemplateRows:`repeat(${GRID},1fr)`,gap:4,height:"100%"}}>
 {cells.map(({r,c,heat})=>(
 <div key={`${r}-${c}`} style={{borderRadius:6,background:`rgba(139,26,43,${heat*0.35+0.05})`}}/>
@@ -2668,10 +2637,12 @@ return(
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
 </div>
 {/* X-axis labels BELOW the grid */}
-<div style={{display:"flex",justifyContent:"space-between",marginTop:8,paddingLeft:4,paddingRight:4}}>
-<span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>LAGE WAARSCHIJNLIJKHEID</span>
-<span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>HOGE WAARSCHIJNLIJKHEID</span>
+<div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
+<span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>LAGE WAARSCHIJNLIJKHEID</span>
+<span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>HOGE WAARSCHIJNLIJKHEID</span>
 </div>
+</div>{/* end flex:1 */}
+</div>{/* end flex row with Y-axis */}
 </div>
 <div style={{display:"flex",flexDirection:"column",gap:12}}>
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
@@ -2718,11 +2689,7 @@ const months=["JAN","FEB","MRT","APR","MEI","JUN"];
 const tcBars=[22,28,35,30,42,48];
 const ffBars=[12,16,18,22,20,26];
 const maxBar=Math.max(...tcBars.map((t,i)=>t+ffBars[i]));
-const movements=[
-{date:"14 Jun 2024",desc:"Project Alfa Dividend",dept:"TC",amount:"+SRD 42.500",status:"Afgerond"},
-{date:"12 Jun 2024",desc:"Fiscale Optimalisatie Q2",dept:"FF",amount:"-SRD 12.800",status:"Verwerkt"},
-{date:"08 Jun 2024",desc:"Directie Bonus Pool",dept:"TC",amount:"+SRD 115.000",status:"Geverifieerd"},
-];
+const movements=[];
 return(
 <div>
 <PageHeader kicker="Intelligence" title="Vermogensstroom"/>
