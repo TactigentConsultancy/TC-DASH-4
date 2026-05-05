@@ -639,13 +639,7 @@ const MESSAGES_INIT={"1":[
 {},
 {id:"m3",author:"Adviseur TC",avatar:"MR",time:"11:05",body:"Ja, de actie staat klaar in uw portaal onder Actiepunten.",visible:true},
 ]};
-const DOCUMENTS=[
-{},
-{},
-{},
-{id:"d4",name:"Fernandes_Due_Diligence_Rapport.pdf",dept:"FF",engagement:"FF-2204-SR",type:"PDF",size:"5.1 MB",visibility:"shared",status:"verified",date:"28 Jan 2025",uploadedBy:"PS"},
-{},
-];
+const DOCUMENTS=[];
 const INVOICES_INIT=[];
 const TRANSACTIONS=[
 {},
@@ -653,25 +647,13 @@ const TRANSACTIONS=[
 {id:"tr3",desc:"Fernandes Retainer Apr",dept:"FF",amount:38400,dir:"in",status:"Afgerond",date:"12 Apr"},
 ];
 const NOTIFICATIONS_INIT=[];
-const LEADS=[
-{id:"1",name:"VSH United N.V.",dept:"TC",stage:"proposal",value:485000,rep:"MR"},
-{id:"2",name:"FKP Suriname",dept:"FF",stage:"strategy_review",value:620000,rep:"PS"},
-{id:"3",name:"Bruynzeel Suriname",dept:"TC",stage:"new",value:145000,rep:"MR"},
-{},
-];
+const LEADS=[];
 const MARKETING_CAMPAIGNS=[];
 const SOCIAL_CHANNELS=[];
 
 const REVIEW_DOCS=[];
 const CLIENT_PORTAL_ACTIONS=[];
-const CLIENT_THREADS=[
-{id:"t1",subject:"Oliesector Digitalisering — Update",from:"Adviseur TC",avatar:"MR",preview:"Het projectplan voor Q3 is klaar.",time:"14:32",unread:true,messages:[
-{id:"m1",author:"Adviseur TC",avatar:"MR",body:"Goedemiddag, het projectplan voor Q3 is bijgewerkt en klaar voor uw goedkeuring.",time:"14:32",fromMe:false},
-]},
-{id:"t2",subject:"Kapitaalaanvraag — Documenten Vereist",from:"Beheerder",avatar:"KB",preview:"We hebben uw jaarrekening 2024 nodig.",time:"Gisteren",unread:true,messages:[
-{id:"m1",author:"Beheerder",avatar:"KB",body:"Voor de Series B aanvraag hebben wij uw jaarrekening 2024 nodig.",time:"Gisteren",fromMe:false},
-]},
-];
+const CLIENT_THREADS=[];
 
 // ─── SIDEBAR ────────────────────────────────────────────────────────────────
 function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng}){
@@ -1007,50 +989,75 @@ return(
 function useRealNews(dept){
 const [news,setNews]=useState([]);
 const [loading,setLoading]=useState(true);
-const [lastFetch,setLastFetch]=useState(null);
+const NEWS_API_KEY="cf17161e168546ba85b3643e5ed5fcdb";
+const CACHE_KEY="tge_news_v2";
+const CACHE_TIME=30*60*1000;
 
 useEffect(()=>{
-// Cache: only refetch after 30 min
-const CACHE_KEY="tge_news_cache";
-const CACHE_TIME=30*60*1000;
-try{
-  const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||"null");
-  if(cached&&Date.now()-cached.ts<CACHE_TIME){ setNews(cached.items); setLoading(false); return; }
-}catch(e){}
-
-const fetchNews=async()=>{
+  // Check cache first
   try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        model:"claude-sonnet-4-20250514",
-        max_tokens:1000,
-        tools:[{type:"web_search_20250305",name:"web_search"}],
-        messages:[{role:"user",content:`Search for the 5 most recent and relevant news articles about tax law, business regulation, economic developments, and financial compliance in Suriname and the Caribbean region (published within the last 7 days). Return ONLY a JSON array with no markdown, no explanation, just valid JSON. Each item: {"id":"1","tag":"WETGEVING","tagColor":"#8B1A2B","title":"...","body":"brief 1-sentence summary in Dutch","time":"X days ago","dept":"FF","urgent":false,"source":"source name"} Tags: WETGEVING, MARKT, COMPLIANCE, STRATEGIE, BELASTING, OFFSHORE. dept: TC for business/strategy, FF for tax/fiscal, BOTH for both. urgent:true only if deadline or critical regulatory change.`}]
-      })
-    });
-    const data=await res.json();
-    // Extract text from response
-    const textBlock=data.content?.find(b=>b.type==="text");
-    if(textBlock?.text){
-      try{
-        const cleaned=textBlock.text.replace(/```json|```/g,"").trim();
-        const items=JSON.parse(cleaned);
-        if(Array.isArray(items)&&items.length>0){
-          setNews(items);
-          try{ localStorage.setItem("tge_news_cache",JSON.stringify({ts:Date.now(),items})); }catch(e){}
-          setLoading(false);
-          return;
-        }
-      }catch(e){ console.warn("News parse error:",e); }
+    const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||"null");
+    if(cached&&Date.now()-cached.ts<CACHE_TIME){
+      setNews(cached.items); setLoading(false); return;
     }
-  }catch(e){ console.warn("News fetch error:",e); }
-  // Fallback to curated static news
-  setNews(FALLBACK_NEWS);
-  setLoading(false);
-};
-fetchNews();
+  }catch(e){}
+
+  const fetchNews=async()=>{
+    try{
+      // NewsAPI — Suriname + Caribbean business/tax news
+      const queries=[
+        "Suriname belasting OR tax OR economie OR business",
+        "Caribbean tax compliance finance business",
+        "CARICOM finance trade Suriname",
+      ];
+      const allArticles=[];
+      for(const q of queries){
+        const url=`https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&sortBy=publishedAt&pageSize=5&language=en&apiKey=${NEWS_API_KEY}`;
+        const res=await fetch(url);
+        if(!res.ok) continue;
+        const data=await res.json();
+        if(data.articles) allArticles.push(...data.articles);
+      }
+
+      // Deduplicate and map to our format
+      const seen=new Set();
+      const mapped=allArticles
+        .filter(a=>a.title&&a.title!=="[Removed]"&&!seen.has(a.title)&&seen.add(a.title))
+        .slice(0,8)
+        .map((a,i)=>{
+          const title=a.title||"";
+          const isTax=/(tax|belasting|fiscal|BTW|customs|douane)/i.test(title+a.description);
+          const isCompliance=/(compliance|regulation|wet|law|audit|FATF|AML)/i.test(title+a.description);
+          const isBusiness=/(business|economie|economy|investment|trade|handel)/i.test(title+a.description);
+          const tag=isCompliance?"COMPLIANCE":isTax?"BELASTING":isBusiness?"MARKT":"STRATEGIE";
+          const tagColor=isCompliance?"#6366F1":isTax?"#8B1A2B":isBusiness?"#C97B1A":"#15803D";
+          const dept=isTax||isCompliance?"FF":"TC";
+          const pub=new Date(a.publishedAt);
+          const diffDays=Math.floor((Date.now()-pub)/86400000);
+          const time=diffDays===0?"Vandaag":diffDays===1?"Gisteren":`${diffDays} dagen geleden`;
+          return {
+            id:String(i+1), tag, tagColor,
+            title: title.length>90?title.slice(0,87)+"...":title,
+            body: (a.description||a.content||"").slice(0,160),
+            time, dept,
+            urgent: isCompliance&&diffDays<3,
+            source: a.source?.name||"NewsAPI",
+            url: a.url||null,
+          };
+        });
+
+      if(mapped.length>0){
+        setNews(mapped);
+        try{ localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),items:mapped})); }catch(e){}
+        setLoading(false);
+        return;
+      }
+    }catch(e){ console.warn("NewsAPI fetch error:",e); }
+    // Fallback
+    setNews(FALLBACK_NEWS);
+    setLoading(false);
+  };
+  fetchNews();
 },[]);
 
 return {news,loading};
@@ -2389,18 +2396,26 @@ return(
 {user.dept==="BOTH"&&["ALL","TC","FF"].map(f=>(<Pill key={f} label={f==="ALL"?"Alle":f==="TC"?"Tactigent":"Fiscal Fuse"} active={deptF===f} onClick={()=>setDeptF(f)}/>))}
 </div>
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+{leads.length===0?(
+<div style={{padding:"52px 24px",textAlign:"center"}}>
+<Users size={32} color={C.mushroom} style={{marginBottom:12}}/>
+<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen leads gevonden</div>
+<div style={{fontSize:12,color:C.secondary}}>Voeg uw eerste lead toe om te beginnen.</div>
+</div>
+):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{[t("company"),"AFDELING",t("stage"),t("value"),t("advisor")].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{leads.map(l=>(
+<tbody>{leads.filter(l=>l&&l.id&&l.name).map(l=>(
 <tr key={l.id} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>setDetailLead&&setDetailLead(l)}>
 <td style={{padding:"12px 18px",fontSize:13,fontWeight:600,color:C.text}}>{l.name}</td>
 <td style={{padding:"14px 18px"}}><DeptTag dept={l.dept}/></td>
 <td style={{padding:"14px 18px"}}><Badge label={sL[l.stage]||l.stage} color={sC[l.stage]||C.secondary} bg={C.warm50}/></td>
-<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>SRD {l.value.toLocaleString()}</td>
-<td style={{padding:"14px 18px"}}><Avatar initials={l.rep} size={26} bg={l.dept==="TC"?C.crimson:C.taupe}/></td>
+<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>SRD {(l.value||0).toLocaleString()}</td>
+<td style={{padding:"14px 18px"}}><Avatar initials={l.rep||"?"} size={26} bg={l.dept==="TC"?C.crimson:C.taupe}/></td>
 </tr>
 ))}</tbody>
 </table>
+)}
 </div>
 </div>
 );
