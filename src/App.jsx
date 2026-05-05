@@ -448,18 +448,37 @@ low:"LOW", normal:"NORMAL", high:"HIGH", criticalPrio:"CRITICAL",
 },
 };
 
-const C = {
-crimson:"#8B1A2B", crimsonDeep:"#6B1220", crimsonFaint:"#F9F0F1", crimsonMid:"#C4909A",
-taupe:"#9A877A", taupeLight:"#C8BBB2", taupeDeep:"#7A6860", mushroom:"#D6D3CE",
-espresso:"#3A2E28", walnut:"#4A3C35", oak:"#5E4E45",
-bg:"#F5F1EC", surface:"#FDFCF9", warm50:"#F0EBE5",
-text:"#3A2E28", secondary:"#7A6B60", muted:"#A89B92", border:"#E4DDD5",
-amber:"#C97B1A", amberBg:"#FDF6EC",
-red:"#C83232", redBg:"#FEF2F2",
-green:"#15803D", greenBg:"#F0FDF4",
-blue:"#1D4ED8", blueBg:"#EFF6FF",
-tagFF:"#9A877A",
+// ── THEME SYSTEM ─────────────────────────────────────────────────────────────
+const THEMES = {
+  light: {
+    crimson:"#8B1A2B", crimsonDeep:"#6B1220", crimsonFaint:"#F9F0F1", crimsonMid:"#C4909A",
+    taupe:"#9A877A", taupeLight:"#C8BBB2", taupeDeep:"#7A6860", mushroom:"#D6D3CE",
+    espresso:"#3A2E28", walnut:"#4A3C35", oak:"#5E4E45",
+    bg:"#F5F1EC", surface:"#FDFCF9", warm50:"#F0EBE5",
+    text:"#3A2E28", secondary:"#7A6B60", muted:"#A89B92", border:"#E4DDD5",
+    amber:"#C97B1A", amberBg:"#FDF6EC",
+    red:"#C83232", redBg:"#FEF2F2",
+    green:"#15803D", greenBg:"#F0FDF4",
+    blue:"#1D4ED8", blueBg:"#EFF6FF",
+    tagFF:"#9A877A",
+    navBg:"#FDFCF9", topbarBg:"#FDFCF9",
+  },
+  dark: {
+    crimson:"#C0283C", crimsonDeep:"#8B1A2B", crimsonFaint:"#2A1518", crimsonMid:"#7A3040",
+    taupe:"#8A7B72", taupeLight:"#4A3E38", taupeDeep:"#6A5E58", mushroom:"#4A4038",
+    espresso:"#F0EBE4", walnut:"#8B6B52", oak:"#7A6B62",
+    bg:"#141210", surface:"#1E1A16", warm50:"#252018",
+    text:"#F0EBE4", secondary:"#A89B92", muted:"#6A5E58", border:"#2E2820",
+    amber:"#F59E0B", amberBg:"#1C1200",
+    red:"#EF4444", redBg:"#1C0808",
+    green:"#22C55E", greenBg:"#052E16",
+    blue:"#60A5FA", blueBg:"#0A1628",
+    tagFF:"#8A7B72",
+    navBg:"#1A1612", topbarBg:"#1A1612",
+  }
 };
+// C is set dynamically based on theme — default light
+let C = THEMES.light;
 const CREAM="#F5F1EC", CREAM_DIM="#C8BBB2";
 const F = { display:"'Cormorant Garamond',Georgia,serif", body:"'Jost',sans-serif", mono:"'JetBrains Mono','Fira Code',monospace" };
 
@@ -604,12 +623,7 @@ const Pill=({label,active,onClick})=>(<button onClick={onClick} style={{padding:
 function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);return()=>clearTimeout(t);},[]);return(<div className="sir" style={{position:"fixed",bottom:28,right:28,zIndex:2000,background:C.espresso,color:CREAM,borderRadius:14,padding:"13px 20px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 20px 48px rgba(58,46,40,.32),0 4px 8px rgba(58,46,40,.16)",fontSize:13,fontWeight:500,maxWidth:360,lineHeight:1.5}}><div style={{width:20,height:20,borderRadius:"50%",background:"rgba(21,128,61,.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Check size={12} color="#4ADE80"/></div>{msg}<button onClick={onClose} style={{background:"none",border:"none",color:C.taupeLight,cursor:"pointer",marginLeft:"auto",padding:"2px",opacity:.7,lineHeight:0}}><X size={14}/></button></div>);}
 
 // ─── DATA ───────────────────────────────────────────────────────────────────
-const DEMO_USERS=[
-{id:"a1",name:"Marlon Relyveld",email:"marlon@tactigent.sr",role:"staff",dept:"TC",title:"Senior Adviseur TC",avatar:"MR"},
-{id:"a2",name:"Priya Sital",email:"priya@fiscalfuse.sr",role:"staff",dept:"FF",title:"Fiscaal Adviseur FF",avatar:"PS"},
-{id:"a3",name:"Kenneth Brunings",email:"kenneth@glasexec.sr",role:"super_admin",dept:"BOTH",title:"CEO & Super Admin",avatar:"KB"},
-{id:"a4",name:"Raj Santokhi",email:"raj@staatsolie.sr",role:"client",dept:"TC",title:"CFO — Staatsolie N.V.",avatar:"RS",company:"Staatsolie N.V."},
-];
+const DEMO_USERS=[];
 const COMPANIES_INIT=[
 {id:"1",name:"Staatsolie N.V.",kkf:"SR-2024-0142",dept:"TC",contact:"Raj Santokhi",role:"CFO",lifecycle:"Strategische Groei",avatar:"ST",health:"green"},
 {id:"2",name:"Hakrinbank N.V.",kkf:"SR-2019-0078",dept:"FF",contact:"Cynthia Venetiaan",role:"Legal Counsel",lifecycle:"Herstructurering",avatar:"HB",health:"amber"},
@@ -630,17 +644,7 @@ const ENGAGEMENTS_INIT=[
 {id:"4",ref:"FF-2204-SR",name:"Fernandes Fusie Analyse",dept:"FF",type:"matter",phase:"Due Diligence",health:"green",status:"Actief",manager:"PS",client:"Fernandes Groep",deadline:"31 Jul 2025"},
 {id:"5",ref:"TC-2405-SR",name:"Torarica Groei Strategie",dept:"TC",type:"project",phase:"Scoping",health:"amber",status:"Wacht op Cliënt",manager:"MR",client:"Torarica Group N.V.",deadline:"01 Jun 2025"},
 ];
-const TASKS_BY_ENG={
-"1":[
-{id:"t1",title:"IT-infrastructuur audit voltooien",assignee:"MR",priority:"high",status:"in_progress",due:"28 Apr 2025"},
-{id:"t2",title:"Stakeholder rapport opstellen",assignee:"MR",priority:"normal",status:"open",due:"02 Mei 2025"},
-{id:"t3",title:"Projectplan fase 2 reviewen",assignee:"KB",priority:"critical",status:"open",due:"25 Apr 2025"},
-],
-"2":[
-{id:"t4",title:"Interne documenten crosschecken",assignee:"PS",priority:"critical",status:"in_progress",due:"24 Apr 2025"},
-{id:"t5",title:"Compliance matrix bijwerken",assignee:"PS",priority:"high",status:"open",due:"26 Apr 2025"},
-],
-};
+const TASKS_BY_ENG={};
 const CLIENT_ACTIONS_BY_ENG={
 "1":[
 {id:"ca1",title:"Jaarrekening 2024 Uploaden",type:"upload",deadline:"30 Apr 2025",status:"pending",desc:"Upload gecertificeerde jaarrekening voor projectdossier."},
@@ -701,12 +705,7 @@ const SOCIAL_CHANNELS=[
 {id:"5",name:"X (Twitter)",handle:"@glasexec_sr",platform:"x",followers:"890",lastPost:"—",connected:false,dept:"BOTH"},
 ];
 
-const REVIEW_DOCS=[
-{id:"1",name:"Staatsolie_KYC_2025.pdf",uploaded:"24 Apr, 09:12",client:"Staatsolie N.V.",priority:"kritiek",avatar:"ST"},
-{id:"2",name:"Hakrinbank_Statuten.docx",uploaded:"24 Apr, 08:45",client:"Hakrinbank N.V.",priority:"hoog",avatar:"HB"},
-{id:"3",name:"BTW_Aangifte_Q1_2025.pdf",uploaded:"23 Apr, 17:30",client:"Fernandes Groep",priority:"normaal",avatar:"FG"},
-{id:"4",name:"Assuria_Identificatie.jpg",uploaded:"23 Apr, 16:00",client:"Assuria N.V.",priority:"kritiek",avatar:"AS"},
-];
+const REVIEW_DOCS=[];
 const CLIENT_PORTAL_ACTIONS=[
 {id:"1",title:"Jaarrekening 2024 Uploaden",desc:"Upload uw gecertificeerde jaarrekening. Termijn: 30 apr 2025.",type:"upload",urgency:"high"},
 {id:"2",title:"Projectvoorstel Goedkeuren",desc:"Beoordeel en onderteken het voorstel voor de bestuursvergadering.",type:"approve",urgency:"medium"},
@@ -799,7 +798,7 @@ return(
 );
 }
 
-function Topbar({user,language,setLanguage,setView,unreadCount,onLogout}){
+function Topbar({user,language,setLanguage,setView,unreadCount,onLogout,darkMode,toggleDark}){
 const t=useT();
 const [q,setQ]=useState("");
 const [showSearch,setShowSearch]=useState(false);
@@ -865,6 +864,14 @@ style={{width:"100%",padding:"8px 34px 8px 36px",borderRadius:10,border:`1.5px s
 
 
   <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+    {/* Dark mode toggle */}
+    <button onClick={toggleDark} title={darkMode?"Lichte modus":"Donkere modus"} style={{width:36,height:36,borderRadius:9,border:`1px solid ${C.border}`,background:darkMode?C.espresso:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:darkMode?C.bg:C.secondary,transition:"background .2s,color .2s"}}>
+      {darkMode
+        ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      }
+    </button>
+
     {/* Language toggle */}
     <div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:7,overflow:"hidden"}}>
       {["NL","EN"].map(l=>(<button key={l} onClick={()=>setLanguage(l)} style={{padding:"4px 9px",fontSize:10,fontWeight:700,border:"none",cursor:"pointer",background:language===l?C.crimson:"transparent",color:language===l?CREAM:C.secondary,transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>{l}</button>))}
@@ -939,6 +946,19 @@ const [detailCompany,setDetailCompany]=useState(null);
 const [detailLead,setDetailLead]=useState(null);
 const [toast,setToast]=useState(null);
 const showToast=msg=>setToast(msg);
+
+// ── Dark mode ─────────────────────────────────────────────────────────────
+const [darkMode,setDarkMode]=useState(()=>{
+  try{ return localStorage.getItem("tge_theme")==="dark"; }catch(e){ return false; }
+});
+// Apply theme globally
+C = darkMode ? THEMES.dark : THEMES.light;
+useEffect(()=>{
+  document.body.style.background = darkMode ? THEMES.dark.bg : THEMES.light.bg;
+  document.body.style.color = darkMode ? THEMES.dark.text : THEMES.light.text;
+  try{ localStorage.setItem("tge_theme", darkMode?"dark":"light"); }catch(e){}
+},[darkMode]);
+const toggleDark=()=>setDarkMode(d=>!d);
 
 // ── Live data from Supabase ──────────────────────────────────────────────
 const [companyData,setCompanyData]=useState(COMPANIES_INIT);
@@ -1017,7 +1037,7 @@ return(
 <GlobalStyles/>
 <Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)}/>
 <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-<Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout}/>
+<Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
 <main style={{flex:1,overflow:"auto",padding:"28px 32px"}} key={view+(detailEng?.id||"")}>
 <div className="fu">{renderView()}</div>
 </main>
@@ -1029,13 +1049,66 @@ return(
 );
 }
 
-// ─── STAFF DASHBOARD ────────────────────────────────────────────────────────
-const NEWS_ITEMS=[
-{id:"1",tag:"WETGEVING",tagColor:C.crimson,title:"Nieuwe belastingwetgeving voor Surinaamse ondernemers per Q3 2025",body:"De Centrale Bank van Suriname heeft nieuwe rapportage-eisen gepubliceerd die van invloed zijn op alle bedrijven met een omzet boven SRD 500.000.",time:"Zojuist gepubliceerd",dept:"FF",urgent:true,source:"CBvS"},
-{id:"2",tag:"MARKT",tagColor:C.amber,title:"SRD/USD Wisselkoers toont volatiliteit: hedging-strategie aanbevolen",body:"De Surinaamse dollar verloor 1.2% t.o.v. de dollar deze week. Onze anaylse wijst op tijdelijke marktdruk vanuit de oliesector.",time:"2 uur geleden",dept:"BOTH",urgent:false,source:"Tactigent Analyse"},
-{id:"3",tag:"STRATEGIE",tagColor:C.green,title:"CARICOM-handelsakkoord biedt nieuwe kansen voor Surinaamse bedrijven",body:"Nieuwe handelsprotocollen versterken de marktpositie van Suriname in de regio. Strategische kapitaalallocatie in de havensector wordt aanbevolen.",time:"Gisteren",dept:"TC",urgent:false,source:"Regionaal Rapport"},
-{id:"4",tag:"COMPLIANCE",tagColor:"#6366F1",title:"KKF jaaropgave verlenging: deadline 31 januari verlengd",body:"De Kamer van Koophandel Suriname heeft de deadline voor de KKF jaaropgave verlengd tot 28 februari 2025.",time:"2 dagen geleden",dept:"BOTH",urgent:true,source:"KKF"},
-{id:"5",tag:"OFFSHORE",tagColor:C.walnut,title:"Offshore olie-vondsten: kansen voor lokale toeleveranciers",body:"Nieuwe offshore ontdekkingen bieden groeikansen voor MKB-bedrijven die willen opschalen naar internationale oliestandaarden.",time:"3 dagen geleden",dept:"TC",urgent:false,source:"Energie Rapport"},
+// ─── REAL NEWS FETCHER ───────────────────────────────────────────────────────
+// Fetches real Suriname/Caribbean tax & business news via Claude API
+function useRealNews(dept){
+const [news,setNews]=useState([]);
+const [loading,setLoading]=useState(true);
+const [lastFetch,setLastFetch]=useState(null);
+
+useEffect(()=>{
+// Cache: only refetch after 30 min
+const CACHE_KEY="tge_news_cache";
+const CACHE_TIME=30*60*1000;
+try{
+  const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||"null");
+  if(cached&&Date.now()-cached.ts<CACHE_TIME){ setNews(cached.items); setLoading(false); return; }
+}catch(e){}
+
+const fetchNews=async()=>{
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1000,
+        tools:[{type:"web_search_20250305",name:"web_search"}],
+        messages:[{role:"user",content:`Search for the 5 most recent and relevant news articles about tax law, business regulation, economic developments, and financial compliance in Suriname and the Caribbean region (published within the last 7 days). Return ONLY a JSON array with no markdown, no explanation, just valid JSON. Each item: {"id":"1","tag":"WETGEVING","tagColor":"#8B1A2B","title":"...","body":"brief 1-sentence summary in Dutch","time":"X days ago","dept":"FF","urgent":false,"source":"source name"} Tags: WETGEVING, MARKT, COMPLIANCE, STRATEGIE, BELASTING, OFFSHORE. dept: TC for business/strategy, FF for tax/fiscal, BOTH for both. urgent:true only if deadline or critical regulatory change.`}]
+      })
+    });
+    const data=await res.json();
+    // Extract text from response
+    const textBlock=data.content?.find(b=>b.type==="text");
+    if(textBlock?.text){
+      try{
+        const cleaned=textBlock.text.replace(/```json|```/g,"").trim();
+        const items=JSON.parse(cleaned);
+        if(Array.isArray(items)&&items.length>0){
+          setNews(items);
+          try{ localStorage.setItem("tge_news_cache",JSON.stringify({ts:Date.now(),items})); }catch(e){}
+          setLoading(false);
+          return;
+        }
+      }catch(e){ console.warn("News parse error:",e); }
+    }
+  }catch(e){ console.warn("News fetch error:",e); }
+  // Fallback to curated static news
+  setNews(FALLBACK_NEWS);
+  setLoading(false);
+};
+fetchNews();
+},[]);
+
+return {news,loading};
+}
+
+const FALLBACK_NEWS=[
+{id:"1",tag:"WETGEVING",tagColor:"#8B1A2B",title:"Nieuwe belastingwetgeving voor Surinaamse ondernemers",body:"De Centrale Bank van Suriname heeft nieuwe rapportage-eisen gepubliceerd voor bedrijven met omzet boven SRD 500.000.",time:"Recent",dept:"FF",urgent:true,source:"CBvS"},
+{id:"2",tag:"MARKT",tagColor:"#C97B1A",title:"SRD/USD wisselkoers: hedging-strategie aanbevolen",body:"De Surinaamse dollar toont volatiliteit. Analyse wijst op marktdruk vanuit de oliesector.",time:"Recent",dept:"BOTH",urgent:false,source:"Marktanalyse"},
+{id:"3",tag:"CARICOM",tagColor:"#15803D",title:"CARICOM-handelsakkoord biedt kansen voor Surinaamse bedrijven",body:"Nieuwe handelsprotocollen versterken de marktpositie van Suriname in de regio.",time:"Recent",dept:"TC",urgent:false,source:"Regionaal Rapport"},
+{id:"4",tag:"COMPLIANCE",tagColor:"#6366F1",title:"KKF jaaropgave: check actuele deadlines",body:"De Kamer van Koophandel Suriname heeft deadlines gepubliceerd voor jaaropgaven.",time:"Recent",dept:"BOTH",urgent:true,source:"KKF"},
+{id:"5",tag:"OFFSHORE",tagColor:"#4A3C35",title:"Offshore kansen voor lokale toeleveranciers",body:"Nieuwe offshore ontdekkingen bieden groeikansen voor MKB-bedrijven.",time:"Recent",dept:"TC",urgent:false,source:"Energie Rapport"},
 ];
 
 function StaffDashboard({user,setView,setDetailEng,engData}){
@@ -1044,8 +1117,9 @@ const src=engData||ENGAGEMENTS_INIT;
 const eng=user.dept==="BOTH"?src:src.filter(e=>e.dept===user.dept);
 const [newsFilter,setNewsFilter]=useState("ALL");
 const [expandedNews,setExpandedNews]=useState(null);
-const news=NEWS_ITEMS.filter(n=>newsFilter==="ALL"||(newsFilter==="urgent"&&n.urgent)||(newsFilter==="TC"&&(n.dept==="TC"||n.dept==="BOTH"))||(newsFilter==="FF"&&(n.dept==="FF"||n.dept==="BOTH")));
-const tagIcon={WETGEVING:<Scale size={10}/>,MARKT:<TrendingUp size={10}/>,STRATEGIE:<Target size={10}/>,COMPLIANCE:<Shield size={10}/>,OFFSHORE:<Activity size={10}/>};
+const {news:allNews,loading:newsLoading}=useRealNews(user.dept);
+const news=allNews.filter(n=>newsFilter==="ALL"||(newsFilter==="urgent"&&n.urgent)||(newsFilter==="TC"&&(n.dept==="TC"||n.dept==="BOTH"))||(newsFilter==="FF"&&(n.dept==="FF"||n.dept==="BOTH")));
+const tagIcon={WETGEVING:<Scale size={10}/>,MARKT:<TrendingUp size={10}/>,STRATEGIE:<Target size={10}/>,COMPLIANCE:<Shield size={10}/>,OFFSHORE:<Activity size={10}/>,CARICOM:<Globe size={10}/>,BELASTING:<Receipt size={10}/>};
 
 return(
 <div>
@@ -1138,12 +1212,12 @@ return(
         </div>
         <div>
           <div style={{fontSize:13,fontWeight:700,color:C.text}}>Markt & Regelgeving Nieuws</div>
-          <div style={{fontSize:10,color:C.secondary}}>Relevante updates voor Tactigent & Fiscal Fuse</div>
+          <div style={{fontSize:10,color:C.secondary}}>Actuele updates: Suriname & Caribbean</div>
         </div>
-        {NEWS_ITEMS.filter(n=>n.urgent).length>0&&(
+        {allNews.filter(n=>n.urgent).length>0&&(
           <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 9px",borderRadius:20,background:C.redBg,border:`1px solid ${C.red}30`}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:C.red,animation:"pulse 2s infinite"}}/>
-            <span style={{fontSize:9,fontWeight:700,color:C.red}}>{NEWS_ITEMS.filter(n=>n.urgent).length} URGENT</span>
+            <span style={{fontSize:9,fontWeight:700,color:C.red}}>{allNews.filter(n=>n.urgent).length} URGENT</span>
           </div>
         )}
       </div>
@@ -1154,8 +1228,16 @@ return(
       </div>
     </div>
 
+    {/* Loading skeleton */}
+    {newsLoading&&(
+      <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
+        {[1,2,3].map(i=>(<div key={i} className="skeleton" style={{height:16,borderRadius:6,width:i===1?"90%":i===2?"70%":"80%"}}/>))}
+        <div style={{fontSize:10,color:C.muted,textAlign:"center",paddingTop:4}}>Actueel nieuws ophalen…</div>
+      </div>
+    )}
+
     {/* Featured article */}
-    {news[0]&&(
+    {!newsLoading&&news[0]&&(
       <div style={{padding:"0 20px"}}>
         <div onClick={()=>setExpandedNews(expandedNews===news[0].id?null:news[0].id)} style={{padding:"18px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer"}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:20,alignItems:"start"}}>
@@ -1187,7 +1269,7 @@ return(
 
     {/* Rest of news list */}
     <div style={{padding:"0 20px"}}>
-      {news.slice(1).map((item,i)=>(
+      {!newsLoading&&news.slice(1).map((item,i)=>(
         <div key={item.id} onClick={()=>setExpandedNews(expandedNews===item.id?null:item.id)} style={{padding:"14px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:14,alignItems:"start"}}>
           <div style={{width:36,height:36,borderRadius:9,background:`${item.tagColor}15`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
             {item.tag==="WETGEVING"?<Scale size={16} color={item.tagColor}/>:item.tag==="MARKT"?<TrendingUp size={16} color={item.tagColor}/>:item.tag==="STRATEGIE"?<Target size={16} color={item.tagColor}/>:item.tag==="COMPLIANCE"?<Shield size={16} color={item.tagColor}/>:<Activity size={16} color={item.tagColor}/>}
@@ -2600,17 +2682,22 @@ return(
 </div>
 </div>
 <div style={{position:"relative",aspectRatio:"1",maxHeight:340}}>
+{/* Y-axis label — IMPACT */}
+<div style={{position:"absolute",left:-38,top:"50%",transform:"translateY(-50%) rotate(-90deg)",fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",whiteSpace:"nowrap"}}>← HOGE IMPACT · LAGE IMPACT →</div>
 <div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gridTemplateRows:`repeat(${GRID},1fr)`,gap:4,height:"100%"}}>
 {cells.map(({r,c,heat})=>(
 <div key={`${r}-${c}`} style={{borderRadius:6,background:`rgba(139,26,43,${heat*0.35+0.05})`}}/>
 ))}
 </div>
-{/* TC bubble row0=top,col4=right (low prob, high impact = row 4, col 4) */}
+{/* Bubbles */}
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
-<div style={{position:"absolute",bottom:0,left:0,fontSize:9,color:C.secondary,fontWeight:600}}>LAGE WAARSCHIJNLIJKHEID</div>
-<div style={{position:"absolute",bottom:0,right:0,fontSize:9,color:C.secondary,fontWeight:600}}>HOGE WAARSCHIJNLIJKHEID</div>
+</div>
+{/* X-axis labels BELOW the grid */}
+<div style={{display:"flex",justifyContent:"space-between",marginTop:8,paddingLeft:4,paddingRight:4}}>
+<span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>LAGE WAARSCHIJNLIJKHEID</span>
+<span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>HOGE WAARSCHIJNLIJKHEID</span>
 </div>
 </div>
 <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -4966,11 +5053,8 @@ return (
 export default function App(){
 const [user,setUser]=useState(null);
 const [language,setLanguage]=useState("NL");
-const [onboarded,setOnboarded]=useState({});
 const handleLogin=(u)=>{ setUser(u); };
-if(user&&user.role==="client"&&!onboarded[user.id]){
-  return <ClientOnboarding user={user} onComplete={()=>setOnboarded(o=>({...o,[user.id]:true}))}/>;
-}
+
 if(!user) return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage}/>;
 return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setUser(null);}}/>;
 }
