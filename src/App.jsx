@@ -978,7 +978,7 @@ return(
 </main>
 </div>
 {toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
-{showNewEng&&<NewEngagementModal user={user} engData={engData} setEngData={setEngData} companyData={companyData} onClose={()=>setShowNewEng(false)} showToast={showToast}/>}
+{showNewEng&&<NewEngagementModal user={user} onClose={()=>setShowNewEng(false)} onCreated={(eng)=>{setEngData(es=>[eng,...es]);}} showToast={showToast}/>}
 </div>
 </LangCtx.Provider>
 );
@@ -1331,6 +1331,195 @@ return(
 }
 
 // ─── ENGAGEMENT LIST ─────────────────────────────────────────────────────────
+
+// ─── NEW ENGAGEMENT MODAL ────────────────────────────────────────────────────
+// CEO/admin creates a project, assigns dept + staff member + client
+function NewEngagementModal({user,onClose,onCreated,showToast}){
+const [name,setName]=useState("");
+const [dept,setDept]=useState("TC");
+const [phase,setPhase]=useState("Intake");
+const [assignedTo,setAssignedTo]=useState("");
+const [clientId,setClientId]=useState("");
+const [saving,setSaving]=useState(false);
+const [staff,setStaff]=useState([]);
+const [clients,setClients]=useState([]);
+
+// Load staff and clients from Supabase
+useEffect(()=>{
+  const load=async()=>{
+    try{
+      // Load staff
+      const {data:staffData}=await supabase
+        .from("user_profiles")
+        .select("id,full_name,department,title,avatar_initials")
+        .in("role",["staff","finance"]);
+      setStaff(staffData||[]);
+      // Load clients
+      const {data:clientData}=await supabase
+        .from("user_profiles")
+        .select("id,full_name,company_id,avatar_initials")
+        .eq("role","client");
+      setClients(clientData||[]);
+    }catch(e){ console.warn("load error",e); }
+  };
+  load();
+},[]);
+
+const filteredStaff=staff.filter(s=>s.department===dept||s.department==="BOTH");
+const phases=dept==="TC"?TC_PHASES:FF_PHASES;
+const typeLabel=dept==="TC"?"Project":"Dossier";
+
+const submit=async()=>{
+  if(!name.trim()||saving)return;
+  setSaving(true);
+  try{
+    const newEng={
+      name:name.trim(),
+      department:dept,
+      type:dept==="TC"?"Project":"Matter",
+      phase:phase,
+      status:"active",
+      health:"green",
+      assigned_to:assignedTo||null,
+      client_id:clientId||null,
+    };
+    // Try Supabase insert
+    try{
+      const {data,error}=await supabase
+        .from("engagements")
+        .insert(newEng)
+        .select()
+        .single();
+      if(!error&&data){
+        onCreated({...data,
+          id:data.id,
+          ref:`${dept}-${Date.now().toString().slice(-4)}`,
+          dept:data.department,
+          client:clients.find(c=>c.id===clientId)?.full_name||"—",
+          assignee:staff.find(s=>s.id===assignedTo)?.avatar_initials||"—",
+          health:"green",phase:data.phase,status:"active",name:data.name
+        });
+        showToast(`${typeLabel} "${name}" aangemaakt`);
+        onClose();
+        return;
+      }
+    }catch(e){ console.warn("Supabase insert failed, using local",e); }
+    // Local fallback
+    onCreated({
+      id:`eng${Date.now()}`,
+      ref:`${dept}-${Date.now().toString().slice(-4)}`,
+      name:name.trim(),
+      dept,phase,status:"active",health:"green",
+      client:clients.find(c=>c.id===clientId)?.full_name||"—",
+      assignee:staff.find(s=>s.id===assignedTo)?.avatar_initials||"—",
+    });
+    showToast(`${typeLabel} "${name}" aangemaakt`);
+    onClose();
+  }finally{ setSaving(false); }
+};
+
+useEffect(()=>{
+  const h=e=>{if(e.key==="Escape")onClose();};
+  window.addEventListener("keydown",h);
+  return()=>window.removeEventListener("keydown",h);
+},[]);
+
+return(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",maxHeight:"90vh"}}>
+  {/* Header */}
+  <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+    <div>
+      <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:4}}>CEO — Nieuw aanmaken</div>
+      <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw {dept==="TC"?"Project":"Dossier"}</div>
+    </div>
+    <button onClick={onClose} style={{width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.secondary}}><X size={14}/></button>
+  </div>
+
+  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:16}}>
+    {/* Dept toggle */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>AFDELING</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {[["TC","Tactigent","Project"],["FF","Fiscal Fuse","Dossier"]].map(([d,label,type])=>(
+          <div key={d} onClick={()=>{setDept(d);setAssignedTo("");setPhase(d==="TC"?TC_PHASES[0]:FF_PHASES[0]);}}
+            style={{padding:"12px 14px",borderRadius:10,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:C.bg,cursor:"pointer",transition:"border-color .15s,background .15s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <div style={{width:28,height:28,borderRadius:7,background:dept===d?C.crimson:C.warm50,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <span style={{fontSize:9,fontWeight:700,color:dept===d?CREAM:C.secondary}}>{d}</span>
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{label}</div>
+            </div>
+            <div style={{fontSize:10,color:C.secondary}}>{type}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Name */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>{dept==="TC"?"PROJECTNAAM":"DOSSIERNAAM"} <span style={{color:C.crimson}}>*</span></div>
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder={dept==="TC"?"Bijv. Jaarplan 2026":"Bijv. Belastingaangifte 2025"}
+        style={{width:"100%",padding:"10px 14px",borderRadius:9,border:`1.5px solid ${name.length>2?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,transition:"border-color .15s"}}/>
+    </div>
+
+    {/* Phase */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>STARTFASE</div>
+      <select value={phase} onChange={e=>setPhase(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
+        {phases.map(p=><option key={p} value={p}>{p}</option>)}
+      </select>
+    </div>
+
+    {/* Assign staff */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN MEDEWERKER</div>
+      {filteredStaff.length===0?(
+        <div style={{fontSize:11,color:C.muted,padding:"10px 14px",background:C.warm50,borderRadius:8}}>
+          Geen {dept} medewerkers gevonden. Controleer of de accounts zijn aangemaakt.
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {filteredStaff.map(s=>(
+            <div key={s.id} onClick={()=>setAssignedTo(s.id===assignedTo?"":s.id)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:`1.5px solid ${assignedTo===s.id?C.crimson:C.border}`,background:assignedTo===s.id?C.crimsonFaint:C.bg,cursor:"pointer",transition:"border-color .15s,background .15s"}}>
+              <Avatar initials={s.avatar_initials||"?"} size={30} bg={s.department==="TC"?C.crimson:C.taupe}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:C.text}}>{s.full_name}</div>
+                <div style={{fontSize:10,color:C.secondary}}>{s.title||s.department}</div>
+              </div>
+              {assignedTo===s.id&&<CheckCircle size={14} color={C.crimson}/>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Assign client */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>KOPPEL AAN CLIËNT <span style={{color:C.muted,fontWeight:400,textTransform:"none",fontSize:9}}>(optioneel)</span></div>
+      <select value={clientId} onChange={e=>setClientId(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
+        <option value="">— Geen cliënt koppelen —</option>
+        {clients.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+      </select>
+    </div>
+  </div>
+
+  {/* Footer */}
+  <div style={{padding:"14px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
+    <button onClick={submit} disabled={!name.trim()||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:name.trim()?C.crimson:"#D6D3CE",color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:name.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:name.trim()?"0 4px 12px rgba(139,26,43,.24)":"none",transition:"background .15s"}}>
+      <Plus size={14}/>{saving?"Aanmaken…":`${dept==="TC"?"Project":"Dossier"} aanmaken`}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
+</div>
+</div>
+);
+}
+
 function EngagementList({user,dept,engData,setDetailEng}){
 const src=engData||ENGAGEMENTS_INIT;
 const eng=src.filter(e=>e.dept===dept&&(user.dept==="BOTH"||e.dept===user.dept));
@@ -3638,230 +3827,6 @@ return(
 );
 }
 
-// ─── NEW ENGAGEMENT MODAL ────────────────────────────────────────────────────
-function NewEngagementModal({user,engData,setEngData,companyData,onClose,showToast}){
-const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
-const [name,setName]=useState("");
-const [client,setClient]=useState("");
-const [phase,setPhase]=useState("");
-const [status,setStatus]=useState("Actief");
-const [manager,setManager]=useState(user.avatar);
-const [deadline,setDeadline]=useState("");
-const [step,setStep]=useState(1); // 1=details, 2=templates
-const [selectedTemplates,setSelectedTemplates]=useState([]);
-const [expandedTpl,setExpandedTpl]=useState(null);
-
-const phases=dept==="TC"?TC_PHASES:FF_PHASES;
-const templates=dept==="TC"?TASK_TEMPLATES_TC:TASK_TEMPLATES_FF;
-useEffect(()=>{ setPhase(phases[0]); setSelectedTemplates([]); },[dept]);
-
-// Keyboard escape
-useEffect(()=>{
-  const h=e=>{if(e.key==="Escape")onClose();};
-  window.addEventListener("keydown",h);
-  return()=>window.removeEventListener("keydown",h);
-},[]);
-
-const toggleTemplate=(id)=>setSelectedTemplates(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
-const totalTasks=selectedTemplates.reduce((n,id)=>{const t=templates.find(t=>t.id===id);return n+(t?.items.length||0);},0);
-const canProceed=name.trim()&&client.trim();
-
-const submit=async()=>{
-  if(!canProceed) return;
-  const count=engData.filter(e=>e.dept===dept).length+1;
-  const ref=`${dept}-${2400+count}-SR`;
-  const company=companyData.find(c=>c.name===client);
-  const newEngLocal={id:`e${Date.now()}`,ref,name,dept,type:dept==="TC"?"project":"matter",phase,health:"green",status,manager,client,deadline:deadline||"—"};
-  setEngData(es=>[...es,newEngLocal]);
-  const tplNames=selectedTemplates.map(id=>templates.find(t=>t.id===id)?.name).filter(Boolean);
-  showToast(`${dept==="TC"?"Project":"Dossier"} "${name}" aangemaakt${tplNames.length?` · ${totalTasks} taken geladen`:""}` );
-  onClose();
-  if(company){
-    try{
-      const res=await createEngagement({name,dept,phase,status,ref,company_id:company.id,deadline});
-      // Apply templates in background if engagement was created in DB
-      if(res?.id && selectedTemplates.length){
-        for(const tplId of selectedTemplates){
-          // call the DB function — map local id to DB id by name
-          const tplName=templates.find(t=>t.id===tplId)?.name;
-          if(tplName){
-            await supabase.rpc("apply_task_template",{
-              p_engagement_id:res.id,
-              p_template_id:null, // will be looked up below
-            }).catch(()=>{});
-          }
-        }
-      }
-    }catch(e){console.warn("createEngagement:",e.message);}
-  }
-};
-
-const ICON_MAP={receipt:<Receipt size={15}/>,target:<Target size={15}/>,layers:<Layers size={15}/>,shield:<Shield size={15}/>,"file-text":<FileText size={15}/>,"scan-search":<ScanSearch size={15}/>,search:<Search size={15}/>};
-
-return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.58)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:600,maxWidth:"96vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
-
-  {/* Header */}
-  <div style={{padding:"20px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
-    <div style={{display:"flex",alignItems:"center",gap:10}}>
-      <div style={{width:36,height:36,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Plus size={17} color={CREAM}/></div>
-      <div>
-        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw {dept==="TC"?"Project":"Dossier"}</div>
-        <div style={{fontSize:10,color:C.secondary}}>Stap {step} van 2 — {step===1?"Projectgegevens":"Taaktemplates selecteren"}</div>
-      </div>
-    </div>
-    <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,lineHeight:0}}><X size={18}/></button>
-  </div>
-
-  {/* Step indicator */}
-  <div style={{display:"flex",padding:"12px 24px",gap:8,borderBottom:`1px solid ${C.border}`,flexShrink:0,background:C.surface}}>
-    {[{n:1,label:"Gegevens"},{n:2,label:"Templates"}].map(s=>(
-      <div key={s.n} onClick={()=>s.n===2&&canProceed?setStep(2):s.n===1?setStep(1):null}
-        style={{display:"flex",alignItems:"center",gap:7,cursor:s.n===2&&canProceed?"pointer":s.n===1?"pointer":"default",opacity:s.n===2&&!canProceed?0.4:1}}>
-        <div style={{width:22,height:22,borderRadius:"50%",background:step>=s.n?C.crimson:C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:step>=s.n?CREAM:C.secondary,transition:"background .2s"}}>{step>s.n?<Check size={11} color={CREAM}/>:s.n}</div>
-        <span style={{fontSize:11,fontWeight:600,color:step===s.n?C.text:C.secondary}}>{s.label}</span>
-        {s.n<2&&<ChevronRight size={12} color={C.mushroom}/>}
-      </div>
-    ))}
-    {selectedTemplates.length>0&&<div style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:C.green,background:C.greenBg,padding:"3px 10px",borderRadius:10}}>{totalTasks} taken geselecteerd</div>}
-  </div>
-
-  {/* Body */}
-  <div style={{overflowY:"auto",flex:1}}>
-
-  {/* ── STEP 1: Details ── */}
-  {step===1&&(
-  <div style={{padding:"22px 24px",display:"flex",flexDirection:"column",gap:16}}>
-    {user.dept==="BOTH"&&(
-    <div>
-      <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>AFDELING *</div>
-      <div style={{display:"flex",gap:8}}>
-      {["TC","FF"].map(d=>(
-        <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer",transition:"background .15s,border-color .15s"}}>
-          <BrandLogo dept={d} variant="light" size={20} showName={true}/>
-        </button>
-      ))}
-      </div>
-    </div>
-    )}
-    <div>
-      <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>{dept==="TC"?"PROJECTNAAM":"DOSSIERNAAM"} *</div>
-      <input value={name} onChange={e=>setName(e.target.value)} placeholder="" style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1.5px solid ${name?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/>
-    </div>
-    <div>
-      <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>CLIËNT *</div>
-      <select value={client} onChange={e=>setClient(e.target.value)} style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1.5px solid ${client?C.crimson:C.border}`,fontSize:13,outline:"none",cursor:"pointer",background:C.surface,boxSizing:"border-box"}}>
-        <option value="">Selecteer cliënt...</option>
-        {(companyData||COMPANIES_INIT).filter(c=>user.dept==="BOTH"||c.dept===dept).map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
-      </select>
-    </div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <div>
-        <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>STARTFASE</div>
-        <select value={phase} onChange={e=>setPhase(e.target.value)} style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface}}>
-          {phases.map(p=><option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-      <div>
-        <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>STATUS</div>
-        <select value={status} onChange={e=>setStatus(e.target.value)} style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface}}>
-          {ENGAGEMENT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-    </div>
-    <div>
-      <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>DEADLINE</div>
-      <input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)} style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-    </div>
-  </div>
-  )}
-
-  {/* ── STEP 2: Templates ── */}
-  {step===2&&(
-  <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:10}}>
-    <div style={{fontSize:12,color:C.secondary,marginBottom:4,lineHeight:1.6}}>
-      Selecteer één of meerdere taaktemplates. De vaste subtaken worden automatisch aangemaakt bij het project.
-    </div>
-    {templates.map(tpl=>{
-      const sel=selectedTemplates.includes(tpl.id);
-      const expanded=expandedTpl===tpl.id;
-      return(
-      <div key={tpl.id} style={{borderRadius:12,border:`2px solid ${sel?C.crimson:C.border}`,background:sel?C.crimsonFaint:C.surface,overflow:"hidden",transition:"border-color .15s,background .15s"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}} onClick={()=>toggleTemplate(tpl.id)}>
-          <div style={{width:38,height:38,borderRadius:10,background:sel?C.crimson:C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background .15s"}}>
-            <span style={{color:sel?CREAM:C.secondary}}>{ICON_MAP[tpl.icon]||<ClipboardList size={15}/>}</span>
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{tpl.name}</div>
-            <div style={{fontSize:11,color:C.secondary,marginTop:1}}>{tpl.items.length} vaste subtaken</div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${sel?C.crimson:C.border}`,background:sel?C.crimson:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {sel&&<Check size={11} color={CREAM}/>}
-            </div>
-            <button onClick={e=>{e.stopPropagation();setExpandedTpl(expanded?null:tpl.id);}} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:2,lineHeight:0}}>
-              <ChevronRight size={14} style={{transform:expanded?"rotate(90deg)":"rotate(0deg)",transition:"transform .15s"}}/>
-            </button>
-          </div>
-        </div>
-        {expanded&&(
-        <div style={{borderTop:`1px solid ${sel?C.crimson+"30":C.border}`,padding:"10px 16px 14px",background:sel?"rgba(139,26,43,.03)":C.bg}}>
-          <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>SUBTAKEN</div>
-          <div style={{display:"flex",flexDirection:"column",gap:5}}>
-            {tpl.items.map((item,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:7,background:C.surface,border:`1px solid ${C.border}`}}>
-              <div style={{width:18,height:18,borderRadius:4,background:sel?C.crimsonFaint:C.warm50,border:`1px solid ${sel?C.crimson+"40":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span style={{fontSize:8,fontWeight:700,color:sel?C.crimson:C.muted}}>{i+1}</span>
-              </div>
-              <span style={{fontSize:12,color:C.text}}>{item}</span>
-            </div>
-            ))}
-          </div>
-        </div>
-        )}
-      </div>
-      );
-    })}
-    <div style={{padding:"12px 14px",borderRadius:10,background:C.warm50,border:`1px solid ${C.border}`,fontSize:11,color:C.secondary,display:"flex",alignItems:"center",gap:7,marginTop:4}}>
-      <Info size={13} color={C.secondary}/>
-      Je kunt later ook handmatig taken toevoegen vanuit het projectdossier.
-    </div>
-  </div>
-  )}
-  </div>
-
-  {/* Footer */}
-  <div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
-    {step===1?(
-    <>
-      <button onClick={()=>canProceed&&setStep(2)} disabled={!canProceed}
-        style={{flex:1,padding:"12px",borderRadius:10,background:canProceed?C.espresso:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:canProceed?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"background .15s"}}>
-        Volgende: Templates <ChevronRight size={14}/>
-      </button>
-      <button onClick={submit} disabled={!canProceed}
-        style={{padding:"12px 18px",borderRadius:10,background:canProceed?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:600,cursor:canProceed?"pointer":"default",transition:"background .15s"}}>
-        Direct aanmaken
-      </button>
-    </>
-    ):(
-    <>
-      <button onClick={()=>setStep(1)} style={{padding:"12px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-        <ChevronLeft size={14}/> Terug
-      </button>
-      <button onClick={submit}
-        style={{flex:1,padding:"12px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 4px 16px rgba(139,26,43,.24)"}}>
-        <Check size={14}/> {dept==="TC"?"Project":"Dossier"} aanmaken {selectedTemplates.length>0?`· ${totalTasks} taken`:"(geen templates)"}
-      </button>
-    </>
-    )}
-    <button onClick={onClose} style={{padding:"12px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
-  </div>
-
-</div>
-</div>
-);
-}
 
 // ─── MARKETING VIEW ──────────────────────────────────────────────────────────
 function MarketingView({user,showToast}){
