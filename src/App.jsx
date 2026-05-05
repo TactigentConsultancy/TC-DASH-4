@@ -20,7 +20,7 @@ Building, LayoutDashboard
 //   logo-ff.png          — Fiscal Fuse logo (dark background variant)
 //   logo-tc-light.png    — Tactigent logo (light/white background variant)
 //   logo-ff-light.png    — Fiscal Fuse logo (light/white background variant)
-//   logo-main.png        — "The Glass Executive" combined logo (optional)
+//   logo-main.png        — "The Client Portal" combined logo (optional)
 //   favicon.png          — Square icon 512×512px (also update public/favicon.svg)
 //
 // Once you add your images, change BRANDING_USE_IMAGES to true.
@@ -39,7 +39,7 @@ const BRANDING = {
   // Fallback text when images are not yet set
   nameTC:       "Tactigent",
   nameFF:       "Fiscal Fuse",
-  nameMain:     "The Glass Executive",
+  nameMain:     "The Client Portal",
   initTC:       "TC",
   initFF:       "FF",
   initMain:     "GE",
@@ -74,7 +74,7 @@ function BrandLogo({ dept="TC", variant="dark", size=36, showName=false }) {
   );
 }
 
-// BrandLogoMain — the combined Glass Executive logo for sidebar/login
+// BrandLogoMain — the combined Client Portal logo for sidebar/login
 function BrandLogoMain({ size=34, variant="dark" }) {
   const imgSrc = BRANDING_USE_IMAGES ? BRANDING.logoMain : null;
   const textColor = variant === "dark" ? "#F5F1EC" : "#3A2E28";
@@ -624,26 +624,14 @@ function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);re
 
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const DEMO_USERS=[];
-const COMPANIES_INIT=[
-{id:"1",name:"Staatsolie N.V.",kkf:"SR-2024-0142",dept:"TC",contact:"Raj Santokhi",role:"CFO",lifecycle:"Strategische Groei",avatar:"ST",health:"green"},
-{id:"2",name:"Hakrinbank N.V.",kkf:"SR-2019-0078",dept:"FF",contact:"Cynthia Venetiaan",role:"Legal Counsel",lifecycle:"Herstructurering",avatar:"HB",health:"amber"},
-{id:"3",name:"Assuria N.V.",kkf:"SR-2021-0311",dept:"TC",contact:"Jerome Bijnoe",role:"Ops Dir.",lifecycle:"Compliance Review",avatar:"AS",health:"red",alert:true},
-{id:"4",name:"Fernandes Groep",kkf:"SR-2018-0056",dept:"FF",contact:"Anand Dwarka",role:"MD",lifecycle:"Portfolio Uitbreiding",avatar:"FG",health:"green"},
-{id:"5",name:"Torarica Group N.V.",kkf:"SR-2022-0189",dept:"TC",contact:"Sharmila Ramdjan",role:"CEO",lifecycle:"Strategische Groei",avatar:"TG",health:"green"},
-];
+const COMPANIES_INIT=[];
 const TC_PHASES=["Intake","Informatieverzameling","Scoping","Uitvoering","Review","Oplevering","Afgerond"];
 const FF_PHASES=["Assessment","Technische Analyse","Draft Advies","Review","Retainer Monitoring","Afgerond"];
 const ENGAGEMENT_STATUSES=["Actief","Prioriteit","Geblokkeerd","Wacht op Cliënt","Gepauzeerd","Gesloten"];
 const STATUS_COLOR={Actief:C.green,Prioriteit:C.crimson,Geblokkeerd:C.red,GepauzeerD:C.secondary,"Wacht op Cliënt":C.amber,Gepauzeerd:C.secondary,Gesloten:C.mushroom};
 const STATUS_BG={Actief:C.greenBg,Prioriteit:C.crimsonFaint,Geblokkeerd:C.redBg,"Wacht op Cliënt":C.amberBg,Gepauzeerd:C.warm50,Gesloten:C.warm50};
 
-const ENGAGEMENTS_INIT=[
-{id:"1",ref:"TC-2401-SR",name:"Oliesector Digitalisering",dept:"TC",type:"project",phase:"Uitvoering",health:"green",status:"Actief",manager:"MR",client:"Staatsolie N.V.",deadline:"30 Jun 2025"},
-{id:"2",ref:"FF-2202-SR",name:"Hakrinbank Audit Q4",dept:"FF",type:"matter",phase:"Review",health:"red",status:"Prioriteit",manager:"PS",client:"Hakrinbank N.V.",deadline:"28 Apr 2025"},
-{id:"3",ref:"TC-2403-SR",name:"Assuria Compliance Review",dept:"TC",type:"project",phase:"Intake",health:"red",status:"Geblokkeerd",manager:"MR",client:"Assuria N.V.",deadline:"15 Mei 2025"},
-{id:"4",ref:"FF-2204-SR",name:"Fernandes Fusie Analyse",dept:"FF",type:"matter",phase:"Due Diligence",health:"green",status:"Actief",manager:"PS",client:"Fernandes Groep",deadline:"31 Jul 2025"},
-{id:"5",ref:"TC-2405-SR",name:"Torarica Groei Strategie",dept:"TC",type:"project",phase:"Scoping",health:"amber",status:"Wacht op Cliënt",manager:"MR",client:"Torarica Group N.V.",deadline:"01 Jun 2025"},
-];
+const ENGAGEMENTS_INIT=[];
 const TASKS_BY_ENG={};
 const CLIENT_ACTIONS_BY_ENG={
 "1":[
@@ -656,40 +644,34 @@ const CLIENT_ACTIONS_BY_ENG={
 ],
 };
 const MESSAGES_INIT={"1":[
-{id:"m1",author:"Marlon Relyveld",avatar:"MR",time:"10:24",body:"Goedemorgen, de eerste fase van de IT-audit is afgerond.",visible:false},
-{id:"m2",author:"Raj Santokhi",avatar:"RS",time:"10:41",body:"Dank u. Is de uploadlink voor de jaarrekening al klaar?",visible:true},
-{id:"m3",author:"Marlon Relyveld",avatar:"MR",time:"11:05",body:"Ja, de actie staat klaar in uw portaal onder Actiepunten.",visible:true},
+{id:"m1",author:"Adviseur TC",avatar:"MR",time:"10:24",body:"Goedemorgen, de eerste fase van de IT-audit is afgerond.",visible:false},
+{},
+{id:"m3",author:"Adviseur TC",avatar:"MR",time:"11:05",body:"Ja, de actie staat klaar in uw portaal onder Actiepunten.",visible:true},
 ]};
 const DOCUMENTS=[
-{id:"d1",name:"Staatsolie_Jaarrekening_2023.pdf",dept:"TC",engagement:"TC-2401-SR",type:"PDF",size:"3.2 MB",visibility:"client",status:"verified",date:"15 Mrt 2025",uploadedBy:"RS"},
-{id:"d2",name:"Hakrinbank_Auditplan_Q4.xlsx",dept:"FF",engagement:"FF-2202-SR",type:"Excel",size:"1.8 MB",visibility:"internal",status:"in_review",date:"08 Apr 2025",uploadedBy:"PS"},
-{id:"d3",name:"Assuria_Compliance_Matrix_v2.docx",dept:"TC",engagement:"TC-2403-SR",type:"Word",size:"942 KB",visibility:"internal",status:"pending",date:"01 Apr 2025",uploadedBy:"MR"},
+{},
+{},
+{},
 {id:"d4",name:"Fernandes_Due_Diligence_Rapport.pdf",dept:"FF",engagement:"FF-2204-SR",type:"PDF",size:"5.1 MB",visibility:"shared",status:"verified",date:"28 Jan 2025",uploadedBy:"PS"},
-{id:"d5",name:"Torarica_Groeiplan_2025.pdf",dept:"TC",engagement:"TC-2405-SR",type:"PDF",size:"2.4 MB",visibility:"shared",status:"verified",date:"12 Feb 2025",uploadedBy:"MR"},
+{},
 ];
-const INVOICES_INIT=[
-{id:"inv1",ref:"INV-2025-041",client:"Staatsolie N.V.",dept:"TC",amount:28500,status:"paid",due:"31 Mrt 2025",paid:"28 Mrt 2025",qbo:"QBO-SR-041"},
-{id:"inv2",ref:"INV-2025-042",client:"Assuria N.V.",dept:"TC",amount:14750,status:"overdue",due:"10 Apr 2025",paid:null,qbo:"QBO-SR-042"},
-{id:"inv3",ref:"INV-2025-043",client:"Hakrinbank N.V.",dept:"FF",amount:52000,status:"sent",due:"30 Apr 2025",paid:null,qbo:"QBO-SR-043"},
-{id:"inv4",ref:"INV-2025-044",client:"Fernandes Groep",dept:"FF",amount:38400,status:"paid",due:"15 Apr 2025",paid:"12 Apr 2025",qbo:"QBO-SR-044"},
-{id:"inv5",ref:"INV-2025-045",client:"Torarica Group N.V.",dept:"TC",amount:21900,status:"draft",due:"15 Mei 2025",paid:null,qbo:null},
-];
+const INVOICES_INIT=[];
 const TRANSACTIONS=[
-{id:"tr1",desc:"Staatsolie — Kwartaal 1",dept:"TC",amount:28500,dir:"in",status:"Afgerond",date:"28 Mrt"},
+{},
 {id:"tr2",desc:"Belastingreservering Q1",dept:"FF",amount:-8500,dir:"out",status:"In Afwachting",date:"25 Mrt"},
 {id:"tr3",desc:"Fernandes Retainer Apr",dept:"FF",amount:38400,dir:"in",status:"Afgerond",date:"12 Apr"},
 ];
 const NOTIFICATIONS_INIT=[
-{id:"n1",type:"warning",title:"Factuur Achterstallig",body:"INV-2025-042 voor Assuria N.V. is 14 dagen achterstallig.",time:"2 uur geleden",read:false},
-{id:"n2",type:"success",title:"QBO Betaling Ontvangen",body:"Staatsolie N.V. heeft SRD 28.500 voldaan via QuickBooks.",time:"Gisteren",read:false},
-{id:"n3",type:"info",title:"Nieuwe Cliëntactie",body:"Raj Santokhi heeft de jaarrekening upload actie bekeken.",time:"Gisteren",read:true},
-{id:"n4",type:"warning",title:"Hakrinbank Deadline",body:"Auditrapport FF-2202-SR vervalt over 48 uur.",time:"2 dagen geleden",read:true},
+{},
+{},
+{},
+{},
 ];
 const LEADS=[
 {id:"1",name:"VSH United N.V.",dept:"TC",stage:"proposal",value:485000,rep:"MR"},
 {id:"2",name:"FKP Suriname",dept:"FF",stage:"strategy_review",value:620000,rep:"PS"},
 {id:"3",name:"Bruynzeel Suriname",dept:"TC",stage:"new",value:145000,rep:"MR"},
-{id:"4",name:"Royal Torarica Hotel",dept:"FF",stage:"engaged",value:290000,rep:"PS"},
+{},
 ];
 const MARKETING_CAMPAIGNS=[
 {id:"1",name:"Kwartaalnieuwsbrief Q2 2025",type:"newsletter",status:"sent",recipients:342,openRate:"68%",date:"01 Apr 2025",dept:"TC"},
@@ -700,7 +682,7 @@ const MARKETING_CAMPAIGNS=[
 const SOCIAL_CHANNELS=[
 {id:"1",name:"LinkedIn — Tactigent Consultancy",handle:"@tactigent.sr",platform:"linkedin",followers:"4.2K",lastPost:"2 dagen geleden",connected:true,dept:"TC"},
 {id:"2",name:"LinkedIn — Fiscal Fuse",handle:"@fiscalfuse.sr",platform:"linkedin",followers:"2.8K",lastPost:"5 dagen geleden",connected:true,dept:"FF"},
-{id:"3",name:"Instagram — The Glass Executive",handle:"@glasexec",platform:"instagram",followers:"1.1K",lastPost:"1 week geleden",connected:true,dept:"BOTH"},
+{id:"3",name:"Instagram — The Client Portal",handle:"@glasexec",platform:"instagram",followers:"1.1K",lastPost:"1 week geleden",connected:true,dept:"BOTH"},
 {id:"4",name:"Facebook — Tactigent",handle:"Tactigent Consultancy SR",platform:"facebook",followers:"3.6K",lastPost:"3 dagen geleden",connected:false,dept:"TC"},
 {id:"5",name:"X (Twitter)",handle:"@glasexec_sr",platform:"x",followers:"890",lastPost:"—",connected:false,dept:"BOTH"},
 ];
@@ -712,11 +694,11 @@ const CLIENT_PORTAL_ACTIONS=[
 {id:"3",title:"Openstaande Factuur SRD 14.750",desc:"INV-2025-042 is verschuldigd. Neem contact op voor betaling.",type:"review",urgency:"low"},
 ];
 const CLIENT_THREADS=[
-{id:"t1",subject:"Oliesector Digitalisering — Update",from:"Marlon Relyveld",avatar:"MR",preview:"Het projectplan voor Q3 is klaar.",time:"14:32",unread:true,messages:[
-{id:"m1",author:"Marlon Relyveld",avatar:"MR",body:"Goedemiddag, het projectplan voor Q3 is bijgewerkt en klaar voor uw goedkeuring.",time:"14:32",fromMe:false},
+{id:"t1",subject:"Oliesector Digitalisering — Update",from:"Adviseur TC",avatar:"MR",preview:"Het projectplan voor Q3 is klaar.",time:"14:32",unread:true,messages:[
+{id:"m1",author:"Adviseur TC",avatar:"MR",body:"Goedemiddag, het projectplan voor Q3 is bijgewerkt en klaar voor uw goedkeuring.",time:"14:32",fromMe:false},
 ]},
-{id:"t2",subject:"Kapitaalaanvraag — Documenten Vereist",from:"Kenneth Brunings",avatar:"KB",preview:"We hebben uw jaarrekening 2024 nodig.",time:"Gisteren",unread:true,messages:[
-{id:"m1",author:"Kenneth Brunings",avatar:"KB",body:"Voor de Series B aanvraag hebben wij uw jaarrekening 2024 nodig.",time:"Gisteren",fromMe:false},
+{id:"t2",subject:"Kapitaalaanvraag — Documenten Vereist",from:"Beheerder",avatar:"KB",preview:"We hebben uw jaarrekening 2024 nodig.",time:"Gisteren",unread:true,messages:[
+{id:"m1",author:"Beheerder",avatar:"KB",body:"Voor de Series B aanvraag hebben wij uw jaarrekening 2024 nodig.",time:"Gisteren",fromMe:false},
 ]},
 ];
 
@@ -1871,12 +1853,12 @@ return(
 
 // ─── CLIENT ACTIONS VIEW (STAFF) ──────────────────────────────────────────────
 const ALL_CLIENT_ACTIONS_DATA=[
-{id:"ca1",title:"Jaarrekening 2024 Uploaden",type:"upload",deadline:"30 Apr 2025",status:"pending",desc:"Upload gecertificeerde jaarrekening voor projectdossier.",dept:"TC",client:"Staatsolie N.V.",engagement:"TC-2401-SR"},
-{id:"ca2",title:"Projectvoorstel Fase 2 Goedkeuren",type:"approve",deadline:"02 Mei 2025",status:"pending",desc:"Beoordeel en onderteken het projectvoorstel voor fase 2.",dept:"TC",client:"Staatsolie N.V.",engagement:"TC-2401-SR"},
-{id:"ca3",title:"KYC Documentatie Aanleveren",type:"upload",deadline:"22 Apr 2025",status:"overdue",desc:"Vereiste identificatiedocumenten zijn achterstallig.",dept:"FF",client:"Hakrinbank N.V.",engagement:"FF-2202-SR"},
-{id:"ca4",title:"Auditrapport Ondertekenen",type:"sign",deadline:"28 Apr 2025",status:"pending",desc:"Onderteken het interne auditrapport voor bestuursvergadering.",dept:"FF",client:"Hakrinbank N.V.",engagement:"FF-2202-SR"},
-{id:"ca5",title:"Identiteitsbewijs Uploaden",type:"upload",deadline:"05 Mei 2025",status:"completed",desc:"Kopie paspoort van bestuurders.",dept:"TC",client:"Assuria N.V.",engagement:"TC-2403-SR"},
-{id:"ca6",title:"Strategisch Plan Reviewen",type:"review",deadline:"10 Mei 2025",status:"pending",desc:"Beoordeel het strategisch groeiplan voor Q3.",dept:"TC",client:"Torarica Group N.V.",engagement:"TC-2405-SR"},
+{},
+{},
+{},
+{},
+{},
+{},
 {id:"ca7",title:"Fiscale Aanslagbiljet Goedkeuren",type:"approve",deadline:"18 Apr 2025",status:"overdue",desc:"Goedkeuring vereist voor indiening bij belastingdienst.",dept:"FF",client:"Fernandes Groep",engagement:"FF-2204-SR"},
 ];
 function ClientActionsView({dept,showToast}){
@@ -1980,16 +1962,7 @@ return(
 );
 }
 // ─── AUDIT LOG VIEW ──────────────────────────────────────────────────────────
-const DEMO_AUDIT=[
-{id:"al1",actor:"Marlon Relyveld",action:"FASE_BIJGEWERKT",entity:"Engagement",entityId:"TC-2401-SR",dept:"TC",time:"Vandaag 14:32",delta:"Uitvoering → Review"},
-{id:"al2",actor:"Priya Sital",action:"DOCUMENT_GEVERIFIEERD",entity:"Document",entityId:"Hakrinbank_Auditplan_Q4.xlsx",dept:"FF",time:"Vandaag 11:15",delta:"pending → verified"},
-{id:"al3",actor:"Kenneth Brunings",action:"CLIËNT_AANGEMAAKT",entity:"Company",entityId:"Torarica Group N.V.",dept:"TC",time:"Gisteren 16:40",delta:null},
-{id:"al4",actor:"System",action:"QBO_BETALING_ONTVANGEN",entity:"Invoice",entityId:"INV-2025-041",dept:"TC",time:"Gisteren 09:22",delta:"sent → paid · SRD 28.500"},
-{id:"al5",actor:"Priya Sital",action:"GEZONDHEID_BIJGEWERKT",entity:"Engagement",entityId:"FF-2202-SR",dept:"FF",time:"2 dagen geleden",delta:"amber → red"},
-{id:"al6",actor:"Marlon Relyveld",action:"CLIËNTACTIE_AANGEMAAKT",entity:"ClientAction",entityId:"ca1",dept:"TC",time:"3 dagen geleden",delta:"Jaarrekening 2024 Uploaden"},
-{id:"al7",actor:"Kenneth Brunings",action:"FACTUUR_AANGEMAAKT",entity:"Invoice",entityId:"INV-2025-045",dept:"TC",time:"4 dagen geleden",delta:"SRD 21.900 · Torarica Group"},
-{id:"al8",actor:"System",action:"GEZONDHEID_AUTO_ROOD",entity:"Engagement",entityId:"TC-2403-SR",dept:"TC",time:"5 dagen geleden",delta:"KYC actie > 3 dagen achterstallig"},
-];
+const DEMO_AUDIT=[];
 const AUDIT_COLOR={FASE_BIJGEWERKT:{c:"#6366F1",bg:"#EEF2FF"},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:"#EFF6FF"}};
 
 function AuditLogView({user}){
@@ -2097,7 +2070,7 @@ return(
 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"16px"}}>
 <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}><AlertTriangle size={14} color={C.amber}/><span style={{fontSize:13,fontWeight:700,color:C.text}}>{t("focusRequired")}</span></div>
-{[{title:"Audit Deadline Naderend",desc:"Hakrinbank auditrapport vóór 17:00 geverifieerd.",c:C.crimson},{title:"Nieuwe Uploads",desc:"5 nieuwe documenten ontvangen afgelopen 20 minuten.",c:C.amber}].map(a=>(
+{[{},{title:"Nieuwe Uploads",desc:"5 nieuwe documenten ontvangen afgelopen 20 minuten.",c:C.amber}].map(a=>(
 <div key={a.title} style={{padding:"11px 14px",borderRadius:9,border:`1.5px solid ${a.c}30`,background:a.c===C.crimson?C.crimsonFaint:C.amberBg,marginBottom:7,display:"flex",gap:10,alignItems:"flex-start"}}>
 <div style={{width:6,height:6,borderRadius:"50%",background:a.c,flexShrink:0,marginTop:5}}/>
 <div><div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:2}}>{a.title}</div>
@@ -2235,7 +2208,7 @@ return(
 
       {/* Bedrijfsnaam + KKF */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Bedrijfsnaam" required>{inp(name,setName,"Bijv. Staatsolie N.V.")}</Field>
+        <Field label="Bedrijfsnaam" required>{}</Field>
         <Field label="KKF-nummer">
           <input value={kkf} onChange={e=>setKkf(e.target.value)} placeholder="SR-2025-0001 (auto)"
             style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${kkf?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
@@ -2266,7 +2239,7 @@ return(
 
       {/* Contact */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Volledige naam" required>{inp(contact,setContact,"Bijv. Raj Santokhi")}</Field>
+        <Field label="Volledige naam" required>{}</Field>
         <Field label="Functietitel">{inp(role,setRole,"Bijv. CFO, Directeur")}</Field>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
@@ -3166,7 +3139,7 @@ return(
         {inv.status!=="paid"&&(
           <div style={{padding:"16px 20px",borderRadius:10,border:`1.5px solid ${inv.status==="overdue"?C.red:C.border}`,background:inv.status==="overdue"?C.redBg:C.warm50}}>
             <div style={{fontSize:11,fontWeight:700,color:inv.status==="overdue"?C.red:C.text,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>{inv.status==="overdue"&&<AlertTriangle size={13}/>}{inv.status==="overdue"?"Betaling achterstallig":"Betaalinstructies"}</div>
-            <div style={{fontSize:11,color:C.secondary,lineHeight:1.6}}>Bank: DSB Suriname · IBAN: SR12 3456 7890 1234 · t.n.v. The Glass Executive N.V.</div>
+            <div style={{fontSize:11,color:C.secondary,lineHeight:1.6}}>Bank: DSB Suriname · IBAN: SR12 3456 7890 1234 · t.n.v. The Client Portal N.V.</div>
           </div>
         )}
         {inv.status==="paid"&&(
@@ -3253,7 +3226,7 @@ return(
 }
 
 function ClientFinanceView({user,invData}){
-const invoices=invData.filter(i=>i.client==="Staatsolie N.V.");
+const invoices=invData.filter(i=>i.client===user.company_name||i.company_id===user.company_id);
 const [preview,setPreview]=useState(null);
 const [toast,setToast]=useState(null);
 const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
@@ -3644,7 +3617,7 @@ return(
 <div style={{display:"flex",flexDirection:"column",gap:12}}>
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
 <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Lead Details</div>
-{[["Bedrijf",lead.name],["Afdeling",lead.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"],["Huidig Stadium",stageLabels[lead.stage]?.label||lead.stage],["Geschatte Waarde",`SRD ${lead.value.toLocaleString()}`],["Toegewezen aan",lead.rep==="MR"?"Marlon Relyveld":lead.rep==="PS"?"Priya Sital":"Kenneth Brunings"]].map(([l,v])=>(
+{[["Bedrijf",lead.name],["Afdeling",lead.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"],["Huidig Stadium",stageLabels[lead.stage]?.label||lead.stage],["Geschatte Waarde",`SRD ${lead.value.toLocaleString()}`],["Toegewezen aan",lead.rep==="MR"?"Adviseur TC":lead.rep==="PS"?"Adviseur FF":"Beheerder"]].map(([l,v])=>(
 <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
 <span style={{fontSize:11,color:C.secondary}}>{l}</span>
 <span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
@@ -3792,7 +3765,7 @@ return(
     )}
     <div>
       <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>{dept==="TC"?"PROJECTNAAM":"DOSSIERNAAM"} *</div>
-      <input value={name} onChange={e=>setName(e.target.value)} placeholder={dept==="TC"?"Bijv. Assuria Payroll Q3":"Bijv. Hakrinbank Fiscale Review"} style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1.5px solid ${name?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/>
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="" style={{width:"100%",padding:"11px 14px",borderRadius:9,border:`1.5px solid ${name?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/>
     </div>
     <div>
       <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>CLIËNT *</div>
@@ -4204,7 +4177,7 @@ return(
           <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12,fontWeight:700,color:C.text}}>Geplande Posts</div>
           {[
             {platform:"linkedin",text:"Tactigent kondigt haar Q2 resultaten aan. Strategische groei van 18% t.o.v. vorig kwartaal.",time:"Morgen 09:00",dept:"TC"},
-            {platform:"instagram",text:"Wij zijn trots op onze samenwerking met Staatsolie N.V. — een mijlpaal voor de Surinaamse zakelijke markt.",time:"Vrij 14:00",dept:"BOTH"},
+            {},
             {platform:"facebook",text:"Nieuwe fiscale richtlijnen voor 2025: wat betekent dit voor uw onderneming? Lees ons analyse-rapport.",time:"Ma 10:30",dept:"FF"},
           ].map((p,i)=>(
             <div key={i} style={{padding:"12px 16px",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
@@ -4399,7 +4372,7 @@ return(
 <div style={{fontWeight:700,marginBottom:4,fontSize:13}}>{subject||"(geen onderwerp)"}</div>
 </div>
 <div style={{padding:"14px 16px",fontSize:11,color:C.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{preview||"(geen inhoud)"}</div>
-<div style={{padding:"12px 16px",background:C.warm50,fontSize:9,color:C.secondary}}>The Glass Executive · Waterkant 45, Paramaribo · Uitschrijven</div>
+<div style={{padding:"12px 16px",background:C.warm50,fontSize:9,color:C.secondary}}>The Client Portal · Waterkant 45, Paramaribo · Uitschrijven</div>
 </div>
 </div>
 <div style={{padding:"14px 16px",borderTop:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
@@ -4485,7 +4458,7 @@ return(
 <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
 <div style={{width:36,height:36,borderRadius:"50%",background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:700,color:CREAM}}>GE</div>
 <div>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:2}}>The Glass Executive <span style={{color:C.secondary,fontWeight:400}}>· Zojuist</span></div>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:2}}>The Client Portal <span style={{color:C.secondary,fontWeight:400}}>· Zojuist</span></div>
 <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{text}</div>
 </div>
 </div>
@@ -4790,7 +4763,7 @@ return(
 ))}
 </div>
 </div>
-<div style={{marginTop:20,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>Beheerd door Corporate IT · © 2025 The Glass Executive</div>
+<div style={{marginTop:20,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>Beheerd door Corporate IT · © 2025 The Client Portal</div>
 </div>
 </div>
 </div>
@@ -4803,7 +4776,7 @@ return(
 const ONBOARDING_STEPS = [
 {
 id: "welcome",
-title: "Welkom bij The Glass Executive",
+title: "Welkom bij The Client Portal",
 subtitle: "Uw beveiligde portaal voor Tactigent & Fiscal Fuse",
 description: "In de volgende stappen stellen we uw profiel in en leggen we uit hoe u het portaal optimaal gebruikt.",
 icon: LayoutDashboard,
@@ -4817,7 +4790,7 @@ subtitle: "KYC-verificatie",
 description: "We moeten uw identiteit verifiëren conform de Surinaamse wet- en regelgeving. Dit proces duurt maximaal 2 minuten.",
 icon: Shield, color: C.crimson,
 fields: [
-{ id: "fullName", label: "Volledige naam", placeholder: "Bijv. Raj Santokhi", type: "text" },
+{},
 { id: "idNumber", label: "Identiteitsbewijs nummer", placeholder: "Bijv. SR-123456789", type: "text" },
 { id: "dob", label: "Geboortedatum", placeholder: "", type: "date" },
 ],
@@ -4831,7 +4804,7 @@ description: "Vul de gegevens van uw organisatie in zodat uw adviseurs direct to
 icon: Building,
 color: C.crimson,
 fields: [
-{ id: "companyName", label: "Bedrijfsnaam", placeholder: "Bijv. Staatsolie N.V.", type: "text" },
+{},
 { id: "kkf", label: "KKF-nummer", placeholder: "Bijv. SR-2024-0142", type: "text" },
 { id: "role", label: "Uw functietitel", placeholder: "Bijv. CFO", type: "text" },
 { id: "phone", label: "Telefoonnummer", placeholder: "+597 8xx-xxxx", type: "tel" },
@@ -4868,7 +4841,7 @@ action: "Instellingen opslaan →",
 id: "done",
 title: "Uw portaal is klaar!",
 subtitle: "Onboarding voltooid",
-description: "Alles is ingesteld. U kunt nu volledig gebruik maken van The Glass Executive. Uw adviseur wordt automatisch op de hoogte gesteld.",
+description: "Alles is ingesteld. U kunt nu volledig gebruik maken van The Client Portal. Uw adviseur wordt automatisch op de hoogte gesteld.",
 icon: CheckCircle, color: C.green,
 action: "Naar mijn dashboard →",
 },
@@ -4905,7 +4878,7 @@ return (
 <span style={{ color: CREAM, fontWeight: 800, fontSize: 16, fontFamily: F.display }}>GE</span>
 </div>
 <div>
-<div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>The Glass Executive</div>
+<div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>The Client Portal</div>
 <div style={{ fontSize: 9, color: C.secondary, letterSpacing: "0.1em", textTransform: "uppercase" }}>Cliëntonboarding</div>
 </div>
 </div>
@@ -5020,7 +4993,7 @@ return (
             ))}
           </div>
           <div style={{ padding: "14px 18px", borderRadius: 12, background: C.bg, border: `1px solid ${C.border}`, fontSize: 12, color: C.secondary, lineHeight: 1.6 }}>
-            Uw adviseur <strong style={{ color: C.text }}>{user.dept === "FF" ? "Priya Sital" : "Marlon Relyveld"}</strong> is automatisch op de hoogte gesteld en zal binnen 1 werkdag contact opnemen.
+            Uw adviseur <strong style={{ color: C.text }}>{user.dept === "FF" ? "Adviseur FF" : "Adviseur TC"}</strong> is automatisch op de hoogte gesteld en zal binnen 1 werkdag contact opnemen.
           </div>
         </div>
       )}
