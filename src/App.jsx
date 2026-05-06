@@ -1015,7 +1015,7 @@ useEffect(()=>{
   };
   loadAll();
 },[user.id]);
-const [notifData,setNotifData]=useState(NOTIFICATIONS_INIT);
+const [notifData,setNotifData]=useState(Array.isArray(NOTIFICATIONS_INIT)?NOTIFICATIONS_INIT:[]);
 const [dbLoaded,setDbLoaded]=useState(false);
 
 useEffect(()=>{
@@ -1214,7 +1214,7 @@ return(
     <div style={{position:"absolute",top:16,right:18}}><AlertTriangle size={18} color={C.red} opacity={0.4}/></div>
     <div style={{fontSize:10,fontWeight:700,color:C.red,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12,opacity:0.8}}>{t("healthLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:eng.filter(e=>e.health==="red").length>0?C.red:C.green,lineHeight:1}}>
+      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:(eng||[]).filter(e=>e.health==="red").length>0?C.red:C.green,lineHeight:1}}>
         {String(eng.filter(e=>e.health==="red").length).padStart(2,"0")}
       </span>
       <span style={{fontSize:12,color:eng.filter(e=>e.health==="red").length>0?C.red:C.green,fontWeight:600,opacity:0.7}}>{t("criticalThresholds")}</span>
@@ -2955,7 +2955,7 @@ const t=useT();
 const [q,setQ]=useState(""); const [deptF,setDeptF]=useState("ALL");
 const sL={new:"Nieuw",qualified:"Gekwalificeerd",proposal:"Voorstel",won:"Gewonnen",inquiry:"Aanvraag",strategy_review:"Strategie Review",engaged:"Betrokken"};
 const sC={new:C.secondary,qualified:C.amber,proposal:C.crimson,won:C.green,inquiry:C.secondary,strategy_review:C.amber,engaged:C.green};
-const leads=LEADS.filter(l=>{ const dOk=(user.dept==="BOTH"||l.dept===user.dept)&&(deptF==="ALL"||l.dept===deptF); const qOk=!q||l.name.toLowerCase().includes(q.toLowerCase()); return dOk&&qOk; });
+const leads=(Array.isArray(LEADS)?LEADS:[]).filter(l=>{ const dOk=(user.dept==="BOTH"||l.dept===user.dept)&&(deptF==="ALL"||l.dept===deptF); const qOk=!q||l.name.toLowerCase().includes(q.toLowerCase()); return dOk&&qOk; });
 return(
 <div>
 <PageHeader kicker="CRM" title={t("leadsTitle")}/>
@@ -5557,11 +5557,45 @@ return (
 }
 
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
+
+// ─── ERROR BOUNDARY ──────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={hasError:false,error:null}; }
+  static getDerivedStateFromError(error){ return {hasError:true,error}; }
+  componentDidCatch(error,info){ console.error("AppError:",error,info); }
+  render(){
+    if(this.state.hasError){
+      const C2=THEMES.light;
+      return(
+        <div style={{minHeight:"100vh",background:C2.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Jost',sans-serif"}}>
+          <div style={{background:C2.surface,borderRadius:20,padding:"32px 36px",maxWidth:480,width:"95vw",boxShadow:"0 24px 60px rgba(58,46,40,.15)",textAlign:"center"}}>
+            <div style={{width:52,height:52,borderRadius:"50%",background:C2.redBg,border:`2px solid ${C2.red}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+              <span style={{fontSize:22}}>⚠️</span>
+            </div>
+            <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",fontSize:22,fontWeight:600,color:C2.text,marginBottom:8}}>Er is iets misgegaan</div>
+            <div style={{fontSize:12,color:C2.secondary,marginBottom:6,lineHeight:1.6}}>
+              {this.state.error?.message || "Onbekende fout"}
+            </div>
+            <div style={{fontSize:10,color:C2.muted,fontFamily:"monospace",background:C2.warm50,padding:"8px 12px",borderRadius:8,marginBottom:20,textAlign:"left",wordBreak:"break-all"}}>
+              {this.state.error?.stack?.split("\n")[0] || ""}
+            </div>
+            <button onClick={()=>window.location.reload()}
+              style={{padding:"10px 24px",borderRadius:10,background:"#8B1A2B",color:"#F5F1EC",border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              Pagina herladen
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App(){
 const [user,setUser]=useState(null);
 const [language,setLanguage]=useState("NL");
 const handleLogin=(u)=>{ setUser(u); };
 
 if(!user) return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage}/>;
-return <AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setUser(null);}}/>;
+return <ErrorBoundary><AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setUser(null);}}/></ErrorBoundary>;
 }
