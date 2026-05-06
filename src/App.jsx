@@ -547,6 +547,13 @@ input[style*="background"], textarea[style*="background"] {
 }
 
 /* ── Scrollbar ── */
+/* Modal portal styles */
+#modal-root, [id^="modal-root-"] { 
+  position:fixed;top:0;left:0;
+  width:100vw;height:100vh;
+  z-index:99999;
+  pointer-events:auto;
+}
 .modal-open{overflow:hidden!important;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -1570,8 +1577,7 @@ useEffect(()=>{
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -1820,8 +1826,7 @@ return(
 {/* Template Picker Modal */}
 {showTemplatePicker&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -2203,8 +2208,7 @@ onClose();
 };
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -2540,8 +2544,7 @@ return(
 </div>
 {reviewing&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -2690,8 +2693,7 @@ useEffect(()=>{
 
 if(createdAccount) return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -2744,8 +2746,7 @@ if(createdAccount) return(
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3025,8 +3026,7 @@ const submit=async()=>{
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3170,8 +3170,7 @@ return(
 {/* New folder modal */}
 {showNewFolder&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3254,8 +3253,7 @@ return(
 </div>
 {selected&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3407,8 +3405,7 @@ return(
 {/* Invoice file upload modal */}
 {showUpload&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3769,8 +3766,7 @@ return ()=>window.removeEventListener("keydown", handler);
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -3924,8 +3920,7 @@ const lineItems = [
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -4213,8 +4208,7 @@ return(
 {done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
 {uploading&&(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -4991,8 +4985,7 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -5103,8 +5096,7 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{
-      position:"fixed",top:0,left:0,right:0,bottom:0,
-      width:"100vw",height:"100vh",
+      position:"fixed",top:0,left:0,width:"100%",height:"100%",
       background:"rgba(0,0,0,.85)",
       backdropFilter:"blur(6px)",
       WebkitBackdropFilter:"blur(6px)",
@@ -5798,6 +5790,26 @@ return (
 }
 
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
+
+
+// ─── MODAL PORTAL ─────────────────────────────────────────────────────────────
+// Renders children directly on document.body, outside AppShell DOM tree
+// This guarantees no parent overflow/transform clipping
+function Modal({children, open}){
+  const [el]=useState(()=>{ const d=document.createElement('div'); d.id='modal-root-'+Math.random().toString(36).slice(2); return d; });
+  useEffect(()=>{
+    if(open){
+      document.body.appendChild(el);
+      document.body.style.overflow='hidden';
+      return ()=>{ 
+        if(document.body.contains(el)) document.body.removeChild(el);
+        document.body.style.overflow='';
+      };
+    }
+  },[open,el]);
+  if(!open) return null;
+  return ReactDOM.createPortal(children, el);
+}
 
 // ─── ERROR BOUNDARY ──────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
