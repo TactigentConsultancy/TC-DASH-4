@@ -1578,9 +1578,9 @@ useEffect(()=>{
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -1827,9 +1827,9 @@ return(
 {showTemplatePicker&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -2209,9 +2209,9 @@ onClose();
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -2545,9 +2545,9 @@ return(
 {reviewing&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -2694,9 +2694,9 @@ useEffect(()=>{
 if(createdAccount) return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -2747,9 +2747,9 @@ if(createdAccount) return(
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3027,9 +3027,9 @@ const submit=async()=>{
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3171,9 +3171,9 @@ return(
 {showNewFolder&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3254,9 +3254,9 @@ return(
 {selected&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3406,9 +3406,9 @@ return(
 {showUpload&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3767,9 +3767,9 @@ return ()=>window.removeEventListener("keydown", handler);
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -3921,9 +3921,9 @@ const lineItems = [
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -4209,9 +4209,9 @@ return(
 {uploading&&(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -4986,9 +4986,9 @@ useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListen
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -5097,9 +5097,9 @@ useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListen
 return(
 <div style={{
       position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(6px)",
-      WebkitBackdropFilter:"blur(6px)",
+      background:"rgba(240,235,228,0.7)",
+      backdropFilter:"blur(20px) saturate(0.5)",
+      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
       alignItems:"flex-start",
       justifyContent:"center",
@@ -5792,24 +5792,7 @@ return (
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
 
 
-// ─── MODAL PORTAL ─────────────────────────────────────────────────────────────
-// Renders children directly on document.body, outside AppShell DOM tree
-// This guarantees no parent overflow/transform clipping
-function Modal({children, open}){
-  const [el]=useState(()=>{ const d=document.createElement('div'); d.id='modal-root-'+Math.random().toString(36).slice(2); return d; });
-  useEffect(()=>{
-    if(open){
-      document.body.appendChild(el);
-      document.body.style.overflow='hidden';
-      return ()=>{ 
-        if(document.body.contains(el)) document.body.removeChild(el);
-        document.body.style.overflow='';
-      };
-    }
-  },[open,el]);
-  if(!open) return null;
-  return ReactDOM.createPortal(children, el);
-}
+
 
 // ─── ERROR BOUNDARY ──────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
