@@ -153,6 +153,10 @@ select: (cols="*") => ({
 _table:table, _cols:cols, _filters:[], _order:null, _limit:null, _single:false,
 eq(col,val){ this._filters.push(`${col}=eq.${val}`); return this; },
 neq(col,val){ this._filters.push(`${col}=neq.${val}`); return this; },
+in(col,vals){ this._filters.push(`${col}=in.(${vals.join(",")})`); return this; },
+gte(col,val){ this._filters.push(`${col}=gte.${val}`); return this; },
+lte(col,val){ this._filters.push(`${col}=lte.${val}`); return this; },
+is(col,val){ this._filters.push(`${col}=is.${val}`); return this; },
 order(col,{ascending=true}={}){ this._order=`${col}.${ascending?"asc":"desc"}`; return this; },
 limit(n){ this._limit=n; return this; },
 single(){ this._single=true; return this; },
@@ -1563,7 +1567,7 @@ useEffect(()=>{
 },[]);
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 100px)"}}>
   {/* Header */}
   <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
@@ -1801,7 +1805,7 @@ return(
 
 {/* Template Picker Modal */}
 {showTemplatePicker&&(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.52)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={()=>setShowTemplatePicker(false)}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.52)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:20}} onClick={()=>setShowTemplatePicker(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body}}>
 <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div>
@@ -2141,7 +2145,7 @@ showToast(`Cliëntactie "${title}" aangemaakt`);
 onClose();
 };
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.58)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.58)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"96vw",boxShadow:"0 40px 100px rgba(58,46,40,.32)",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 100px)",overflow:"hidden"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
 <div>
@@ -2443,7 +2447,7 @@ return(
 </div>
 </div>
 {reviewing&&(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setReviewing(null)}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto"}} onClick={()=>setReviewing(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)",overflow:"hidden"}}>
 <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{display:"flex",alignItems:"center",gap:9}}><FileText size={15} color={C.crimson}/><span style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>{reviewing.name}</span></div>
@@ -2580,7 +2584,7 @@ useEffect(()=>{
 },[]);
 
 if(createdAccount) return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:2000,overflowY:"auto",padding:"78px 20px 20px 20px",overflowY:"auto"}}>
 <div className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"28px 28px 24px",textAlign:"center"}}>
     <div style={{width:56,height:56,borderRadius:"50%",background:C.greenBg,border:`2px solid ${C.green}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
@@ -2622,7 +2626,7 @@ if(createdAccount) return(
 );
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:2000,overflowY:"auto",padding:"78px 20px 20px 20px",overflowY:"auto"}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
   {/* Header */}
@@ -2891,7 +2895,7 @@ const submit=async()=>{
 };
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"78px 20px 20px 20px"}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:"78px 20px 20px 20px",overflowY:"auto"}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
     <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw Lead Aanmaken</div>
@@ -3024,7 +3028,7 @@ return(
 
 {/* New folder modal */}
 {showNewFolder&&(
-<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"78px 20px 20px 20px"}} onClick={()=>setShowNewFolder(false)}>
+<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:"78px 20px 20px 20px",overflowY:"auto"}} onClick={()=>setShowNewFolder(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:400,maxWidth:"95vw",padding:"22px",boxShadow:"0 24px 60px rgba(0,0,0,.25)",fontFamily:F.body}}>
   <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
   <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()}
@@ -3096,7 +3100,7 @@ return(
 </div>
 </div>
 {selected&&(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setSelected(null)}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto"}} onClick={()=>setSelected(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)",overflow:"hidden"}}>
 <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <span style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{selected.name}</span>
@@ -3237,7 +3241,7 @@ return(
 
 {/* Invoice file upload modal */}
 {showUpload&&(
-<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.72)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}} onClick={()=>setShowUpload(null)}>
+<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.72)",backdropFilter:"blur(6px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:2000,overflowY:"auto",padding:"78px 20px 20px 20px",overflowY:"auto"}} onClick={()=>setShowUpload(null)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:460,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(0,0,0,.3)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
     <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Factuurbestand uploaden</div>
@@ -3587,7 +3591,7 @@ return ()=>window.removeEventListener("keydown", handler);
 },[]);
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -3730,7 +3734,7 @@ const lineItems = [
 ];
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -4007,7 +4011,7 @@ return(
 </div>
 {done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
 {uploading&&(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setUploading(null)}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto"}} onClick={()=>setUploading(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
 <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
@@ -4773,7 +4777,7 @@ onClose();
 };
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
 {/* Header */}
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
@@ -4873,7 +4877,7 @@ onClose();
 };
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,overflowY:"auto",padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
