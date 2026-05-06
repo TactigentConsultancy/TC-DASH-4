@@ -882,7 +882,7 @@ style={{width:"100%",padding:"8px 34px 8px 36px",borderRadius:10,border:`1.5px s
     </button>
 
     {/* Language toggle */}
-    <div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:7,overflow:"hidden"}}>
+    <div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:7}}>
       {["NL","EN"].map(l=>(<button key={l} onClick={()=>setLanguage(l)} style={{padding:"4px 9px",fontSize:10,fontWeight:700,border:"none",cursor:"pointer",background:language===l?C.crimson:"transparent",color:language===l?CREAM:C.secondary,transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>{l}</button>))}
     </div>
 
@@ -1103,10 +1103,10 @@ default: return <div style={{padding:40,color:C.secondary,fontStyle:"italic",dis
 };
 return(
 <LangCtx.Provider value={language}>
-<div key={themeKey} style={{display:"flex",height:"100vh",background:C.bg,overflow:"hidden"}}>
+<div key={themeKey} style={{display:"flex",height:"100vh",background:C.bg}}>
 <GlobalStyles darkMode={darkMode}/>
 <Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)}/>
-<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+<div style={{flex:1,display:"flex",flexDirection:"column"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
 <main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}} key={view+(detailEng?.id||"")}>
 <div className="fu">{renderView()}</div>
@@ -1222,7 +1222,7 @@ return(
 
 {/* Premium status strip — varied widths, not identical cards */}
 <div style={{display:"grid",gridTemplateColumns:"1fr 1.2fr 1fr",gap:12,marginBottom:20}}>
-  <div style={{background:C.redBg,borderRadius:14,padding:"20px 22px",border:`1.5px solid ${C.red}20`,position:"relative",overflow:"hidden"}}>
+  <div style={{background:C.redBg,borderRadius:14,padding:"20px 22px",border:`1.5px solid ${C.red}20`,position:"relative"}}>
     <div style={{position:"absolute",top:16,right:18}}><AlertTriangle size={18} color={C.red} opacity={0.4}/></div>
     <div style={{fontSize:10,fontWeight:700,color:C.red,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12,opacity:0.8}}>{t("healthLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:6}}>
@@ -1249,7 +1249,7 @@ return(
     </div>
     <div style={{fontSize:10,color:C.muted,marginTop:6,fontWeight:600}}>{t("revision")}</div>
   </div>
-  <div style={{background:C.espresso,borderRadius:14,padding:"20px 22px",position:"relative",overflow:"hidden"}}>
+  <div style={{background:C.espresso,borderRadius:14,padding:"20px 22px",position:"relative"}}>
     <div style={{fontSize:10,fontWeight:700,color:C.taupeLight,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
       <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:CREAM,lineHeight:1}}>
@@ -1258,7 +1258,7 @@ return(
       <span style={{fontFamily:F.display,fontSize:24,color:CREAM,opacity:0.6}}>%</span>
     </div>
     {/* Progress arc — different from numbers */}
-    <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3,overflow:"hidden"}}>
+    <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3}}>
       <div style={{width:`${eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}%`,height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3}}/>
     </div>
     <div style={{fontSize:10,color:C.taupeLight,marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
@@ -1267,7 +1267,7 @@ return(
 
 
   <div style={{display:"grid",gridTemplateColumns:"1fr 260px",gap:14,marginBottom:18}}>
-    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
       <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <h3 style={{margin:0,fontSize:13,fontWeight:700,color:C.text}}>{t("activeDossiers")}</h3>
         <button onClick={()=>setView("analyses")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,color:C.crimson}}>{t("viewAll")} →</button>
@@ -1305,7 +1305,7 @@ return(
   </div>
 
   {/* ── NEWS FEED ── */}
-  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
     <div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:30,height:30,borderRadius:8,background:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -1353,7 +1353,7 @@ return(
                 <span style={{fontSize:10,color:C.muted}}>{news[0].time}</span>
               </div>
               <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:8}}>{news[0].title}</div>
-              <div style={{fontSize:12,color:C.secondary,lineHeight:1.7,display:expandedNews===news[0].id?"block":"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{news[0].body}</div>
+              <div style={{fontSize:12,color:C.secondary,lineHeight:1.7,display:expandedNews===news[0].id?"block":"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{news[0].body}</div>
               {expandedNews===news[0].id&&(
                 <div style={{marginTop:12,padding:"12px 16px",borderRadius:10,background:C.warm50,fontSize:12,color:C.secondary,lineHeight:1.7}}>
                   Aanbevolen actie: Bespreek met uw adviseur hoe deze ontwikkeling invloed heeft op uw huidige engagements. Neem contact op met de Fiscal Fuse afdeling voor een impactanalyse.
@@ -1449,7 +1449,7 @@ return(
 </button>
 ))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {eng.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements gevonden</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["ENGAGEMENT","AFDELING","FASE","GEZONDHEID","MGR"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -1582,13 +1582,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",display:"flex",flexDirection:"column"}}>
   {/* Header */}
   <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
     <div>
@@ -1688,7 +1686,7 @@ const eng=src.filter(e=>e.dept===dept&&(user.dept==="BOTH"||e.dept===user.dept))
 return(
 <div>
 <PageHeader kicker={dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"} title={dept==="TC"?"Projecten":"Dossiers"}/>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["NAAM","CLIËNT","FASE","GEZONDHEID","ACTIE"].map((h,i)=><th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{eng.map(e=>(
@@ -1813,7 +1811,7 @@ return(
 ))}
 </div>
 {activeTab==="tasks"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {/* Header */}
 <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:"#EEF2FF"}}>
 <div style={{display:"flex",alignItems:"center",gap:8}}><Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:"#4338CA"}}>Interne Taken — NIET zichtbaar voor cliënten</span></div>
@@ -1831,13 +1829,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setShowTemplatePicker(false)}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column"}}>
 <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div>
 <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:4}}>Taak aanmaken voor {eng.name}</div>
@@ -1922,7 +1918,7 @@ return(
 {subTotal>0&&(
 <div style={{display:"flex",alignItems:"center",gap:8}}>
 {/* Progress bar */}
-<div style={{flex:1,maxWidth:120,height:4,borderRadius:2,background:C.mushroom,overflow:"hidden"}}>
+<div style={{flex:1,maxWidth:120,height:4,borderRadius:2,background:C.mushroom}}>
 <div style={{width:`${pctDone}%`,height:"100%",background:pctDone===100?C.green:"#6366F1",borderRadius:2,transition:"width .3s"}}/>
 </div>
 <span style={{fontSize:10,fontWeight:700,color:pctDone===100?C.green:C.secondary}}>{subDone}/{subTotal}</span>
@@ -1967,7 +1963,7 @@ return(
 </div>
 )}
 {activeTab==="actions"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:C.greenBg}}>
 <div style={{display:"flex",alignItems:"center",gap:8}}><Eye size={13} color={C.green}/><span style={{fontSize:11,fontWeight:700,color:C.green}}>Cliëntacties — Zichtbaar in portaal</span></div>
 <button onClick={()=>setShowNewAction(true)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}><Plus size={11}/> Actie aanmaken</button>
@@ -2111,7 +2107,7 @@ return(
 <button onClick={()=>setShowForm(false)} style={{padding:"7px 10px",borderRadius:8,background:"transparent",color:C.secondary,border:`1px solid ${C.border}`,fontSize:11,cursor:"pointer"}}><X size={12}/></button>
 </div>
 )}
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {filtered.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen taken gevonden</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["","TAAK","PRIO","STATUS","DATUM","MGR"].map((h,i)=><th key={i} style={{padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -2208,111 +2204,105 @@ onClose();
 };
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
-      backdropFilter:"blur(20px) saturate(0.5)",
-      WebkitBackdropFilter:"blur(20px) saturate(0.5)",
-      display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
-    }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"96vw",boxShadow:"0 40px 100px rgba(58,46,40,.32)",display:"flex",flexDirection:"column",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
-<div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+  position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+  background:"rgba(240,235,228,0.75)",
+  backdropFilter:"blur(20px) saturate(0.4)",
+  WebkitBackdropFilter:"blur(20px) saturate(0.4)",
+  display:"flex",alignItems:"center",justifyContent:"center",
+  zIndex:9999,
+}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} style={{
+  background:C.surface,borderRadius:16,width:540,maxWidth:"92vw",
+  boxShadow:"0 24px 60px rgba(58,46,40,.18)",
+  display:"flex",flexDirection:"column",
+  fontFamily:F.body,
+}}>
+{/* Header */}
+<div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div>
-<div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{eng.ref} · {eng.client}</div>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuwe Cliëntactie</div>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>{eng.ref} · {eng.client}</div>
+<div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Cliëntactie</div>
 </div>
-<button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
+<button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={14}/></button>
 </div>
-<div style={{overflowY:"auto",padding:"22px 24px",display:"flex",flexDirection:"column",gap:18}}>
-<div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,background:C.greenBg,border:`1px solid ${C.green}30`}}>
-<Eye size={13} color={C.green}/>
-<span style={{fontSize:11,fontWeight:700,color:C.green}}>Zichtbaar voor cliënt in het portaal · Niet bewerkbaar door cliënt</span>
+{/* Body - NO scroll, all fits */}
+<div style={{padding:"14px 20px",display:"flex",flexDirection:"column",gap:12}}>
+{/* Visibility badge */}
+<div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:8,background:C.greenBg,border:`1px solid ${C.green}30`}}>
+<Eye size={11} color={C.green}/>
+<span style={{fontSize:10,fontWeight:700,color:C.green}}>Zichtbaar voor cliënt · Niet bewerkbaar door cliënt</span>
 </div>
+{/* Action type - compact horizontal pills */}
 <div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>ACTIETYPE</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>ACTIETYPE</div>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
 {ACTION_TYPES.map(at=>{
 const sel=type===at.id;
 return(
-<div key={at.id} onClick={()=>setType(at.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:11,border:`2px solid ${sel?C.crimson:C.border}`,background:sel?C.crimsonFaint:C.bg,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
-<div style={{width:34,height:34,borderRadius:9,background:sel?C.crimson:C.surface,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
-<at.Icon size={15} color={sel?CREAM:C.secondary}/>
-</div>
-<div>
-<div style={{fontSize:12,fontWeight:700,color:C.text}}>{at.label}</div>
-<div style={{fontSize:9,color:C.secondary,lineHeight:1.4}}>{at.desc}</div>
-</div>
+<div key={at.id} onClick={()=>setType(at.id)} style={{
+  display:"flex",alignItems:"center",gap:6,padding:"7px 12px",
+  borderRadius:8,border:`1.5px solid ${sel?C.crimson:C.border}`,
+  background:sel?C.crimsonFaint:C.bg,cursor:"pointer",
+  fontSize:11,fontWeight:sel?700:400,color:sel?C.crimson:C.text,
+  transition:"all .15s",
+}}>
+<at.Icon size={12} color={sel?C.crimson:C.secondary}/>
+{at.label}
 </div>
 );
 })}
 </div>
 </div>
+{/* Row: Title + Deadline side by side */}
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
 <div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>ACTIETITEL <span style={{color:C.crimson}}>*</span></div>
-<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Bijv. Jaarrekening 2024 Uploaden" style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${title.length>2?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>ACTIETITEL <span style={{color:C.crimson}}>*</span></div>
+<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Bijv. Jaarrekening Uploaden"
+  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${title.length>2?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
 </div>
 <div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>INSTRUCTIES VOOR CLIËNT</div>
-<textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Geef duidelijke instructies aan de cliënt..." rows={3} style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.6}}/>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>DEADLINE</div>
+<input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)}
+  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}/>
 </div>
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>DEADLINE</div>
-<input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)} style={{padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}/>
 </div>
-
-{/* Assign to client */}
+{/* Row: Client + Staff side by side */}
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
 <div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN CLIËNT</div>
-{clientList.length===0
-  ? <div style={{fontSize:11,color:C.muted,padding:"10px 14px",background:C.warm50,borderRadius:8}}>Nog geen cliënten — maak eerst een cliënt aan</div>
-  : <select value={assignedClient} onChange={e=>setAssignedClient(e.target.value)}
-      style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${assignedClient?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
-      <option value="">— Selecteer cliënt —</option>
-      {clientList.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
-    </select>
-}
-</div>
-
-{/* Assign to staff member */}
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN MEDEWERKER <span style={{color:C.muted,fontWeight:400,fontSize:8}}>(optioneel)</span></div>
-<select value={assignedStaff} onChange={e=>setAssignedStaff(e.target.value)}
-  style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
-  <option value="">— Geen medewerker —</option>
-  {staffList.map(s=><option key={s.id} value={s.id}>{s.full_name} ({s.department})</option>)}
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
+<select value={assignedClient} onChange={e=>setAssignedClient(e.target.value)}
+  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${assignedClient?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+  <option value="">— Selecteer —</option>
+  {clientList.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
 </select>
 </div>
-{isValid&&(
-<div style={{background:C.warm50,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`}}>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>VOORVERTONING</div>
-<div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-<div style={{width:38,height:38,borderRadius:10,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-{type==="upload"?<Upload size={15} color={CREAM}/>:type==="approve"?<CheckSquare size={15} color={CREAM}/>:type==="sign"?<FileText size={15} color={CREAM}/>:<ClipboardList size={15} color={CREAM}/>}
-</div>
-<div style={{flex:1}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>{title}</div>
-{desc&&<div style={{fontSize:11,color:C.secondary,lineHeight:1.5}}>{desc}</div>}
-{deadline&&<div style={{fontSize:10,color:C.secondary,marginTop:4}}>Termijn: {new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"long",year:"numeric"})}</div>}
-</div>
-<span style={{fontSize:9,fontWeight:700,background:C.amberBg,color:C.amber,padding:"3px 9px",borderRadius:4,textTransform:"uppercase",flexShrink:0}}>OPENSTAAND</span>
+<div>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>MEDEWERKER</div>
+<select value={assignedStaff} onChange={e=>setAssignedStaff(e.target.value)}
+  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+  <option value="">— Optioneel —</option>
+  {staffList.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}
+</select>
 </div>
 </div>
-)}
+{/* Instructies */}
+<div>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>INSTRUCTIES VOOR CLIËNT</div>
+<textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Geef duidelijke instructies..." rows={2}
+  style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:"inherit",background:C.bg,color:C.text}}/>
 </div>
-<div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
-<button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"12px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background .15s"}}>
-<Send size={14}/> {saving?"Aanmaken...":"Actie aanmaken"}
+</div>
+{/* Footer */}
+<div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
+<button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"10px",borderRadius:9,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+<Send size={13}/>{saving?"Aanmaken...":"Actie aanmaken"}
 </button>
-<button onClick={onClose} style={{padding:"12px 20px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+<button onClick={onClose} style={{padding:"10px 16px",borderRadius:9,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
 </div>
 </div>
 </div>
-);
-}
+);}
+
 
 // ─── CLIENT ACTIONS VIEW (STAFF) ──────────────────────────────────────────────
 const ALL_CLIENT_ACTIONS_DATA=[];
@@ -2369,7 +2359,7 @@ return(
 <Pill key={v} label={l} active={statusF===v} onClick={()=>setStatusF(v)}/>
 ))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {filtered.length===0?(
 <div style={{padding:"52px 24px",textAlign:"center"}}>
 <CheckCircle size={32} color={C.green} style={{marginBottom:10}}/>
@@ -2446,7 +2436,7 @@ return(
 <button key={v} onClick={()=>setDeptF(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${deptF===v?C.crimson:C.border}`,background:deptF===v?C.crimson:"transparent",color:deptF===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>{l}</button>
 ))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {logs.map((l,i)=>{
 const meta=AUDIT_COLOR[l.action]||{c:C.secondary,bg:C.warm50};
 return(
@@ -2549,13 +2539,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setReviewing(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
 <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{display:"flex",alignItems:"center",gap:9}}><FileText size={15} color={C.crimson}/><span style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>{reviewing.name}</span></div>
 <button onClick={()=>setReviewing(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
@@ -2698,13 +2686,11 @@ if(createdAccount) return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }}>
-<div className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",boxShadow:"0 40px 100px rgba(0,0,0,.5)",overflow:"hidden",fontFamily:F.body,maxHeight:"85vh",overflowY:"auto"}}>
+<div className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",boxShadow:"0 40px 100px rgba(0,0,0,.5)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"28px 28px 24px",textAlign:"center"}}>
     <div style={{width:56,height:56,borderRadius:"50%",background:C.greenBg,border:`2px solid ${C.green}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
       <CheckCircle size={26} color={C.green}/>
@@ -2751,13 +2737,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column"}}>
 
   {/* Header */}
   <div style={{padding:"20px 26px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
@@ -2932,7 +2916,7 @@ return(
 </div>
 {user.dept==="BOTH"&&["ALL","TC","FF"].map(f=>(<Pill key={f} label={f==="ALL"?t("all"):f==="TC"?"TACTIGENT":"FISCAL FUSE"} active={deptF===f} onClick={()=>setDeptF(f)}/>))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {list.length===0?(
 <div style={{padding:"48px 24px",textAlign:"center"}}>
 <Users size={32} color={C.mushroom} style={{marginBottom:12}}/>
@@ -3031,13 +3015,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column"}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
     <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw Lead Aanmaken</div>
     <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
@@ -3112,7 +3094,7 @@ return(
 </div>
 {user.dept==="BOTH"&&["ALL","TC","FF"].map(f=>(<Pill key={f} label={f==="ALL"?"Alle":f==="TC"?"Tactigent":"Fiscal Fuse"} active={deptF===f} onClick={()=>setDeptF(f)}/>))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {leads.length===0?(
 <div style={{padding:"52px 24px",textAlign:"center"}}>
 <Users size={32} color={C.mushroom} style={{marginBottom:12}}/>
@@ -3175,11 +3157,9 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setShowNewFolder(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:400,maxWidth:"95vw",padding:"22px",boxShadow:"0 24px 60px rgba(0,0,0,.25)",fontFamily:F.body}}>
   <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
@@ -3218,7 +3198,7 @@ return(
 </div>
 {["ALL","internal","client","shared"].map(v=>(<Pill key={v} label={v==="ALL"?t("all"):v==="internal"?t("internal"):v==="client"?t("client"):t("shared")} active={visF===v} onClick={()=>setVisF(v)}/>))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","ZICHTBAARHEID","STATUS",""].map((h,i)=><th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{docs.map(d=>(
@@ -3258,13 +3238,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setSelected(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
 <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <span style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{selected.name}</span>
 <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
@@ -3372,7 +3350,7 @@ return(
 <button onClick={()=>setShowNew(false)} style={{padding:"8px 10px",borderRadius:8,background:"transparent",color:C.secondary,border:`1px solid ${C.border}`,fontSize:11,cursor:"pointer"}}><X size={12}/></button>
 </div>
 )}
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["REF","CLIËNT","AFDELING",t("amount"),t("dueCol"),"STATUS","QBO"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{invoices.map(inv=>(
@@ -3410,11 +3388,9 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setShowUpload(null)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:460,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(0,0,0,.3)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -3555,7 +3531,7 @@ return(
 <span style={{fontSize:11,color:C.text}}>{s.l}</span>
 <span style={{fontSize:11,fontWeight:700,color:s.red?C.crimson:C.text}}>{s.v}% Risico</span>
 </div>
-<div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+<div style={{height:4,background:C.border,borderRadius:2}}>
 <div style={{height:"100%",width:`${s.v}%`,background:s.red?C.crimson:C.walnut,borderRadius:2}}/>
 </div>
 </div>
@@ -3647,7 +3623,7 @@ return(
 </div>
 </div>
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Vermogensbewegingen</div>
 <button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Exporteren ↓</button>
@@ -3711,7 +3687,7 @@ return(
 <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.crimson}}>68%</div>
 </div>
 <div style={{fontSize:11,color:C.secondary,marginBottom:10}}>Mijlpaal: Strategie Implementatie</div>
-<div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
+<div style={{height:8,background:C.border,borderRadius:4}}>
 <div style={{height:"100%",width:"68%",background:C.crimson,borderRadius:4}}/>
 </div>
 </div>
@@ -3771,13 +3747,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
 <div style={{width:36,height:36,borderRadius:9,background:typeBg[doc.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -3800,7 +3774,7 @@ return(
 
 
     {/* Body: preview left, metadata right */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1,overflow:"hidden"}}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1}}>
       {/* Document preview */}
       <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:"#F8F7F5"}}>
         <div style={{background:CREAM,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
@@ -3925,13 +3899,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
 <div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:C.greenBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -4068,7 +4040,7 @@ return(
 <button key={v} onClick={()=>setTab(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${tab===v?C.crimson:C.border}`,background:tab===v?C.crimson:"transparent",color:tab===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
 ))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","STATUS",""].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{docs.map(d=>(
@@ -4138,7 +4110,7 @@ return(
 </div>
 ))}
 </div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,fontSize:11,color:C.secondary}}>
 Klik op een factuur om de volledige factuurdetails te bekijken.
 </div>
@@ -4213,11 +4185,9 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={()=>setUploading(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -4248,7 +4218,7 @@ setActive(a=>({...a,messages:[...a.messages,{id:`m${Date.now()}`,author:user.nam
 setNewMsg(""); showToast("Bericht verzonden");
 };
 return(
-<div style={{display:"flex",height:"calc(100vh - 140px)",gap:0,background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{display:"flex",height:"calc(100vh - 140px)",gap:0,background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 <div style={{width:260,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column"}}>
 <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text}}>Berichten</div>
 <div style={{flex:1,overflowY:"auto"}}>
@@ -4403,7 +4373,7 @@ invoices.slice(0,3).map(inv=>(
 )}
 {/* Engagements tab */}
 {activeTab==="engagements"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {engagements.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Target size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements voor dit bedrijf</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["NAAM","TYPE","FASE","GEZONDHEID","MANAGER","ACTIE"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -4423,7 +4393,7 @@ invoices.slice(0,3).map(inv=>(
 )}
 {/* Documents tab */}
 {activeTab==="documents"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {docs.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><FileText size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen documenten voor dit bedrijf</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["DOCUMENT","TYPE","DATUM","ZICHTBAARHEID","STATUS"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -4442,7 +4412,7 @@ invoices.slice(0,3).map(inv=>(
 )}
 {/* Invoices tab */}
 {activeTab==="invoices"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {invoices.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Receipt size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen facturen voor dit bedrijf</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS","QBO"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -4511,7 +4481,7 @@ return(
 </div>
 ))}
 </div>
-<div style={{height:6,background:C.border,borderRadius:3,overflow:"hidden"}}>
+<div style={{height:6,background:C.border,borderRadius:3}}>
 <div style={{height:"100%",width:`${currentPct}%`,background:`linear-gradient(90deg,${C.crimson},${C.crimsonMid})`,borderRadius:3,transition:"width .4s"}}/>
 </div>
 </div>
@@ -4688,7 +4658,7 @@ return(
           </div>
         </div>
         {/* Recent campaigns */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
           <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Campagnes</div>
             <button onClick={()=>setTab("campaigns")} style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Alle bekijken →</button>
@@ -4852,7 +4822,7 @@ return(
       </div>
       {/* Scheduled posts */}
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden"}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
           <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12,fontWeight:700,color:C.text}}>Geplande Posts</div>
           {[
             {platform:"linkedin",text:"Tactigent kondigt haar Q2 resultaten aan. Strategische groei van 18% t.o.v. vorig kwartaal.",time:"Morgen 09:00",dept:"TC"},
@@ -4867,7 +4837,7 @@ return(
                 <div style={{fontSize:10,fontWeight:700,color:C.secondary}}>{platformLabel[p.platform]} · {p.time}</div>
                 <DeptTag dept={p.dept}/>
               </div>
-              <div style={{fontSize:11,color:C.text,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.text}</div>
+              <div style={{fontSize:11,color:C.text,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.text}</div>
             </div>
           ))}
           <div style={{padding:"10px 16px",borderTop:`1px solid ${C.border}`,background:C.warm50}}>
@@ -4894,7 +4864,7 @@ return(
                 <span style={{fontSize:11,color:C.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"65%"}}>{c.name}</span>
                 <span style={{fontSize:11,fontWeight:700,color:parseInt(c.openRate)>=60?C.green:C.amber}}>{c.openRate}</span>
               </div>
-              <div style={{height:5,background:C.border,borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:5,background:C.border,borderRadius:3}}>
                 <div style={{height:"100%",width:c.openRate,background:parseInt(c.openRate)>=60?C.green:C.amber,borderRadius:3,transition:"width .4s"}}/>
               </div>
             </div>
@@ -4914,7 +4884,7 @@ return(
                   <span style={{fontSize:11,color:C.text}}>{platformLabel[ch.platform]}</span>
                   <span style={{fontSize:11,fontWeight:700,color:C.text}}>{ch.followers}</span>
                 </div>
-                <div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:4,background:C.border,borderRadius:2}}>
                   <div style={{height:"100%",width:`${Math.min(100,parseInt(ch.followers)*15)}%`,background:platformColor[ch.platform],borderRadius:2,opacity:0.8}}/>
                 </div>
               </div>
@@ -4990,13 +4960,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
 {/* Header */}
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -5009,7 +4977,7 @@ return(
 <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
 </div>
 {/* Body */}
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",flex:1,overflow:"hidden"}}>
+<div style={{display:"grid",gridTemplateColumns:"1fr 280px",flex:1}}>
 {/* Editor */}
 <div style={{padding:"22px",overflowY:"auto",borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:14}}>
 {/* Dept */}
@@ -5101,13 +5069,11 @@ return(
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
-      alignItems:"flex-start",
-      justifyContent:"center",
-      zIndex:9999,
-      overflowY:"auto",
-      padding:0,
+      alignItems:"center",
+justifyContent:"center",
+zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden",maxHeight:"85vh",overflowY:"auto"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
 <div style={{width:38,height:38,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Send size={17} color={CREAM}/></div>
