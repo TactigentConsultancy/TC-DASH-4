@@ -704,7 +704,7 @@ function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng}){
 const t=useT();
 const isFF=user.dept==="FF",isTC=user.dept==="TC",isBOTH=user.dept==="BOTH";
 return(
-<aside key={themeKey} style={{width:228,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",transition:"background .3s"}}>
+<aside style={{width:228,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",transition:"background .3s"}}>
 <div style={{padding:"20px 16px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:11}}>
 <BrandLogoMain size={36} variant="light"/>
 <div>
