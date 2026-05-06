@@ -2300,6 +2300,27 @@ return(
 }
 
 // ─── CRM VIEW ────────────────────────────────────────────────────────────────
+
+// ─── FORM HELPERS (module-level — never recreated, no focus loss) ─────────────
+const FormField=({label,required,children})=>(
+<div>
+<div style={{fontSize:9,fontWeight:700,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6,color:"#7A6B60"}}>
+  {label}{required&&<span style={{color:"#8B1A2B"}}> *</span>}
+</div>
+{children}
+</div>
+);
+
+function FormInput({val,set,placeholder,type="text",border}){
+return(
+<input type={type} value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
+style={{width:"100%",padding:"10px 13px",borderRadius:9,
+  border:`1.5px solid ${border||(val?"#8B1A2B":"#E4DDD5")}`,
+  fontSize:12,outline:"none",boxSizing:"border-box",
+  transition:"border-color .15s",fontFamily:"'Jost',sans-serif"}}/>
+);
+}
+
 function NewClientModal({user,companyData,setCompanyData,onClose,showToast}){
 const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
 const [name,setName]=useState("");
@@ -2357,8 +2378,8 @@ style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${va
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"20px 20px 20px 20px",paddingTop:"max(20px, calc(58px + 20px))"}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden",marginTop:"auto",marginBottom:"auto"}}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
 
     {/* Header */}
@@ -2378,7 +2399,7 @@ return(
 
       {/* Department */}
       {user.dept==="BOTH"&&(
-        <Field label="Afdeling" required>
+        <FormField label="Afdeling" required>
           <div style={{display:"flex",gap:8}}>
             {["TC","FF"].map(d=>(
               <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
@@ -2386,31 +2407,31 @@ return(
               </button>
             ))}
           </div>
-        </Field>
+        </FormField>
       )}
 
       {/* Bedrijfsnaam + KKF */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Bedrijfsnaam" required>{inp(name,setName,"Bijv. Breathe Logistics N.V.")}</Field>
-        <Field label="KKF-nummer">
+        <FormField label="Bedrijfsnaam" required>{<FormInput val={name} set={setName} placeholder="Bijv. Wrokomang Logistics N.V." type="text"/>}</FormField>
+        <FormField label="KKF-nummer">
           <input value={kkf} onChange={e=>setKkf(e.target.value)} placeholder="SR-2025-0001 (auto)"
             style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${kkf?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-        </Field>
+        </FormField>
       </div>
 
       {/* Sector + Lifecycle */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Sector / Industrie">
+        <FormField label="Sector / Industrie">
           <select value={industry} onChange={e=>setIndustry(e.target.value)} style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface,boxSizing:"border-box"}}>
             <option value="">Selecteer sector...</option>
             {INDUSTRY_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
           </select>
-        </Field>
-        <Field label="Lifecycle Status">
+        </FormField>
+        <FormField label="Lifecycle Status">
           <select value={lifecycle} onChange={e=>setLifecycle(e.target.value)} style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface,boxSizing:"border-box"}}>
             {LIFECYCLE_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
           </select>
-        </Field>
+        </FormField>
       </div>
 
       {/* Divider */}
@@ -2422,16 +2443,16 @@ return(
 
       {/* Contact */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Volledige naam" required>{inp(contact,setContact,"Bijv. Jan Jansen")}</Field>
-        <Field label="Functietitel">{inp(role,setRole,"Bijv. CFO, Directeur")}</Field>
+        <FormField label="Volledige naam" required>{<FormInput val={contact} set={setContact} placeholder="Bijv. Jan Jansen" type="text"/>}</FormField>
+        <FormField label="Functietitel">{<FormInput val={role} set={setRole} placeholder="Bijv. CFO type=Directeur"/>}</FormField>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="E-mailadres">{inp(email,setEmail,"naam@bedrijf.sr","email")}</Field>
-        <Field label="Telefoonnummer">{inp(phone,setPhone,"+597 8xx-xxxx","tel")}</Field>
+        <FormField label="E-mailadres">{<FormInput val={email} set={setEmail} placeholder="naam@bedrijf.sr" type="email"/>}</FormField>
+        <FormField label="Telefoonnummer">{<FormInput val={phone} set={setPhone} placeholder="+597 8xx-xxxx" type="tel"/>}</FormField>
       </div>
 
       {/* Logo upload */}
-      <Field label="Bedrijfslogo">
+      <FormField label="Bedrijfslogo">
         <input ref={logoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
           const file=e.target.files[0];
           if(!file) return;
@@ -2473,13 +2494,13 @@ return(
             </>
           )}
         </div>
-      </Field>
+      </FormField>
 
       {/* Notes */}
-      <Field label="Interne notities">
+      <FormField label="Interne notities">
         <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Aanvullende context, referenties, bijzonderheden..." rows={3}
           style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body}}/>
-      </Field>
+      </FormField>
 
       {/* Preview card */}
       {name&&(
