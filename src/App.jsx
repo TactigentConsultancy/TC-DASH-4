@@ -484,7 +484,7 @@ const F = { display:"'Cormorant Garamond',Georgia,serif", body:"'Jost',sans-seri
 
 
 
-function GlobalStyles() {
+function GlobalStyles({darkMode=false}) {
 useEffect(()=>{
 const id="gds-fonts"; if(document.getElementById(id)) return;
 const l=document.createElement("link"); l.id=id; l.rel="stylesheet";
@@ -492,38 +492,82 @@ l.href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,
 l.setAttribute("crossorigin","anonymous");
 document.head.appendChild(l);
 },[]);
+
+const dm = darkMode;
+const bg      = dm ? "#141210" : "#F5F1EC";
+const surface = dm ? "#1E1A16" : "#FDFCF9";
+const text     = dm ? "#F0EBE4" : "#3A2E28";
+const border   = dm ? "#2E2820" : "#E4DDD5";
+const inputBg  = dm ? "#252018" : "#FFFFFF";
+const muted    = dm ? "#6A5E58" : "#A89B92";
+const secondary= dm ? "#A89B92" : "#7A6B60";
+
 return <style>{`
 *,*::before,*::after{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:#F5F1EC;}
-body{font-family:'Jost',sans-serif;color:#3A2E28;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Jost',sans-serif;
+  background:${bg};
+  color:${text};
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+}
 button,input,textarea,select{font-family:'Jost',sans-serif;}
 
-/* Scrollbar */
+/* ── Input/Select contrast-safe overrides ── */
+input, textarea {
+  background: ${inputBg} !important;
+  color: ${text} !important;
+}
+input::placeholder, textarea::placeholder {
+  color: ${muted} !important;
+  opacity: 1;
+}
+select {
+  background: ${inputBg} !important;
+  color: ${text} !important;
+}
+select option {
+  background: ${surface};
+  color: ${text};
+}
+/* Prevent white-on-white or dark-on-dark */
+input[style*="background"], textarea[style*="background"] {
+  color: ${text} !important;
+}
+
+/* ── Modal overlays always dark backdrop ── */
+[data-modal-overlay] {
+  background: rgba(15,10,8,.72) !important;
+}
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:#D6D3CE;border-radius:3px;}
-::-webkit-scrollbar-thumb:hover{background:#B8AFA8;}
+::-webkit-scrollbar-thumb{background:${border};border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:${secondary};}
 
-/* Focus rings — accessibility */
+/* ── Focus rings ── */
 :focus-visible{outline:2px solid #8B1A2B;outline-offset:2px;border-radius:4px;}
 button:focus-visible,a:focus-visible{outline:2px solid #8B1A2B;outline-offset:2px;}
 
-/* Easing tokens */
+/* ── Design tokens ── */
 :root{
   --ease-out-expo:cubic-bezier(0.16,1,0.3,1);
   --ease-out-quart:cubic-bezier(0.25,1,0.5,1);
   --ease-in-out:cubic-bezier(0.4,0,0.2,1);
-  --shadow-sm:0 1px 3px rgba(58,46,40,.08),0 1px 2px rgba(58,46,40,.06);
-  --shadow-md:0 4px 12px rgba(58,46,40,.10),0 2px 4px rgba(58,46,40,.06);
-  --shadow-lg:0 12px 32px rgba(58,46,40,.12),0 4px 8px rgba(58,46,40,.06);
-  --shadow-xl:0 24px 64px rgba(58,46,40,.14),0 8px 16px rgba(58,46,40,.08);
-  --shadow-crimson:0 4px 16px rgba(139,26,43,.24);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.${dm?'18':'08'}),0 1px 2px rgba(0,0,0,.${dm?'12':'06'});
+  --shadow-md:0 4px 12px rgba(0,0,0,.${dm?'28':'10'}),0 2px 4px rgba(0,0,0,.${dm?'16':'06'});
+  --shadow-lg:0 12px 32px rgba(0,0,0,.${dm?'36':'12'}),0 4px 8px rgba(0,0,0,.${dm?'20':'06'});
+  --shadow-xl:0 24px 64px rgba(0,0,0,.${dm?'44':'14'}),0 8px 16px rgba(0,0,0,.${dm?'24':'08'});
+  --shadow-crimson:0 4px 16px rgba(139,26,43,.${dm?'40':'24'});
 }
 
-/* Animations */
+/* ── Animations ── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 @keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);}}
 
@@ -660,7 +704,7 @@ function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng}){
 const t=useT();
 const isFF=user.dept==="FF",isTC=user.dept==="TC",isBOTH=user.dept==="BOTH";
 return(
-<aside style={{width:228,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+<aside key={themeKey} style={{width:228,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",transition:"background .3s"}}>
 <div style={{padding:"20px 16px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:11}}>
 <BrandLogoMain size={36} variant="light"/>
 <div>
@@ -698,7 +742,7 @@ return(
 <SideBtn icon={Receipt} label={t("invoices")} isActive={view==="invoices"} onClick={()=>setView("invoices")}/>
 <SideSection label={t("intelligence")}/>
 <SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")}/>
-<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>
+{(user.role==="super_admin")&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
 <SideSection label={t("system")}/>
 <SideBtn icon={Bell} label={t("notifications")} isActive={view==="notifications"} onClick={()=>setView("notifications")} badge={unreadCount>0?unreadCount:null}/>
 {(user.role==="super_admin"||user.role==="admin")&&<SideBtn icon={ClipboardList} label="Audit Log" isActive={view==="audit_log"} onClick={()=>setView("audit_log")}/>}
@@ -714,7 +758,7 @@ return(
 <SideBtn icon={Receipt} label={t("financeNav")} isActive={view==="c_finance"} onClick={()=>setView("c_finance")}/>
 <SideSection label={t("intelligence")}/>
 <SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")}/>
-<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>
+{(user.role==="super_admin")&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
 <SideSection label="Communicatie"/>
 <SideBtn icon={Send} label={t("messages")} isActive={view==="c_messages"} onClick={()=>setView("c_messages")}/>
 <SideSection label="Account"/>
@@ -904,14 +948,21 @@ const showToast=msg=>setToast(msg);
 const [darkMode,setDarkMode]=useState(()=>{
   try{ return localStorage.getItem("tge_theme")==="dark"; }catch(e){ return false; }
 });
-// Apply theme globally
-C = darkMode ? THEMES.dark : THEMES.light;
+// Apply theme — update C and force re-render via key
+const theme = darkMode ? THEMES.dark : THEMES.light;
+C = theme; // update module-level C for all components
 useEffect(()=>{
-  document.body.style.background = darkMode ? THEMES.dark.bg : THEMES.light.bg;
-  document.body.style.color = darkMode ? THEMES.dark.text : THEMES.light.text;
+  // Inject CSS variables for any CSS-dependent styles
+  const root = document.documentElement;
+  Object.entries(theme).forEach(([k,v])=>root.style.setProperty(`--c-${k}`,v));
+  document.body.style.background = theme.bg;
+  document.body.style.color = theme.text;
+  document.body.classList.toggle("dark-mode", darkMode);
   try{ localStorage.setItem("tge_theme", darkMode?"dark":"light"); }catch(e){}
 },[darkMode]);
 const toggleDark=()=>setDarkMode(d=>!d);
+// themeKey forces child components to re-render when theme changes
+const themeKey = darkMode?"dark":"light";
 
 // ── Live data from Supabase ──────────────────────────────────────────────
 const [companyData,setCompanyData]=useState(COMPANIES_INIT);
@@ -1016,13 +1067,20 @@ case "review":       return <ReviewQueue showToast={showToast}/>;
 case "marketing":    return <MarketingView user={user} showToast={showToast}/>;
 case "settings":     return <SettingsView user={user} language={language} setLanguage={setLanguage} showToast={showToast}/>;
 case "crm":          return <CRMView user={user} companyData={companyData} setCompanyData={setCompanyData} setDetailCompany={setDetailCompany} showToast={showToast}/>;
-case "leads":        return <LeadsView user={user} setDetailLead={setDetailLead}/>;
+case "leads":        return <LeadsView user={user} setDetailLead={setDetailLead} showToast={showToast}/>;
 case "docs":         return <DMSView user={user} showToast={showToast}/>;
 case "invoices":     return <InvoicesView user={user} invData={invData} setInvData={setInvData} showToast={showToast}/>;
 case "notifications":return <NotificationsView notifData={notifData} setNotifData={setNotifData}/>;
 case "audit_log":    return <AuditLogView user={user}/>;
-case "risk_matrix":  return <RiskMatrixView user={user}/>;
-case "asset_flow":   return <AssetFlowView user={user}/>;
+case "risk_matrix":  return <RiskMatrixView user={user} engData={engData}/>;
+case "asset_flow":   return (user.role==="super_admin"
+  ? <AssetFlowView user={user}/>
+  : <div style={{padding:40,textAlign:"center"}}>
+      <Shield size={32} color={C.muted} style={{marginBottom:12}}/>
+      <div style={{fontFamily:F.display,fontSize:18,color:C.text,marginBottom:6}}>Beperkte toegang</div>
+      <div style={{fontSize:12,color:C.secondary}}>Vermogensstroom is alleen beschikbaar voor de CEO.</div>
+    </div>
+);
 case "c_dash":       return <ClientDashboard user={user}/>;
 case "c_docs":       return <ClientDocsView user={user}/>;
 case "c_finance":    return <ClientFinanceView user={user} invData={invData}/>;
@@ -1033,12 +1091,12 @@ default: return <div style={{padding:40,color:C.secondary,fontStyle:"italic",dis
 };
 return(
 <LangCtx.Provider value={language}>
-<div style={{display:"flex",height:"100vh",background:C.bg,overflow:"hidden"}}>
-<GlobalStyles/>
+<div key={themeKey} style={{display:"flex",height:"100vh",background:C.bg,overflow:"hidden"}}>
+<GlobalStyles darkMode={darkMode}/>
 <Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)}/>
 <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
-<main style={{flex:1,overflow:"auto",padding:"28px 32px"}} key={view+(detailEng?.id||"")}>
+<main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}} key={view+(detailEng?.id||"")}>
 <div className="fu">{renderView()}</div>
 </main>
 </div>
@@ -1931,8 +1989,49 @@ return(
 }
 
 // ─── TASKS VIEW ──────────────────────────────────────────────────────────────
+
+// ─── TEAM MEMBERS HOOK ───────────────────────────────────────────────────────
+// Returns all staff + clients from DB for assignment dropdowns
+function useTeamMembers(dept){
+  const [members,setMembers]=useState([]);
+  const [clients,setClients]=useState([]);
+  useEffect(()=>{
+    supabase.from("user_profiles")
+      .select("id,full_name,role,department,avatar_initials,company_id")
+      .in("role",["super_admin","staff","finance"])
+      .then(({data})=>setMembers((data||[]).filter(m=>dept==="BOTH"||m.department===dept||m.department==="BOTH")));
+    supabase.from("user_profiles")
+      .select("id,full_name,role,department,avatar_initials,company_id")
+      .eq("role","client")
+      .then(({data})=>setClients(data||[]));
+  },[dept]);
+  return {members,clients};
+}
+
+// ─── ASSIGNEE SELECT ──────────────────────────────────────────────────────────
+function AssigneeSelect({value,onChange,members,label="Toewijzen aan",style={}}){
+  return(
+    <select value={value||""} onChange={e=>onChange(e.target.value)}
+      style={{padding:"7px 10px",borderRadius:8,border:`1px solid ${C.border}`,
+        fontSize:11,outline:"none",cursor:"pointer",background:C.surface,
+        color:C.text,fontFamily:F.body,...style}}>
+      <option value="">— {label} —</option>
+      {members.map(m=>(
+        <option key={m.id} value={m.id}>
+          {m.full_name} ({m.department})
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function TasksView({user}){
 const t=useT();
+const {members}=useTeamMembers(user.dept);
+const [showNewLead,setShowNewLead]=useState(false);
+const [leadData,setLeadData]=useState([]);
+const [stageF,setStageF]=useState("ALL");
+const [assigneeFilter,setAssigneeFilter]=useState("");
 const [tasks,setTasks]=useState(Object.values(TASKS_BY_ENG).flat());
 const [statusF,setStatusF]=useState("ALL"); const [q,setQ]=useState("");
 const [showForm,setShowForm]=useState(false); const [newTitle,setNewTitle]=useState(""); const [newPrio,setNewPrio]=useState("normal"); const [newDue,setNewDue]=useState("");
@@ -2000,6 +2099,23 @@ return(
 
 // ─── CLIENT ACTIONS VIEW (STAFF) ─────────────────────────────────────────────
 // ─── NEW CLIENT ACTION MODAL ──────────────────────────────────────────────────
+
+function ClientAssignSelect({engId,value,onChange}){
+  const [clients,setClients]=useState([]);
+  useEffect(()=>{
+    supabase.from("user_profiles").select("id,full_name,company_id").eq("role","client")
+      .then(({data})=>setClients(data||[]));
+  },[]);
+  return(
+    <select value={value||""} onChange={e=>onChange(e.target.value)}
+      style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,
+        fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
+      <option value="">— Geen specifieke cliënt —</option>
+      {clients.map(c=>(<option key={c.id} value={c.id}>{c.full_name}</option>))}
+    </select>
+  );
+}
+
 function NewClientActionModal({eng,onClose,onCreated,showToast}){
 const [title,setTitle]=useState("");
 const [desc,setDesc]=useState("");
@@ -2631,12 +2747,20 @@ return(
 
   {/* Footer */}
   <div style={{padding:"16px 26px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
-    <button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"12px",borderRadius:10,background:isValid&&!saving?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid&&!saving?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
-      {saving
-        ? <><div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>
-        : <><Users size={15}/> Cliënt aanmaken</>
-      }
-    </button>
+    <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
+      {!isValid&&!saving&&(
+        <div style={{fontSize:10,color:C.amber,display:"flex",alignItems:"center",gap:5}}>
+          <AlertTriangle size={11}/>
+          {!name.trim()?"Bedrijfsnaam verplicht":!contact.trim()?"Contactpersoon verplicht":!email.includes("@")?"Geldig e-mailadres verplicht":"Vul verplichte velden in"}
+        </div>
+      )}
+      <button onClick={submit} disabled={!isValid||saving} style={{width:"100%",padding:"12px",borderRadius:10,background:isValid&&!saving?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid&&!saving?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+        {saving
+          ? <><div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>
+          : <><Users size={15}/> Cliënt aanmaken</>
+        }
+      </button>
+    </div>
     <button onClick={onClose} style={{padding:"12px 20px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
   </div>
 </div>
@@ -2717,7 +2841,116 @@ return(
 }
 
 // ─── LEADS VIEW ──────────────────────────────────────────────────────────────
-function LeadsView({user,setDetailLead}){
+
+// ─── NEW LEAD MODAL ───────────────────────────────────────────────────────────
+function NewLeadModal({user,members,onClose,onCreated,showToast}){
+const [companyName,setCompanyName]=useState("");
+const [contactName,setContactName]=useState("");
+const [contactEmail,setContactEmail]=useState("");
+const [value,setValue]=useState("");
+const [stage,setStage]=useState("new");
+const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
+const [assignedTo,setAssignedTo]=useState("");
+const [notes,setNotes]=useState("");
+const [saving,setSaving]=useState(false);
+
+const STAGES=[["new","Nieuw"],["contacted","Gecontacteerd"],["proposal","Offerte"],["strategy_review","Strategie Review"],["won","Gewonnen"],["lost","Verloren"]];
+const isValid=companyName.trim()&&contactName.trim();
+
+useEffect(()=>{
+  const h=e=>{if(e.key==="Escape")onClose();};
+  window.addEventListener("keydown",h);
+  return()=>window.removeEventListener("keydown",h);
+},[]);
+
+const submit=async()=>{
+  if(!isValid||saving)return;
+  setSaving(true);
+  try{
+    const {data,error}=await supabase.from("leads").insert({
+      company_name:companyName.trim(),
+      contact_name:contactName.trim(),
+      contact_email:contactEmail.trim()||null,
+      estimated_value:value?parseFloat(value):null,
+      stage, department:dept,
+      assigned_to:assignedTo||null,
+      notes:notes||null,
+      created_by:user.id,
+    }).select().single();
+    if(!error&&data){
+      onCreated({id:data.id,name:companyName,contact:contactName,email:contactEmail,
+        value:parseFloat(value)||0,stage,dept,rep:members.find(m=>m.id===assignedTo)?.avatar_initials||"—"});
+      onClose();
+    } else throw new Error(error?.message||"Insert failed");
+  }catch(e){
+    onCreated({id:`l${Date.now()}`,name:companyName,contact:contactName,
+      email:contactEmail,value:parseFloat(value)||0,stage,dept,
+      rep:members.find(m=>m.id===assignedTo)?.avatar_initials||"—"});
+    onClose();
+  }finally{setSaving(false);}
+};
+
+return(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"78px 20px 20px 20px"}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
+    <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw Lead Aanmaken</div>
+    <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
+  </div>
+  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14,flex:1}}>
+    {user.dept==="BOTH"&&(
+      <div style={{display:"flex",gap:8}}>
+        {["TC","FF"].map(d=>(
+          <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {d==="TC"?"Tactigent":"Fiscal Fuse"}
+          </button>
+        ))}
+      </div>
+    )}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <FormField label="Bedrijfsnaam" required><FormInput val={companyName} set={setCompanyName} placeholder="Bijv. Wrokomang N.V."/></FormField>
+      <FormField label="Contactpersoon" required><FormInput val={contactName} set={setContactName} placeholder="Bijv. Jan Jansen"/></FormField>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <FormField label="E-mailadres"><FormInput val={contactEmail} set={setContactEmail} placeholder="naam@bedrijf.sr" type="email"/></FormField>
+      <FormField label="Geschatte waarde (SRD)"><FormInput val={value} set={setValue} placeholder="0" type="number"/></FormField>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <FormField label="Stadium">
+        <select value={stage} onChange={e=>setStage(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,cursor:"pointer"}}>
+          {STAGES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Toewijzen aan">
+        <select value={assignedTo} onChange={e=>setAssignedTo(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,cursor:"pointer"}}>
+          <option value="">— Niet toegewezen —</option>
+          {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+        </select>
+      </FormField>
+    </div>
+    <FormField label="Notities">
+      <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Context, bron van lead, bijzonderheden..."
+        rows={3} style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",background:C.bg,color:C.text}}/>
+    </FormField>
+  </div>
+  <div style={{padding:"14px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+    <button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"11px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      {saving?<><div style={{width:12,height:12,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>:<><Plus size={13}/> Lead aanmaken</>}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
+</div>
+</div>
+);
+}
+
+function LeadsView({user,setDetailLead,showToast}){
+const {members}=useTeamMembers(user.dept);
+const [showNewLead,setShowNewLead]=useState(false);
+const [leadData,setLeadData]=useState([]);
+const [stageF,setStageF]=useState("ALL");
 const t=useT();
 const [q,setQ]=useState(""); const [deptF,setDeptF]=useState("ALL");
 const sL={new:"Nieuw",qualified:"Gekwalificeerd",proposal:"Voorstel",won:"Gewonnen",inquiry:"Aanvraag",strategy_review:"Strategie Review",engaged:"Betrokken"};
@@ -2764,11 +2997,62 @@ return(
 function DMSView({user,showToast}){
 const t=useT();
 const [visF,setVisF]=useState("ALL"); const [q,setQ]=useState(""); const [selected,setSelected]=useState(null);
+const [showNewFolder,setShowNewFolder]=useState(false);
+const [folderName,setFolderName]=useState("");
+const [folders,setFolders]=useState([]);
+const [activeFolder,setActiveFolder]=useState(null);
 const docs=DOCUMENTS.filter(d=>{ const vOk=visF==="ALL"||d.visibility===visF; const sOk=user.dept==="BOTH"||d.dept===user.dept; const qOk=!q||d.name.toLowerCase().includes(q.toLowerCase()); return vOk&&sOk&&qOk; });
 const typeIconCmp={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
+const createFolder=()=>{
+  if(!folderName.trim())return;
+  setFolders(fs=>[...fs,{id:`f${Date.now()}`,name:folderName.trim(),docs:[]}]);
+  setFolderName(""); setShowNewFolder(false);
+  showToast(`Map "${folderName}" aangemaakt`);
+};
 return(
 <div>
-<PageHeader kicker="Documenten" title={t("docLib")} action={<button onClick={()=>showToast("Upload gestarten")} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}><Upload size={13}/> Uploaden</button>}/>
+<PageHeader kicker="Documenten" title={t("docLib")} action={
+  <div style={{display:"flex",gap:8}}>
+    <button onClick={()=>setShowNewFolder(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+      <Plus size={13}/> Nieuwe map
+    </button>
+    <button onClick={()=>showToast("Upload gestarten")} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+      <Upload size={13}/> Uploaden
+    </button>
+  </div>
+}/>
+
+{/* New folder modal */}
+{showNewFolder&&(
+<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"78px 20px 20px 20px"}} onClick={()=>setShowNewFolder(false)}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:400,maxWidth:"95vw",padding:"22px",boxShadow:"0 24px 60px rgba(0,0,0,.25)",fontFamily:F.body}}>
+  <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
+  <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()}
+    placeholder="Mapnaam..." autoFocus
+    style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${C.crimson}`,fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:14,background:C.bg,color:C.text}}/>
+  <div style={{display:"flex",gap:8}}>
+    <button onClick={createFolder} style={{flex:1,padding:"10px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Aanmaken</button>
+    <button onClick={()=>setShowNewFolder(false)} style={{padding:"10px 16px",borderRadius:9,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,cursor:"pointer"}}>Annuleren</button>
+  </div>
+</div>
+</div>
+)}
+
+{/* Folder list */}
+{folders.length>0&&(
+<div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+  <div onClick={()=>setActiveFolder(null)}
+    style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,border:`1.5px solid ${activeFolder===null?C.crimson:C.border}`,background:activeFolder===null?C.crimsonFaint:C.surface,cursor:"pointer",fontSize:12,color:activeFolder===null?C.crimson:C.text,fontWeight:activeFolder===null?700:400}}>
+    Alle documenten
+  </div>
+  {folders.map(f=>(
+    <div key={f.id} onClick={()=>setActiveFolder(f.id)}
+      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,border:`1.5px solid ${activeFolder===f.id?C.crimson:C.border}`,background:activeFolder===f.id?C.crimsonFaint:C.surface,cursor:"pointer",fontSize:12,color:activeFolder===f.id?C.crimson:C.text,fontWeight:activeFolder===f.id?700:400}}>
+      📁 {f.name}
+    </div>
+  ))}
+</div>
+)}
 <div style={{display:"grid",gridTemplateColumns:"1fr 220px",gap:16}}>
 <div>
 <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
@@ -2841,6 +3125,31 @@ return(
 
 // ─── INVOICES VIEW ───────────────────────────────────────────────────────────
 function InvoicesView({user,invData,setInvData,showToast}){
+const [showUpload,setShowUpload]=useState(null);
+const [invoiceNotes,setInvoiceNotes]=useState({});
+const [uploading,setUploading]=useState(false);
+const uploadInvoiceFile=async(invId,file)=>{
+  if(!file||file.size>10*1024*1024){showToast("Max 10MB");return;}
+  setUploading(true);
+  try{
+    const ext=file.name.split(".").pop();
+    const path=`${invId}.${ext}`;
+    const SB="https://qjlijtlqtyzytxcmzwvu.supabase.co";
+    const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbGlqdGxxdHl6eXR4Y216d3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NTE3MjAsImV4cCI6MjA5MjEyNzcyMH0.EwHl1enE8b5LBXUBQTMSDT4Mv0O6Kkdjbtg1LooH4f8";
+    const res=await fetch(`${SB}/storage/v1/object/invoices/${path}`,{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${_authToken}`,"apikey":SB_KEY,"x-upsert":"true","Content-Type":file.type},
+      body:file,
+    });
+    if(res.ok){
+      const url=`${SB}/storage/v1/object/invoices/${path}`;
+      await supabase.from("invoices").update({file_url:url,notes:invoiceNotes[invId]||null}).eq("id",invId);
+      setInvData(ids=>ids.map(i=>i.id===invId?{...i,file_url:url}:i));
+      showToast("Factuur geüpload ✓"); setShowUpload(null);
+    } else showToast("Upload mislukt");
+  }catch(e){showToast("Upload mislukt: "+e.message);}
+  setUploading(false);
+};
 const t=useT();
 const [showNew,setShowNew]=useState(false);
 const [newClient,setNewClient]=useState(""); const [newAmount,setNewAmount]=useState(""); const [newDue,setNewDue]=useState("");
@@ -2867,6 +3176,7 @@ const inv={id:`inv${Date.now()}`,ref:`INV-2025-0${50+invData.length}`,client:new
 setInvData(ids=>[...ids,inv]);setShowNew(false);setNewClient("");setNewAmount("");setNewDue("");showToast(`${inv.ref} aangemaakt`);
 };
 return(
+<>
 <div>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
 <PageHeader kicker="Financiën" title={t("invoicesTitle")}/>
@@ -2905,7 +3215,15 @@ return(
 <td style={{padding:"11px 16px"}}><DeptTag dept={inv.dept}/></td>
 <td style={{padding:"11px 16px",fontFamily:F.display,fontSize:14,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
 <td style={{padding:"11px 16px",fontSize:11,color:C.secondary}}>{inv.due}</td>
-<td style={{padding:"11px 16px"}}><Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
+<td style={{padding:"11px 16px"}}>
+  <div style={{display:"flex",alignItems:"center",gap:8}}>
+    <Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
+    <button onClick={()=>setShowUpload(inv.id)} title="Upload factuurbestand"
+      style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:inv.file_url?C.greenBg:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:inv.file_url?C.green:C.secondary}}>
+      {inv.file_url?<CheckCircle size={11}/>:<Upload size={11}/>}
+    </button>
+  </div>
+</td>
 <td style={{padding:"11px 16px"}}>
 {inv.qbo?(<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> SYNC</span>):(
 <button onClick={()=>pushQBO(inv)} style={{padding:"3px 8px",borderRadius:6,background:C.amberBg,border:`1px solid ${C.amber}30`,color:C.amber,fontSize:9,fontWeight:700,cursor:"pointer"}}>PUSH</button>
@@ -2916,6 +3234,49 @@ return(
 </table>
 </div>
 </div>
+
+{/* Invoice file upload modal */}
+{showUpload&&(
+<div style={{position:"fixed",inset:0,background:"rgba(20,18,16,.72)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}} onClick={()=>setShowUpload(null)}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:460,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(0,0,0,.3)",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Factuurbestand uploaden</div>
+    <button onClick={()=>setShowUpload(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
+  </div>
+  <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"28px",borderRadius:12,border:`2px dashed ${C.border}`,cursor:"pointer",background:C.bg,transition:"border-color .15s"}}
+      onMouseEnter={e=>e.currentTarget.style.borderColor=C.crimson}
+      onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+      <Upload size={28} color={C.secondary}/>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Klik om bestand te kiezen</div>
+      <div style={{fontSize:11,color:C.secondary}}>PDF, JPG, PNG · Max 10MB</div>
+      <input type="file" accept=".pdf,image/jpeg,image/png,image/jpg" style={{display:"none"}}
+        onChange={e=>{const f=e.target.files?.[0];if(f)uploadInvoiceFile(showUpload,f);}}/>
+    </label>
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>NOTITIE</div>
+      <textarea rows={3} value={invoiceNotes[showUpload]||""} onChange={e=>setInvoiceNotes(n=>({...n,[showUpload]:e.target.value}))}
+        placeholder="Bijv. Q1 2026, goedgekeurd door directie..."
+        style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit"}}/>
+    </div>
+    {uploading&&(
+      <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"8px",color:C.secondary,fontSize:12}}>
+        <div style={{width:14,height:14,border:"2px solid rgba(139,26,43,.3)",borderTopColor:C.crimson,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+        Uploaden...
+      </div>
+    )}
+    <button onClick={()=>{
+      const note=invoiceNotes[showUpload];
+      if(note){supabase.from("invoices").update({notes:note}).eq("id",showUpload).then(()=>showToast("Notitie opgeslagen"));}
+      setShowUpload(null);
+    }} style={{width:"100%",padding:"11px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+      Notitie opslaan & sluiten
+    </button>
+  </div>
+</div>
+</div>
+)}
+</>
 );
 }
 
@@ -2946,7 +3307,16 @@ return(
 }
 
 // ─── RISK MATRIX VIEW ────────────────────────────────────────────────────────
-function RiskMatrixView(){
+function RiskMatrixView({user,engData}){
+// Real risk items derived from engagement health
+const riskItems=React.useMemo(()=>{
+  const items=[];
+  (engData||[]).forEach((e,i)=>{
+    if(e.health==="red") items.push({id:e.id,dept:e.dept,title:e.name,prob:4,impact:4,client:e.client,label:"HOOG"});
+    else if(e.health==="amber") items.push({id:e.id,dept:e.dept,title:e.name,prob:3,impact:3,client:e.client,label:"MIDDEN"});
+  });
+  return items;
+},[engData]);
 const GRID=5;
 const cells=[];
 for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
@@ -3556,6 +3926,7 @@ const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CON
 const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
 const totalPaid=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+i.amount,0);
 return(
+<>
 <div>
 <PageHeader kicker="Financiën" title="Facturen & Betalingen"/>
 {/* KPI strip */}
@@ -3599,9 +3970,9 @@ Klik op een factuur om de volledige factuurdetails te bekijken.
 {preview&&<InvoicePreviewModal inv={preview} onClose={()=>setPreview(null)} onDownload={(inv)=>{setToast(`${inv.ref} gedownload als PDF`);setPreview(null);}}/>}
 {toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
 </div>
+</>
 );
 }
-
 function ClientActionsPortal({user,showToast}){
 const t=useT();
 const [actions,setActions]=useState(Object.values(CLIENT_ACTIONS_BY_ENG).flat());
