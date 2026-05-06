@@ -4624,36 +4624,47 @@ const tryLogin=async()=>{
 if(!email.trim()||!pw.trim()){setErr("Vul uw e-mail en wachtwoord in.");return;}
 setLoading(true); setErr("");
 try{
-// Single parallel call: auth + profile in one round trip
 const {data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password:pw});
-if(error){setErr(error.message==="Invalid login credentials"?"Onjuist e-mailadres of wachtwoord.":error.message);setLoading(false);return;}
-// Profile fetch — indexed on id, single row, fast
-let profile=null, pErr=null;
+if(error){setErr("Onjuist e-mailadres of wachtwoord.");setLoading(false);return;}
+const uid=data.user.id;
+const meta=data.user.user_metadata||{};
+
+// Try profile fetch
+let profile=null;
 try{
-  const pr = await supabase
+  const pr=await supabase
     .from('user_profiles')
     .select('id,full_name,email,role,department,company_id,title,avatar_initials,language')
-    .eq('id',data.user.id)
+    .eq('id',uid)
     .single();
-  profile=pr.data; pErr=pr.error;
-}catch(pe){ pErr=pe; }
-if(pErr||!profile){
-  // Try email fallback
-  try{
-    const pr2 = await supabase
-      .from('user_profiles')
-      .select('id,full_name,email,role,department,company_id,title,avatar_initials,language')
-      .eq('email',data.user.email)
-      .single();
-    profile=pr2.data; pErr=pr2.error;
-  }catch(pe2){ pErr=pe2; }
+  if(pr.data) profile=pr.data;
+}catch(e){}
+
+// Fallback: build profile from JWT metadata if DB read fails
+if(!profile){
+  profile={
+    id:uid,
+    full_name:meta.full_name||data.user.email||email.trim(),
+    email:data.user.email||email.trim(),
+    role:meta.role||'staff',
+    department:meta.department||'BOTH',
+    company_id:null,
+    title:meta.role==='super_admin'?'CEO & Super Admin':meta.role==='staff'?'Adviseur':'',
+    avatar_initials:(meta.full_name||email.trim()).split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'??',
+    language:'NL',
+  };
 }
-if(!profile){setErr("Profiel niet gevonden. Neem contact op met uw beheerder.");setLoading(false);return;}
+
 onLogin({
-id:profile.id, name:profile.full_name, email:profile.email,
-role:profile.role, dept:profile.department, company_id:profile.company_id,
-title:profile.title||'', avatar:profile.avatar_initials||profile.full_name?.split(' ').map(w=>w[0]).join('')||'??',
-language:profile.language||'NL'
+  id:profile.id,
+  name:profile.full_name,
+  email:profile.email,
+  role:profile.role,
+  dept:profile.department,
+  company_id:profile.company_id,
+  title:profile.title||'',
+  avatar:profile.avatar_initials||'??',
+  language:profile.language||'NL',
 });
 }catch(e){setErr("Er is iets misgegaan. Probeer opnieuw.");}
 setLoading(false);
