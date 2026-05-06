@@ -917,6 +917,53 @@ const toggleDark=()=>setDarkMode(d=>!d);
 const [companyData,setCompanyData]=useState(COMPANIES_INIT);
 const [engData,setEngData]=useState(ENGAGEMENTS_INIT);
 const [invData,setInvData]=useState(INVOICES_INIT);
+const [dbReady,setDbReady]=useState(false);
+
+// Load all data on mount
+useEffect(()=>{
+  const loadAll=async()=>{
+    try{
+      // Load companies
+      const {data:cos}=await supabase
+        .from("companies")
+        .select("id,name,kkf_number,department,lifecycle_status,industry,health,contact_name,contact_email,logo_url,portal_user_id,created_at")
+        .order("created_at",{ascending:false});
+      if(cos?.length) setCompanyData(cos.map(c=>({
+        id:c.id, name:c.name, kkf:c.kkf_number, dept:c.department,
+        lifecycle:c.lifecycle_status, industry:c.industry,
+        health:c.health||"green", contact:c.contact_name, email:c.contact_email,
+        logoUrl:c.logo_url, avatar:(c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
+      })));
+
+      // Load engagements with company name
+      const {data:engs}=await supabase
+        .from("engagements")
+        .select("id,name,department,type,status,health,phase,company_id,assigned_to,created_at,companies(name)")
+        .order("created_at",{ascending:false});
+      if(engs?.length) setEngData(engs.map(e=>({
+        id:e.id, name:e.name, dept:e.department, type:e.type,
+        status:e.status||"active", health:e.health||"green", phase:e.phase,
+        company_id:e.company_id, client:e.companies?.name||"—",
+        ref:`${e.department}-${e.id.slice(0,4).toUpperCase()}`,
+        assignee:"—",
+      })));
+
+      // Load invoices
+      const {data:invs}=await supabase
+        .from("invoices")
+        .select("id,ref,company_id,amount,status,due_date,companies(name)")
+        .order("created_at",{ascending:false});
+      if(invs?.length) setInvData(invs.map(i=>({
+        id:i.id, ref:i.ref, company_id:i.company_id,
+        client:i.companies?.name||"—",
+        amount:i.amount||0, status:i.status, due:i.due_date,
+      })));
+
+      setDbReady(true);
+    }catch(e){ console.warn("loadAll error:",e.message); setDbReady(true); }
+  };
+  loadAll();
+},[user.id]);
 const [notifData,setNotifData]=useState(NOTIFICATIONS_INIT);
 const [dbLoaded,setDbLoaded]=useState(false);
 
@@ -1397,47 +1444,56 @@ const submit=async()=>{
   if(!name.trim()||saving)return;
   setSaving(true);
   try{
-    const newEng={
-      name:name.trim(),
-      department:dept,
-      type:dept==="TC"?"Project":"Matter",
-      phase:phase,
-      status:"active",
-      health:"green",
-      assigned_to:assignedTo||null,
-      client_id:clientId||null,
-    };
-    // Try Supabase insert
-    try{
-      const {data,error}=await supabase
-        .from("engagements")
-        .insert(newEng)
-        .select()
-        .single();
-      if(!error&&data){
-        onCreated({...data,
-          id:data.id,
-          ref:`${dept}-${Date.now().toString().slice(-4)}`,
-          dept:data.department,
-          client:clients.find(c=>c.id===clientId)?.full_name||"—",
-          assignee:staff.find(s=>s.id===assignedTo)?.avatar_initials||"—",
-          health:"green",phase:data.phase,status:"active",name:data.name
-        });
-        showToast(`${typeLabel} "${name}" aangemaakt`);
-        onClose();
-        return;
-      }
-    }catch(e){ console.warn("Supabase insert failed, using local",e); }
+    // Find company_id from selected client
+    const selectedClient=clients.find(c=>c.id===clientId);
+    const companyId=selectedClient?.company_id||null;
+
+    const {data,error}=await supabase
+      .from("engagements")
+      .insert({
+        name:name.trim(),
+        department:dept,
+        type:dept==="TC"?"Project":"Matter",
+        phase,
+        status:"active",
+        health:"green",
+        assigned_to:assignedTo||null,
+        client_id:clientId||null,
+        company_id:companyId,
+      })
+      .select("id,name,department,phase,status,health,company_id,assigned_to")
+      .single();
+
+    if(error) throw new Error(error.message);
+
+    const clientName=selectedClient?.full_name||"—";
+    const staffMember=staff.find(s=>s.id===assignedTo);
+
+    onCreated({
+      id:data.id,
+      ref:`${dept}-${data.id.slice(0,4).toUpperCase()}`,
+      name:data.name,
+      dept:data.department,
+      phase:data.phase,
+      status:data.status,
+      health:data.health,
+      client:clientName,
+      company_id:data.company_id,
+      assignee:staffMember?.avatar_initials||"—",
+    });
+    showToast(`${typeLabel} "${name}" aangemaakt ✓`);
+    onClose();
+  }catch(e){
+    console.warn("Engagement insert failed:",e.message);
     // Local fallback
     onCreated({
       id:`eng${Date.now()}`,
       ref:`${dept}-${Date.now().toString().slice(-4)}`,
-      name:name.trim(),
-      dept,phase,status:"active",health:"green",
+      name:name.trim(),dept,phase,status:"active",health:"green",
       client:clients.find(c=>c.id===clientId)?.full_name||"—",
       assignee:staff.find(s=>s.id===assignedTo)?.avatar_initials||"—",
     });
-    showToast(`${typeLabel} "${name}" aangemaakt`);
+    showToast(`${typeLabel} "${name}" aangemaakt (lokaal)`);
     onClose();
   }finally{ setSaving(false); }
 };
@@ -2311,13 +2367,13 @@ const FormField=({label,required,children})=>(
 </div>
 );
 
-function FormInput({val,set,placeholder,type="text",border}){
+function FormInput({val,set,placeholder,type="text"}){
 return(
 <input type={type} value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
 style={{width:"100%",padding:"10px 13px",borderRadius:9,
-  border:`1.5px solid ${border||(val?"#8B1A2B":"#E4DDD5")}`,
+  border:`1.5px solid ${val?"#8B1A2B":"#E4DDD5"}`,
   fontSize:12,outline:"none",boxSizing:"border-box",
-  transition:"border-color .15s",fontFamily:"'Jost',sans-serif"}}/>
+  transition:"border-color .15s",fontFamily:"'Jost',sans-serif",background:"inherit",color:"inherit"}}/>
 );
 }
 
@@ -2326,7 +2382,7 @@ const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
 const [name,setName]=useState("");
 const [kkf,setKkf]=useState("");
 const [contact,setContact]=useState("");
-const [role,setRole]=useState("");
+const [contactRole,setContactRole]=useState("");
 const [email,setEmail]=useState("");
 const [phone,setPhone]=useState("");
 const [lifecycle,setLifecycle]=useState("Strategische Groei");
@@ -2334,208 +2390,257 @@ const [industry,setIndustry]=useState("");
 const [notes,setNotes]=useState("");
 const [logoUrl,setLogoUrl]=useState(null);
 const [logoDragging,setLogoDragging]=useState(false);
+const [saving,setSaving]=useState(false);
+const [createdAccount,setCreatedAccount]=useState(null);
 const logoRef=React.useRef();
 
 const LIFECYCLE_OPTIONS=["Strategische Groei","Herstructurering","Compliance Review","Portfolio Uitbreiding","Retainer","Due Diligence","Nieuw Prospect"];
 const INDUSTRY_OPTIONS=["Energie & Olie","Financiële Diensten","Juridisch","Vastgoed","Handel & Logistiek","Overheid","Horeca & Toerisme","Mijnbouw","Landbouw","Technologie","Anders"];
-
 const avatarFrom=n=>n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"??";
-const isValid=name.trim()&&contact.trim()&&dept;
+const isValid=name.trim()&&contact.trim()&&email.trim()&&email.includes("@")&&dept;
 
 const submit=async()=>{
-if(!isValid) return;
-const kkfVal=kkf.trim()||`SR-${new Date().getFullYear()}-${String(companyData.length+1).padStart(4,"0")}`;
-const payload={name:name.trim(),kkf:kkfVal,dept,contact:contact.trim(),role:role.trim()||"Contactpersoon",
-email:email.trim(),phone:phone.trim(),lifecycle,industry,notes,logo_url:logoUrl};
-try {
-const created=await createCompanyDB(payload);
-setCompanyData(cs=>[{...created,avatar:avatarFrom(name),logoUrl},...cs]);
-showToast(`Cliënt "${name}" aangemaakt in database`);
-onClose(); return;
-} catch(e){ console.warn("Supabase createCompany failed:", e.message); }
-const newC={id:`c${Date.now()}`,name:name.trim(),kkf:kkfVal,dept,contact:contact.trim(),
-role:role.trim()||"Contactpersoon",email:email.trim(),phone:phone.trim(),lifecycle,industry,notes,
-avatar:avatarFrom(name),health:"green",logoUrl,
-createdAt:new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})};
-setCompanyData(cs=>[newC,...cs]);
-showToast(`Cliënt "${name}" aangemaakt`);
-onClose();
+  if(!isValid||saving) return;
+  setSaving(true);
+  const kkfVal=kkf.trim()||`SR-${new Date().getFullYear()}-${String(companyData.length+1).padStart(4,"0")}`;
+  try{
+    const {data:compData,error:compErr}=await supabase
+      .from("companies")
+      .insert({
+        name:name.trim(),
+        kkf_number:kkfVal,
+        department:dept,
+        lifecycle_status:lifecycle,
+        industry:industry||null,
+        notes_internal:notes||null,
+        logo_url:logoUrl||null,
+        contact_name:contact.trim(),
+        contact_email:email.trim(),
+        contact_phone:phone.trim()||null,
+        health:"green",
+        created_by:user.id,
+      })
+      .select()
+      .single();
+
+    if(compErr) throw new Error(compErr.message);
+
+    const {data:accountData}=await supabase.rpc("create_client_portal_account",{
+      p_company_id:   compData.id,
+      p_email:        email.trim(),
+      p_company_name: name.trim(),
+      p_department:   dept,
+    });
+
+    const account=accountData||{};
+    const portalPw=account.password||`${name.trim().slice(0,3).toUpperCase()}${new Date().getFullYear()}#CP`;
+
+    setCompanyData(cs=>[{
+      id:compData.id,name:name.trim(),kkf:kkfVal,dept,
+      contact:contact.trim(),role:contactRole.trim()||"Contactpersoon",
+      email:email.trim(),phone:phone.trim(),lifecycle,industry,notes,
+      avatar:avatarFrom(name),health:"green",logoUrl,
+      createdAt:new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}),
+    },...cs]);
+
+    setCreatedAccount({companyName:name.trim(),email:email.trim(),password:portalPw,dept});
+  }catch(e){
+    console.warn("Create client error:",e.message);
+    const newC={id:`c${Date.now()}`,name:name.trim(),kkf:kkfVal,dept,
+      contact:contact.trim(),role:contactRole||"Contactpersoon",
+      email:email.trim(),phone:phone.trim(),lifecycle,industry,notes,
+      avatar:avatarFrom(name),health:"green",logoUrl,
+      createdAt:new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})};
+    setCompanyData(cs=>[newC,...cs]);
+    showToast(`Cliënt "${name}" aangemaakt (lokaal)`);
+    onClose();
+  }finally{ setSaving(false); }
 };
 
-const Field=({label,required,children})=>(
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>
-{label}{required&&<span style={{color:C.crimson}}> *</span>}
-</div>
-{children}
-</div>
-);
-const inp=(val,set,placeholder,type="text")=>(
-<input type={type} value={val} onChange={e=>set(e.target.value)} placeholder={placeholder}
-style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${val?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/>
-);
+useEffect(()=>{
+  const h=e=>{if(e.key==="Escape")onClose();};
+  window.addEventListener("keydown",h);
+  return()=>window.removeEventListener("keydown",h);
+},[]);
 
-useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+if(createdAccount) return(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}}>
+<div className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"28px 28px 24px",textAlign:"center"}}>
+    <div style={{width:56,height:56,borderRadius:"50%",background:C.greenBg,border:`2px solid ${C.green}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+      <CheckCircle size={26} color={C.green}/>
+    </div>
+    <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:C.text,marginBottom:6}}>Cliënt aangemaakt!</div>
+    <div style={{fontSize:12,color:C.secondary,marginBottom:24}}>
+      Portaalaccount voor <strong>{createdAccount.companyName}</strong> aangemaakt.<br/>
+      Deel onderstaande gegevens veilig met de cliënt.
+    </div>
+    <div style={{background:C.warm50,borderRadius:14,padding:"18px 22px",textAlign:"left",marginBottom:20,border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>PORTAAL INLOGGEGEVENS</div>
+      {[
+        ["E-mailadres",createdAccount.email],
+        ["Tijdelijk wachtwoord",createdAccount.password],
+        ["URL","tc-dash-4.vercel.app"],
+      ].map(([label,val])=>(
+        <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11,color:C.secondary}}>{label}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <code style={{fontSize:12,fontWeight:700,color:C.text,background:C.surface,padding:"3px 8px",borderRadius:5}}>{val}</code>
+            <button onClick={()=>navigator.clipboard?.writeText(val).then(()=>showToast(`${label} gekopieerd`))}
+              style={{background:"none",border:`1px solid ${C.border}`,borderRadius:5,padding:"2px 7px",fontSize:9,cursor:"pointer",color:C.secondary}}>
+              Kopieer
+            </button>
+          </div>
+        </div>
+      ))}
+      <div style={{fontSize:10,color:C.amber,marginTop:10,display:"flex",alignItems:"center",gap:6}}>
+        <AlertTriangle size={11}/> Vraag de cliënt het wachtwoord bij eerste login te wijzigen.
+      </div>
+    </div>
+    <button onClick={onClose} style={{width:"100%",padding:"12px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(139,26,43,.24)"}}>
+      Sluiten
+    </button>
+  </div>
+</div>
+</div>
+);
 
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"78px 20px 20px 20px"}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
-
-    {/* Header */}
-    <div style={{padding:"20px 26px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{width:40,height:40,borderRadius:10,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Users size={18} color={CREAM}/></div>
-        <div>
-          <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuwe Cliënt Aanmaken</div>
-          <div style={{fontSize:10,color:C.secondary}}>Vul bedrijfsgegevens en contactpersoon in</div>
-        </div>
+  {/* Header */}
+  <div style={{padding:"20px 26px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:12}}>
+      <div style={{width:40,height:40,borderRadius:10,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Users size={18} color={CREAM}/></div>
+      <div>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuwe Cliënt Aanmaken</div>
+        <div style={{fontSize:10,color:C.secondary}}>Portaalaccount wordt automatisch aangemaakt</div>
       </div>
-      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:4}}><X size={18}/></button>
+    </div>
+    <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:4}}><X size={18}/></button>
+  </div>
+
+  {/* Body */}
+  <div style={{overflowY:"auto",padding:"24px 26px",display:"flex",flexDirection:"column",gap:18,flex:1}}>
+
+    {user.dept==="BOTH"&&(
+      <div style={{display:"flex",gap:8}}>
+        {["TC","FF"].map(d=>(
+          <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {d==="TC"?"Tactigent Consultancy":"Fiscal Fuse"}
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      <FormField label="Bedrijfsnaam" required><FormInput val={name} set={setName} placeholder="Bijv. Wrokomang Logistics N.V."/></FormField>
+      <FormField label="KKF-nummer">
+        <input value={kkf} onChange={e=>setKkf(e.target.value)} placeholder="SR-2025-0001 (auto)"
+          style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${kkf?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:"inherit",color:"inherit"}}/>
+      </FormField>
     </div>
 
-    {/* Body — scrollable */}
-    <div style={{overflowY:"auto",padding:"24px 26px",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",gap:18}}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      <FormField label="Sector / Industrie">
+        <select value={industry} onChange={e=>setIndustry(e.target.value)}
+          style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:"inherit",color:"inherit",cursor:"pointer"}}>
+          <option value="">Selecteer sector...</option>
+          {INDUSTRY_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+      </FormField>
+      <FormField label="Lifecycle Status">
+        <select value={lifecycle} onChange={e=>setLifecycle(e.target.value)}
+          style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:"inherit",color:"inherit",cursor:"pointer"}}>
+          {LIFECYCLE_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+      </FormField>
+    </div>
 
-      {/* Department */}
-      {user.dept==="BOTH"&&(
-        <FormField label="Afdeling" required>
-          <div style={{display:"flex",gap:8}}>
-            {["TC","FF"].map(d=>(
-              <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
-                {d==="TC"?"Tactigent Consultancy":"Fiscal Fuse"}
-              </button>
-            ))}
-          </div>
-        </FormField>
-      )}
+    <div style={{display:"flex",alignItems:"center",gap:12}}>
+      <div style={{flex:1,height:1,background:C.border}}/>
+      <span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em"}}>PRIMAIR CONTACTPERSOON</span>
+      <div style={{flex:1,height:1,background:C.border}}/>
+    </div>
 
-      {/* Bedrijfsnaam + KKF */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <FormField label="Bedrijfsnaam" required>{<FormInput val={name} set={setName} placeholder="Bijv. Wrokomang Logistics N.V." type="text"/>}</FormField>
-        <FormField label="KKF-nummer">
-          <input value={kkf} onChange={e=>setKkf(e.target.value)} placeholder="SR-2025-0001 (auto)"
-            style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${kkf?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-        </FormField>
-      </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      <FormField label="Volledige naam" required><FormInput val={contact} set={setContact} placeholder="Bijv. Jan Jansen"/></FormField>
+      <FormField label="Functietitel"><FormInput val={contactRole} set={setContactRole} placeholder="Bijv. CFO, Directeur"/></FormField>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      <FormField label="E-mailadres" required><FormInput val={email} set={setEmail} placeholder="naam@bedrijf.sr" type="email"/></FormField>
+      <FormField label="Telefoonnummer"><FormInput val={phone} set={setPhone} placeholder="+597 8xx-xxxx"/></FormField>
+    </div>
 
-      {/* Sector + Lifecycle */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <FormField label="Sector / Industrie">
-          <select value={industry} onChange={e=>setIndustry(e.target.value)} style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface,boxSizing:"border-box"}}>
-            <option value="">Selecteer sector...</option>
-            {INDUSTRY_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
-          </select>
-        </FormField>
-        <FormField label="Lifecycle Status">
-          <select value={lifecycle} onChange={e=>setLifecycle(e.target.value)} style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface,boxSizing:"border-box"}}>
-            {LIFECYCLE_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
-          </select>
-        </FormField>
-      </div>
-
-      {/* Divider */}
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{flex:1,height:1,background:C.border}}/>
-        <span style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",whiteSpace:"nowrap"}}>Primair contactpersoon</span>
-        <div style={{flex:1,height:1,background:C.border}}/>
-      </div>
-
-      {/* Contact */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <FormField label="Volledige naam" required>{<FormInput val={contact} set={setContact} placeholder="Bijv. Jan Jansen" type="text"/>}</FormField>
-        <FormField label="Functietitel">{<FormInput val={role} set={setRole} placeholder="Bijv. CFO type=Directeur"/>}</FormField>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <FormField label="E-mailadres">{<FormInput val={email} set={setEmail} placeholder="naam@bedrijf.sr" type="email"/>}</FormField>
-        <FormField label="Telefoonnummer">{<FormInput val={phone} set={setPhone} placeholder="+597 8xx-xxxx" type="tel"/>}</FormField>
-      </div>
-
-      {/* Logo upload */}
-      <FormField label="Bedrijfslogo">
-        <input ref={logoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-          const file=e.target.files[0];
-          if(!file) return;
-          if(file.size>2*1024*1024){showToast("Bestand te groot — max 2MB");return;}
-          setLogoUrl(URL.createObjectURL(file));
-          showToast("Logo geladen");
+    <FormField label="Bedrijfslogo">
+      <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml" style={{display:"none"}}
+        onChange={e=>{
+          const f=e.target.files?.[0];
+          if(!f||f.size>2*1024*1024) return;
+          const reader=new FileReader();
+          reader.onload=ev=>setLogoUrl(ev.target.result);
+          reader.readAsDataURL(f);
         }}/>
-        <div
-          onClick={()=>logoRef.current?.click()}
-          onDragOver={e=>{e.preventDefault();setLogoDragging(true);}}
-          onDragLeave={()=>setLogoDragging(false)}
-          onDrop={e=>{
-            e.preventDefault();setLogoDragging(false);
-            const file=e.dataTransfer.files[0];
-            if(file&&file.type.startsWith("image/")){setLogoUrl(URL.createObjectURL(file));showToast("Logo geladen");}
-          }}
-          style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderRadius:10,border:`2px dashed ${logoDragging?C.crimson:logoUrl?C.green:C.border}`,background:logoDragging?C.crimsonFaint:logoUrl?C.greenBg:C.bg,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}
-        >
-          {logoUrl?(
-            <>
-              <img src={logoUrl} alt="logo" style={{width:52,height:52,borderRadius:10,objectFit:"contain",border:`1px solid ${C.border}`,background:CREAM}}/>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.green,marginBottom:2}}>Logo geladen</div>
-                <div style={{fontSize:10,color:C.secondary}}>Klik om te vervangen · Max 2 MB</div>
-              </div>
-              <button onClick={e=>{e.stopPropagation();setLogoUrl(null);}} style={{padding:"4px 10px",borderRadius:7,border:`1px solid ${C.border}`,background:C.surface,color:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer"}}>
-                <X size={12}/>
-              </button>
-            </>
-          ):(
-            <>
-              <div style={{width:52,height:52,borderRadius:10,border:`2px dashed ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:C.surface,flexShrink:0}}>
-                <Upload size={18} color={C.secondary}/>
-              </div>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:2}}>Klik of sleep een afbeelding</div>
-                <div style={{fontSize:10,color:C.secondary}}>PNG, JPG, SVG · Max 2 MB · Aanbevolen: 200×200px</div>
-              </div>
-            </>
-          )}
+      <div onClick={()=>logoRef.current?.click()}
+        onDragOver={e=>{e.preventDefault();setLogoDragging(true);}}
+        onDragLeave={()=>setLogoDragging(false)}
+        onDrop={e=>{
+          e.preventDefault();setLogoDragging(false);
+          const f=e.dataTransfer.files?.[0];
+          if(!f||f.size>2*1024*1024) return;
+          const reader=new FileReader();
+          reader.onload=ev=>setLogoUrl(ev.target.result);
+          reader.readAsDataURL(f);
+        }}
+        style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderRadius:10,
+          border:`2px dashed ${logoDragging?C.crimson:C.border}`,cursor:"pointer",
+          background:logoDragging?C.crimsonFaint:C.warm50,transition:"border-color .15s,background .15s"}}>
+        {logoUrl
+          ? <img src={logoUrl} alt="logo" style={{width:40,height:40,borderRadius:8,objectFit:"contain"}}/>
+          : <div style={{width:40,height:40,borderRadius:8,background:C.surface,display:"flex",alignItems:"center",justifyContent:"center"}}><Upload size={16} color={C.secondary}/></div>
+        }
+        <div>
+          <div style={{fontSize:12,fontWeight:600,color:C.text}}>Klik of sleep een afbeelding</div>
+          <div style={{fontSize:10,color:C.secondary}}>PNG, JPG, SVG · Max 2 MB · Aanbevolen: 200×200px</div>
         </div>
-      </FormField>
+      </div>
+    </FormField>
 
-      {/* Notes */}
-      <FormField label="Interne notities">
-        <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Aanvullende context, referenties, bijzonderheden..." rows={3}
-          style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body}}/>
-      </FormField>
+    <FormField label="Interne notities">
+      <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Aanvullende context, referenties, bijzonderheden..."
+        rows={3} style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",background:"inherit",color:"inherit"}}/>
+    </FormField>
 
-      {/* Preview card */}
-      {name&&(
-        <div style={{background:C.warm50,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:14}}>
-          {logoUrl?(
-            <img src={logoUrl} alt={name} style={{width:44,height:44,borderRadius:10,objectFit:"contain",border:`1px solid ${C.border}`,background:CREAM,flexShrink:0}}/>
-          ):(
-            <CompanyLogo name={name||"?"} size={44} dept={dept}/>
-          )}
-          <div>
-            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>{name||"—"}</div>
-            <div style={{fontSize:11,color:C.secondary,display:"flex",gap:12}}>
-              <span>{contact||"Contactpersoon"}{role&&` · ${role}`}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5}}>
-              <DeptTag dept={dept}/>
-              <span style={{fontSize:9,color:C.secondary}}>{lifecycle}</span>
-              {industry&&<span style={{fontSize:9,color:C.muted}}>· {industry}</span>}
-            </div>
+    {name&&(
+      <div style={{background:C.warm50,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:14}}>
+        {logoUrl
+          ? <img src={logoUrl} alt={name} style={{width:44,height:44,borderRadius:10,objectFit:"contain",border:`1px solid ${C.border}`,background:CREAM,flexShrink:0}}/>
+          : <div style={{width:44,height:44,borderRadius:10,background:dept==="TC"?C.crimson:C.taupe,display:"flex",alignItems:"center",justifyContent:"center",color:CREAM,fontWeight:700,fontSize:14,flexShrink:0}}>{avatarFrom(name)}</div>
+        }
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>{name}</div>
+          <div style={{fontSize:11,color:C.secondary}}>{contact||"Contactpersoon"}{contactRole&&` · ${contactRole}`}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5}}>
+            <DeptTag dept={dept}/><span style={{fontSize:9,color:C.secondary}}>{lifecycle}</span>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+  </div>
 
-    {/* Footer */}
-    <div style={{padding:"16px 26px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
-      <button onClick={submit} disabled={!isValid} style={{flex:1,padding:"12px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"background .15s"}}>
-        <Users size={15}/> Cliënt aanmaken
-      </button>
-      <button onClick={onClose} style={{padding:"12px 20px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
-    </div>
+  {/* Footer */}
+  <div style={{padding:"16px 26px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
+    <button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"12px",borderRadius:10,background:isValid&&!saving?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid&&!saving?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      {saving
+        ? <><div style={{width:14,height:14,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>
+        : <><Users size={15}/> Cliënt aanmaken</>
+      }
+    </button>
+    <button onClick={onClose} style={{padding:"12px 20px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
   </div>
 </div>
-
-
+</div>
 );
 }
 
