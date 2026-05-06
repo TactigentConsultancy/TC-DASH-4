@@ -524,7 +524,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #8B1A2B;outline-offset:2p
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
-@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);}}
 
 .fu{animation:fadeUp .28s var(--ease-out-expo) both;}
@@ -733,6 +733,24 @@ return(
 );
 }
 
+
+function TopbarAvatar({user,setView,size=32,clickable=true}){
+const [url,setUrl]=useState(null);
+useEffect(()=>{
+  supabase.from("user_profiles").select("avatar_url").eq("id",user.id).single()
+    .then(({data})=>{ if(data?.avatar_url) setUrl(data.avatar_url); })
+    .catch(()=>{});
+},[user.id]);
+return(
+  <div onClick={clickable?()=>setView("settings"):undefined} style={{width:size,height:size,borderRadius:"50%",border:`2px solid ${C.border}`,overflow:"hidden",cursor:clickable?"pointer":"default",flexShrink:0}}>
+    {url
+      ? <img src={url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+      : <div style={{width:"100%",height:"100%",background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(size*.34),fontWeight:700,color:CREAM}}>{user.avatar}</div>
+    }
+  </div>
+);
+}
+
 function Topbar({user,language,setLanguage,setView,unreadCount,onLogout,darkMode,toggleDark}){
 const t=useT();
 const [q,setQ]=useState("");
@@ -828,7 +846,7 @@ style={{width:"100%",padding:"8px 34px 8px 36px",borderRadius:10,border:`1.5px s
     {/* Profile avatar + dropdown */}
     <div style={{position:"relative"}} onMouseDown={e=>e.stopPropagation()}>
       <button onClick={()=>setShowProfile(v=>!v)} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px 4px 4px",borderRadius:9,border:`1px solid ${showProfile?C.crimson:C.border}`,background:showProfile?C.crimsonFaint:"transparent",cursor:"pointer"}}>
-        <Avatar initials={user.avatar} size={26}/>
+        <TopbarAvatar user={user} setView={setView} size={26}/>
         <div style={{textAlign:"left"}}>
           <div style={{fontSize:11,fontWeight:700,color:C.text,lineHeight:1.2}}>{user.name.split(" ")[0]}</div>
           <div style={{fontSize:9,color:C.secondary}}>{roleLabel[user.role]||user.role}</div>
@@ -4436,6 +4454,19 @@ const [name,setName]=useState(user.name);
 const [email,setEmail]=useState(user.email);
 const [title,setTitle]=useState(user.title||"");
 const [notifPrefs,setNotifPrefs]=useState({email:true,inApp:true,sms:false,weekly:true,clientActions:true,invoices:true});
+const [avatarUrl,setAvatarUrl]=useState(null);
+const [uploading,setUploading]=useState(false);
+
+// Load existing avatar on mount
+useEffect(()=>{
+  const loadAvatar=async()=>{
+    try{
+      const {data}=await supabase.from("user_profiles").select("avatar_url").eq("id",user.id).single();
+      if(data?.avatar_url) setAvatarUrl(data.avatar_url);
+    }catch(e){}
+  };
+  loadAvatar();
+},[user.id]);
 const [secPrefs,setSecPrefs]=useState({twofa:false,sessionTimeout:"30min",loginAlerts:true});
 
 const tabs=[
@@ -4492,11 +4523,53 @@ return(
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:18}}>Persoonlijke gegevens</div>
             <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:22,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
               <div style={{position:"relative",cursor:"pointer"}} onClick={()=>document.getElementById("profileUpload").click()}>
-                <Avatar initials={user.avatar} size={64} bg={C.crimson}/>
-                <div style={{position:"absolute",bottom:-2,right:-2,width:22,height:22,borderRadius:"50%",background:C.walnut,border:`2px solid ${C.surface}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <Upload size={11} color={CREAM}/>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" style={{width:64,height:64,borderRadius:"50%",objectFit:"cover",border:`3px solid ${C.border}`}}/>
+                  : <Avatar initials={user.avatar} size={64} bg={C.crimson}/>
+                }
+                <div style={{position:"absolute",bottom:-2,right:-2,width:22,height:22,borderRadius:"50%",background:uploading?C.amber:C.walnut,border:`2px solid ${C.surface}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {uploading
+                    ? <div style={{width:10,height:10,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+                    : <Upload size={11} color={CREAM}/>
+                  }
                 </div>
-                <input id="profileUpload" type="file" accept="image/*" style={{display:"none"}} onChange={()=>showToast("Profielfoto bijgewerkt")}/>
+                <input id="profileUpload" type="file" accept="image/jpeg,image/png,image/webp" style={{display:"none"}}
+                  onChange={async(e)=>{
+                    const file=e.target.files?.[0];
+                    if(!file) return;
+                    if(file.size>2*1024*1024){showToast("Afbeelding mag max 2MB zijn");return;}
+                    setUploading(true);
+                    try{
+                      // Upload to Supabase Storage
+                      const ext=file.name.split(".").pop();
+                      const path=`${user.id}.${ext}`;
+                      const formData=new FormData();
+                      formData.append("",file);
+                      const SB_URL_STORAGE="https://qjlijtlqtyzytxcmzwvu.supabase.co";
+                      const res=await fetch(`${SB_URL_STORAGE}/storage/v1/object/avatars/${path}`,{
+                        method:"POST",
+                        headers:{
+                          "Authorization":`Bearer ${_authToken}`,
+                          "apikey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbGlqdGxxdHl6eXR4Y216d3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NTE3MjAsImV4cCI6MjA5MjEyNzcyMH0.EwHl1enE8b5LBXUBQTMSDT4Mv0O6Kkdjbtg1LooH4f8",
+                          "x-upsert":"true",
+                        },
+                        body:formData,
+                      });
+                      if(res.ok){
+                        // Get public URL
+                        const publicUrl=`${SB_URL_STORAGE}/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
+                        setAvatarUrl(publicUrl);
+                        // Save URL to user_profiles
+                        await supabase.from("user_profiles").update({avatar_url:publicUrl}).eq("id",user.id);
+                        showToast("Profielfoto bijgewerkt ✓");
+                      } else {
+                        const err=await res.json().catch(()=>({}));
+                        showToast(`Upload mislukt: ${err.message||res.statusText}`);
+                      }
+                    }catch(ex){showToast("Upload mislukt. Probeer opnieuw.");}
+                    setUploading(false);
+                  }}
+                />
               </div>
               <div>
                 <div style={{fontSize:16,fontWeight:700,color:C.text}}>{user.name}</div>
