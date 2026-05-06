@@ -26,23 +26,23 @@ Building, LayoutDashboard
 // Once you add your images, change BRANDING_USE_IMAGES to true.
 // The app will automatically swap from initials to your logos everywhere.
 // ─────────────────────────────────────────────────────────────────────────────
-const BRANDING_USE_IMAGES = false; // ← set to true after adding images
+const BRANDING_USE_IMAGES = true; // ← set to true after adding images
 
 const BRANDING = {
   // Image paths (relative to /public)
   logoTC:       "/images/branding/logo-tc.png",
   logoFF:       "/images/branding/logo-ff.png",
-  logoTCLight:  "/images/branding/logo-tc-light.png",
-  logoFFLight:  "/images/branding/logo-ff-light.png",
+  logoTCLight:  "/images/branding/logo-tc.png",
+  logoFFLight:  "/images/branding/logo-ff.png",
   logoMain:     "/images/branding/logo-main.png",
 
   // Fallback text when images are not yet set
-  nameTC:       "Tactigent",
+  nameTC:       "Tactigent Consultancy",
   nameFF:       "Fiscal Fuse",
   nameMain:     "The Client Portal",
   initTC:       "TC",
   initFF:       "FF",
-  initMain:     "GE",
+  initMain:     "CP",
 
   // Brand colors (keep in sync with C below)
   colorTC:      "#8B1A2B",
@@ -1091,15 +1091,19 @@ return(
     <div style={{position:"absolute",top:16,right:18}}><AlertTriangle size={18} color={C.red} opacity={0.4}/></div>
     <div style={{fontSize:10,fontWeight:700,color:C.red,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12,opacity:0.8}}>{t("healthLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.red,lineHeight:1}}>04</span>
-      <span style={{fontSize:12,color:C.red,fontWeight:600,opacity:0.7}}>{t("criticalThresholds")}</span>
+      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:eng.filter(e=>e.health==="red").length>0?C.red:C.green,lineHeight:1}}>
+        {String(eng.filter(e=>e.health==="red").length).padStart(2,"0")}
+      </span>
+      <span style={{fontSize:12,color:eng.filter(e=>e.health==="red").length>0?C.red:C.green,fontWeight:600,opacity:0.7}}>{t("criticalThresholds")}</span>
     </div>
     <div style={{marginTop:12,fontSize:11,fontWeight:700,color:C.red,letterSpacing:"0.06em",textTransform:"uppercase",opacity:0.9}}>{t("actionRequired")}</div>
   </div>
   <div style={{background:C.surface,borderRadius:14,padding:"20px 22px",border:`1px solid ${C.border}`}}>
     <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("exposureLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:14}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.text,lineHeight:1}}>12</span>
+      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.text,lineHeight:1}}>
+        {String(eng.length).padStart(2,"0")}
+      </span>
       <span style={{fontSize:12,color:C.secondary}}>{t("riskyDossiers")}</span>
     </div>
     {/* Mini bar chart — not number+label again */}
@@ -1113,12 +1117,14 @@ return(
   <div style={{background:C.espresso,borderRadius:14,padding:"20px 22px",position:"relative",overflow:"hidden"}}>
     <div style={{fontSize:10,fontWeight:700,color:C.taupeLight,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:CREAM,lineHeight:1}}>89</span>
+      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:CREAM,lineHeight:1}}>
+        {eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}
+      </span>
       <span style={{fontFamily:F.display,fontSize:24,color:CREAM,opacity:0.6}}>%</span>
     </div>
     {/* Progress arc — different from numbers */}
     <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3,overflow:"hidden"}}>
-      <div style={{width:"89%",height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3}}/>
+      <div style={{width:`${eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}%`,height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3}}/>
     </div>
     <div style={{fontSize:10,color:C.taupeLight,marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
   </div>
