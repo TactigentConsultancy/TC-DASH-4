@@ -1450,7 +1450,7 @@ useEffect(()=>{
 
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",maxHeight:"90vh"}}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 100px)"}}>
   {/* Header */}
   <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
     <div>
@@ -1970,7 +1970,7 @@ onClose();
 };
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.58)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"96vw",boxShadow:"0 40px 100px rgba(58,46,40,.32)",display:"flex",flexDirection:"column",maxHeight:"92vh",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"96vw",boxShadow:"0 40px 100px rgba(58,46,40,.32)",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 100px)",overflow:"hidden"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
 <div>
 <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{eng.ref} · {eng.client}</div>
@@ -2357,8 +2357,8 @@ style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${va
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"92vh",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:"20px 20px 20px 20px",paddingTop:"max(20px, calc(58px + 20px))"}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",overflow:"hidden",marginTop:"auto",marginBottom:"auto"}}>
 
 
     {/* Header */}
@@ -2374,7 +2374,7 @@ return(
     </div>
 
     {/* Body — scrollable */}
-    <div style={{overflowY:"auto",padding:"24px 26px",display:"flex",flexDirection:"column",gap:18}}>
+    <div style={{overflowY:"auto",padding:"24px 26px",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",gap:18}}>
 
       {/* Department */}
       {user.dept==="BOTH"&&(
@@ -2391,7 +2391,7 @@ return(
 
       {/* Bedrijfsnaam + KKF */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Bedrijfsnaam" required>{}</Field>
+        <Field label="Bedrijfsnaam" required>{inp(name,setName,"Bijv. Breathe Logistics N.V.")}</Field>
         <Field label="KKF-nummer">
           <input value={kkf} onChange={e=>setKkf(e.target.value)} placeholder="SR-2025-0001 (auto)"
             style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${kkf?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
@@ -2422,7 +2422,7 @@ return(
 
       {/* Contact */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Field label="Volledige naam" required>{}</Field>
+        <Field label="Volledige naam" required>{inp(contact,setContact,"Bijv. Jan Jansen")}</Field>
         <Field label="Functietitel">{inp(role,setRole,"Bijv. CFO, Directeur")}</Field>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
@@ -3092,7 +3092,7 @@ return ()=>window.removeEventListener("keydown", handler);
 
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
 <div style={{width:36,height:36,borderRadius:9,background:typeBg[doc.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -3235,7 +3235,7 @@ const lineItems = [
 
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
 <div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:C.greenBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -4277,7 +4277,7 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
 {/* Header */}
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -4377,7 +4377,7 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)",overflow:"hidden"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
 <div style={{width:38,height:38,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Send size={17} color={CREAM}/></div>
