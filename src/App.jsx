@@ -754,7 +754,7 @@ return(
 <SideBtn icon={Receipt} label={t("invoices")} isActive={view==="invoices"} onClick={()=>setView("invoices")}/>
 <SideSection label={t("intelligence")}/>
 <SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")}/>
-{(user.role==="super_admin")&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
+{user.role==="super_admin"&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
 <SideSection label={t("system")}/>
 <SideBtn icon={Bell} label={t("notifications")} isActive={view==="notifications"} onClick={()=>setView("notifications")} badge={unreadCount>0?unreadCount:null}/>
 {(user.role==="super_admin"||user.role==="admin")&&<SideBtn icon={ClipboardList} label="Audit Log" isActive={view==="audit_log"} onClick={()=>setView("audit_log")}/>}
@@ -770,7 +770,7 @@ return(
 <SideBtn icon={Receipt} label={t("financeNav")} isActive={view==="c_finance"} onClick={()=>setView("c_finance")}/>
 <SideSection label={t("intelligence")}/>
 <SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")}/>
-{(user.role==="super_admin")&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
+{user.role==="super_admin"&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
 <SideSection label="Communicatie"/>
 <SideBtn icon={Send} label={t("messages")} isActive={view==="c_messages"} onClick={()=>setView("c_messages")}/>
 <SideSection label="Account"/>
@@ -1027,7 +1027,16 @@ useEffect(()=>{
   };
   loadAll();
 },[user.id]);
-const [notifData,setNotifData]=useState(Array.isArray(NOTIFICATIONS_INIT)?NOTIFICATIONS_INIT:[]);
+const [notifData,setNotifData]=useState([]);
+// Load notifications from Supabase
+useEffect(()=>{
+  supabase.from("notifications")
+    .select("id,title,body,is_read,created_at,action_type,entity_type,company_id")
+    .eq("user_id",user.id)
+    .order("created_at",{ascending:false})
+    .limit(50)
+    .then(({data})=>{ if(data?.length) setNotifData(data.map(n=>({...n,read:n.is_read,type:n.action_type||"info",time:new Date(n.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"})}))); });
+},[user.id]);
 const [dbLoaded,setDbLoaded]=useState(false);
 
 useEffect(()=>{
@@ -1056,11 +1065,13 @@ return()=>{active=false;};
 },[user.id]);
 
 const [showNewEng,setShowNewEng]=useState(false);
-const unreadCount=notifData.filter(n=>!n.read).length;
+const unreadCount=notifData.filter(n=>!n.read&&!n.is_read).length;
 const handleSetView=(v)=>{
 setView(v);setDetailEng(null);setDetailCompany(null);setDetailLead(null);
 if(v==="notifications"){
-setNotifData(ns=>ns.map(n=>({...n,read:true})));
+setNotifData(ns=>ns.map(n=>({...n,read:true,is_read:true})));
+    // Mark all read in DB
+    supabase.from("notifications").update({is_read:true}).eq("user_id",user?.id||"").then(()=>{});
 markNotificationsRead(user.id).catch(()=>{});
 }
 };  const renderView=()=>{
@@ -1500,7 +1511,14 @@ useEffect(()=>{
         .from("user_profiles")
         .select("id,full_name,company_id,avatar_initials")
         .eq("role","client");
-      setClients(clientData||[]);
+      // Also load companies without portal users
+      const {data:compData}=await supabase
+        .from("companies")
+        .select("id,name,department,portal_user_id");
+      const compClients=(compData||[]).filter(c=>!c.portal_user_id).map(c=>({
+        id:c.id,full_name:c.name,company_id:c.id,avatar_initials:(c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
+      }));
+      setClients([...(clientData||[]),...compClients]);
     }catch(e){ console.warn("load error",e); }
   };
   load();
@@ -1577,8 +1595,8 @@ useEffect(()=>{
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -1824,8 +1842,8 @@ return(
 {/* Template Picker Modal */}
 {showTemplatePicker&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -2062,6 +2080,20 @@ const {members}=useTeamMembers(user.dept);
 const [showNewLead,setShowNewLead]=useState(false);
 const [leadData,setLeadData]=useState([]);
 const [stageF,setStageF]=useState("ALL");
+// Load leads from Supabase on mount
+useEffect(()=>{
+  supabase.from("leads")
+    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,notes,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setLeadData(data.map(l=>({
+        id:l.id,name:l.company_name,contact:l.contact_name,
+        email:l.contact_email,value:l.estimated_value||0,
+        stage:l.stage||"new",dept:l.department,
+        rep:l.assigned_to?"?":"—",
+      })));
+    });
+},[]);
 const [assigneeFilter,setAssigneeFilter]=useState("");
 const [tasks,setTasks]=useState(Object.values(TASKS_BY_ENG).flat());
 const [statusF,setStatusF]=useState("ALL"); const [q,setQ]=useState("");
@@ -2205,7 +2237,7 @@ onClose();
 return(
 <div style={{
   position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
-  background:"rgba(240,235,228,0.75)",
+  background:"rgba(40,32,26,0.82)",
   backdropFilter:"blur(20px) saturate(0.4)",
   WebkitBackdropFilter:"blur(20px) saturate(0.4)",
   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2534,8 +2566,8 @@ return(
 </div>
 {reviewing&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -2588,7 +2620,7 @@ return(
 style={{width:"100%",padding:"10px 13px",borderRadius:9,
   border:`1.5px solid ${val?"#8B1A2B":"#E4DDD5"}`,
   fontSize:12,outline:"none",boxSizing:"border-box",
-  transition:"border-color .15s",fontFamily:"'Jost',sans-serif",background:"inherit",color:"inherit"}}/>
+  transition:"border-color .15s",fontFamily:"'Jost',sans-serif",background:C.bg,color:C.text}}/>
 );
 }
 
@@ -2681,8 +2713,8 @@ useEffect(()=>{
 
 if(createdAccount) return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -2732,8 +2764,8 @@ zIndex:9999,
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -2887,6 +2919,21 @@ zIndex:9999,
 }
 
 function CRMView({user,companyData,setCompanyData,setDetailCompany,showToast}){
+// Refresh company list from Supabase on mount
+useEffect(()=>{
+  supabase.from("companies")
+    .select("id,name,kkf_number,department,lifecycle_status,industry,health,contact_name,contact_email,logo_url,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setCompanyData(data.map(c=>({
+        id:c.id,name:c.name,kkf:c.kkf_number,dept:c.department,
+        lifecycle:c.lifecycle_status,industry:c.industry,
+        health:c.health||"green",contact:c.contact_name,email:c.contact_email,
+        logoUrl:c.logo_url,
+        avatar:(c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
+      })));
+    });
+},[]);
 const t=useT();
 const [q,setQ]=useState(""); const [deptF,setDeptF]=useState("ALL");
 const [showNew,setShowNew]=useState(false);
@@ -2926,7 +2973,7 @@ return(
 ):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{[t("companyName"),t("contactPerson"),"AFDELING","SECTOR",t("lifecycle"),""].map((h,i)=><th key={i} style={{padding:"10px 20px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{list.map(c=>(
+<tbody>{list.length===0?(<tr><td colSpan={5} style={{padding:"40px",textAlign:"center",color:C.secondary,fontSize:13}}>Geen cliënten gevonden. Maak een nieuwe cliënt aan via de knop rechtsboven.</td></tr>):list.map(c=>(
 <tr key={c.id} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer",position:"relative"}} onClick={()=>setDetailCompany(c)}>
 {c.alert&&<div style={{position:"absolute",left:0,top:"12px",bottom:"12px",width:3,background:C.crimson,borderRadius:"0 2px 2px 0"}}/>}
 <td style={{padding:"13px 19px"}}>
@@ -3010,8 +3057,8 @@ const submit=async()=>{
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -3078,6 +3125,37 @@ const {members}=useTeamMembers(user.dept);
 const [showNewLead,setShowNewLead]=useState(false);
 const [leadData,setLeadData]=useState([]);
 const [stageF,setStageF]=useState("ALL");
+const [leadsLoading,setLeadsLoading]=useState(true);
+
+// Load leads from DB on mount
+useEffect(()=>{
+  supabase.from("leads")
+    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setLeadData(data.map(l=>({
+        id:l.id, name:l.company_name, contact:l.contact_name,
+        email:l.contact_email, value:l.estimated_value||0,
+        stage:l.stage||"new", dept:l.department,
+        rep:l.assigned_to?.slice(0,2).toUpperCase()||"—",
+      })));
+      setLeadsLoading(false);
+    }).catch(()=>setLeadsLoading(false));
+},[]);
+// Load leads from Supabase on mount
+useEffect(()=>{
+  supabase.from("leads")
+    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,notes,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setLeadData(data.map(l=>({
+        id:l.id,name:l.company_name,contact:l.contact_name,
+        email:l.contact_email,value:l.estimated_value||0,
+        stage:l.stage||"new",dept:l.department,
+        rep:l.assigned_to?"?":"—",
+      })));
+    });
+},[]);
 const t=useT();
 const [q,setQ]=useState(""); const [deptF,setDeptF]=useState("ALL");
 const sL={new:"Nieuw",qualified:"Gekwalificeerd",proposal:"Voorstel",won:"Gewonnen",inquiry:"Aanvraag",strategy_review:"Strategie Review",engaged:"Betrokken"};
@@ -3152,8 +3230,8 @@ return(
 {/* New folder modal */}
 {showNewFolder&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -3233,8 +3311,8 @@ zIndex:9999,
 </div>
 {selected&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -3383,8 +3461,8 @@ return(
 {/* Invoice file upload modal */}
 {showUpload&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -3441,7 +3519,8 @@ const icons={warning:<AlertTriangle size={15} color={C.amber}/>,success:<CheckCi
 return(
 <div>
 <PageHeader kicker="Systeem" title={t("notifTitle")} action={
-<button onClick={()=>setNotifData(ns=>ns.map(n=>({...n,read:true})))} style={{padding:"7px 14px",borderRadius:9,border:`1.5px solid ${C.border}`,background:C.surface,fontSize:11,fontWeight:700,color:C.secondary,cursor:"pointer"}}>{t("markAllRead")}</button>
+<button onClick={()=>{setNotifData(ns=>ns.map(n=>({...n,read:true,is_read:true})));
+    supabase.from("notifications").update({is_read:true}).eq("user_id",user?.id||"").then(()=>{});}} style={{padding:"7px 14px",borderRadius:9,border:`1.5px solid ${C.border}`,background:C.surface,fontSize:11,fontWeight:700,color:C.secondary,cursor:"pointer"}}>{t("markAllRead")}</button>
 }/>
 <div style={{display:"flex",flexDirection:"column",gap:8}}>
 {notifData.map(n=>(
@@ -3742,8 +3821,8 @@ return ()=>window.removeEventListener("keydown", handler);
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -3894,8 +3973,8 @@ const lineItems = [
 
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -4180,8 +4259,8 @@ return(
 {done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
 {uploading&&(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -4955,8 +5034,8 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -4964,7 +5043,7 @@ return(
 justifyContent:"center",
 zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
 {/* Header */}
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -5064,8 +5143,8 @@ onClose();
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
 <div style={{
-      position:"fixed",top:0,left:0,width:"100%",height:"100%",
-      background:"rgba(240,235,228,0.7)",
+      position:"fixed",top:0,left:0,width:"100vw",height:"100vh",
+      background:"rgba(40,32,26,0.82)",
       backdropFilter:"blur(20px) saturate(0.5)",
       WebkitBackdropFilter:"blur(20px) saturate(0.5)",
       display:"flex",
@@ -5073,7 +5152,7 @@ return(
 justifyContent:"center",
 zIndex:9999,
     }} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 40px 100px rgba(58,46,40,.3)"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
 <div style={{width:38,height:38,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Send size={17} color={CREAM}/></div>
@@ -5440,7 +5519,7 @@ setLoading(false);
 };
 return(
 <LangCtx.Provider value={language}>
-<GlobalStyles/>
+<GlobalStyles darkMode={false}/>
 <div style={{minHeight:"100vh",background:`linear-gradient(150deg,#F0EBE4 0%,#EDE7E0 40%,#E8E0D6 100%)`,display:"flex",flexDirection:"column"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 28px"}}>
 <div style={{display:"flex",alignItems:"center",gap:9}}>
