@@ -5602,10 +5602,214 @@ return(
 );
 }
 
-// ─── LOGIN PAGE ──────────────────────────────────────────────────────────────
+// ─── GLOBE COMPONENT (WebGL canvas, no npm required) ─────────────────────────
+function GlobeBackground(){
+  const canvasRef=useRef(null);
+  const phiRef=useRef(0);
+  const rafRef=useRef(null);
+  const pointerDown=useRef(null);
+  const pointerDelta=useRef(0);
+  const rRef=useRef(0);
+
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas) return;
+    const gl=canvas.getContext("webgl")||canvas.getContext("experimental-webgl");
+    if(!gl){ canvas.style.opacity="1"; return; }
+
+    // ── Shader sources ──────────────────────────────────────────────────────
+    const VS=`
+      attribute vec2 a_pos;
+      void main(){ gl_Position=vec4(a_pos,0.,1.); }
+    `;
+    const FS=`
+      precision mediump float;
+      uniform vec2  u_res;
+      uniform float u_phi;
+      uniform float u_time;
+
+      #define PI 3.14159265
+
+      // Noise helpers
+      float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){
+        vec2 i=floor(p), f=fract(p), u=f*f*(3.-2.*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),
+                   mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+      }
+
+      // Sphere ray intersection
+      bool sphere(vec3 ro,vec3 rd,out float t){
+        float b=dot(ro,rd), c=dot(ro,ro)-1.;
+        float disc=b*b-c;
+        if(disc<0.) return false;
+        t=-b-sqrt(disc);
+        return t>0.;
+      }
+
+      // Simple land mask using layered noise (approximates continents)
+      float landMask(vec2 uv){
+        float n=noise(uv*2.8+vec2(0.3,0.7))*0.5
+               +noise(uv*5.6+vec2(1.1,2.3))*0.25
+               +noise(uv*11.+vec2(3.2,0.9))*0.125;
+        return smoothstep(0.52,0.58,n);
+      }
+
+      void main(){
+        vec2 uv=(gl_FragCoord.xy/u_res-.5)*vec2(u_res.x/u_res.y,1.)*2.;
+        vec3 ro=vec3(0.,0.,2.8);
+        vec3 rd=normalize(vec3(uv,-2.));
+
+        // Glow halo behind sphere
+        float glowR=length(uv);
+        vec3 halo=vec3(.08,.06,.12)*pow(max(0.,1.-glowR*.85),3.)*2.5;
+
+        float t;
+        if(!sphere(ro,rd,t)){ gl_FragColor=vec4(halo,1.); return; }
+
+        vec3 pos=ro+rd*t;
+        vec3 nrm=pos;
+
+        // Spherical UVs with rotation
+        float phi_=atan(pos.z,pos.x)+u_phi;
+        float theta_=acos(clamp(pos.y,-1.,1.));
+        vec2 sph=vec2((phi_/(2.*PI)+.5), theta_/PI);
+
+        // Diffuse lighting
+        vec3 light=normalize(vec3(1.,0.8,0.4));
+        float diff=max(dot(nrm,light),0.);
+        float rim=pow(1.-max(dot(nrm,-rd),0.),3.)*0.6;
+
+        // Land/ocean base colors
+        float land=landMask(sph*vec2(4.,2.)+vec2(u_phi*.15,0.));
+        vec3 oceanCol=vec3(.05,.06,.12)*(diff*.8+.2)+vec3(.1,.14,.28)*rim;
+        vec3 landCol =vec3(.12,.10,.08)*(diff*.7+.3)+vec3(.18,.12,.06)*rim;
+        vec3 col=mix(oceanCol,landCol,land);
+
+        // Specular on ocean
+        vec3 refl=reflect(rd,nrm);
+        float spec=pow(max(dot(refl,light),0.),60.)*(1.-land)*.5;
+        col+=vec3(.4,.5,.7)*spec;
+
+        // City dots — hardcoded major locations
+        // Each: lon(rad), lat(rad), size
+        vec3 markerCol=vec3(.95,.45,.12);
+        vec2 mkrs[8];
+        mkrs[0]=vec2( 2.111,  0.361); // Manila
+        mkrs[1]=vec2( 1.272,  0.333); // Mumbai
+        mkrs[2]=vec2( 1.578,  0.416); // Beijing
+        mkrs[3]=vec2( 0.546, -0.411); // São Paulo
+        mkrs[4]=vec2(-1.731,  0.339); // New York
+        mkrs[5]=vec2( 0.503,  0.531); // Cairo
+        mkrs[6]=vec2( 2.361,  0.606); // Tokyo
+        mkrs[7]=vec2(-1.729,  0.785); // Paramaribo approx
+        float marker=0.;
+        for(int i=0;i<8;i++){
+          float mPhi=mkrs[i].x+u_phi;
+          float mTheta=PI*.5-mkrs[i].y;
+          vec3 mPos=vec3(sin(mTheta)*cos(mPhi),cos(mTheta),sin(mTheta)*sin(mPhi));
+          float d=distance(pos,mPos);
+          float pulse=.5+.5*sin(u_time*2.+float(i)*1.3);
+          marker+=smoothstep(.028+pulse*.012,.0,.0+d)*0.9;
+        }
+        col=mix(col,markerCol,clamp(marker,0.,1.));
+
+        // Atmosphere rim
+        col+=vec3(.15,.18,.32)*rim*.8;
+
+        // Subtle grid lines (latitude/longitude)
+        float grid=0.;
+        float gPhi=mod(sph.x*12.,1.);
+        float gTheta=mod(sph.y*6.,1.);
+        grid+=smoothstep(.03,.0,min(gPhi,1.-gPhi))*.12;
+        grid+=smoothstep(.03,.0,min(gTheta,1.-gTheta))*.12;
+        col+=vec3(.3,.35,.5)*grid*(1.-land);
+
+        gl_FragColor=vec4(col+halo*.15,1.);
+      }
+    `;
+
+    // ── Compile shaders ──────────────────────────────────────────────────────
+    const compile=(type,src)=>{
+      const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+      if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.warn(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const prog=gl.createProgram();
+    gl.attachShader(prog,compile(gl.VERTEX_SHADER,VS));
+    gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FS));
+    gl.linkProgram(prog); gl.useProgram(prog);
+
+    const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+    const aPos=gl.getAttribLocation(prog,"a_pos");
+    gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
+
+    const uRes=gl.getUniformLocation(prog,"u_res");
+    const uPhi=gl.getUniformLocation(prog,"u_phi");
+    const uTime=gl.getUniformLocation(prog,"u_time");
+
+    const resize=()=>{
+      canvas.width=canvas.offsetWidth*window.devicePixelRatio;
+      canvas.height=canvas.offsetHeight*window.devicePixelRatio;
+      gl.viewport(0,0,canvas.width,canvas.height);
+    };
+    window.addEventListener("resize",resize); resize();
+
+    const start=performance.now();
+    const tick=()=>{
+      const t=(performance.now()-start)/1000;
+      phiRef.current+=0.003;
+      const r=rRef.current*0.96; rRef.current=r;
+      gl.uniform2f(uRes,canvas.width,canvas.height);
+      gl.uniform1f(uPhi,phiRef.current+r);
+      gl.uniform1f(uTime,t);
+      gl.drawArrays(gl.TRIANGLES,0,6);
+      rafRef.current=requestAnimationFrame(tick);
+    };
+    tick();
+    setTimeout(()=>{ canvas.style.opacity="1"; },100);
+
+    return()=>{
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize",resize);
+    };
+  },[]);
+
+  const onPointerDown=(e)=>{
+    pointerDown.current=e.clientX-pointerDelta.current;
+    if(canvasRef.current) canvasRef.current.style.cursor="grabbing";
+  };
+  const onPointerMove=(e)=>{
+    if(pointerDown.current===null) return;
+    const delta=e.clientX-pointerDown.current;
+    pointerDelta.current=delta;
+    rRef.current=delta/200;
+  };
+  const onPointerUp=()=>{
+    pointerDown.current=null;
+    if(canvasRef.current) canvasRef.current.style.cursor="grab";
+  };
+
+  return(
+    <canvas ref={canvasRef}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp} onPointerOut={onPointerUp}
+      onTouchMove={e=>{ if(e.touches[0]) onPointerMove({clientX:e.touches[0].clientX}); }}
+      style={{
+        position:"absolute",inset:0,width:"100%",height:"100%",
+        opacity:0,transition:"opacity .8s ease",cursor:"grab",display:"block",
+      }}
+    />
+  );
+}
+
+// ─── LOGIN PAGE — GLOBE EDITION ───────────────────────────────────────────────
 function LoginPage({onLogin,language,setLanguage}){
 const t=useT();
 const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
+const [showModal,setShowModal]=useState(false);
+
 const tryLogin=async()=>{
 if(!email.trim()||!pw.trim()){setErr("Vul uw e-mail en wachtwoord in.");return;}
 setLoading(true); setErr("");
@@ -5655,73 +5859,240 @@ onLogin({
 }catch(e){setErr("Er is iets misgegaan. Probeer opnieuw.");}
 setLoading(false);
 };
+
+// Close modal on Escape
+useEffect(()=>{
+  const h=e=>{ if(e.key==="Escape") setShowModal(false); };
+  window.addEventListener("keydown",h);
+  return()=>window.removeEventListener("keydown",h);
+},[]);
+
 return(
 <LangCtx.Provider value={language}>
-<GlobalStyles darkMode={false}/>
-<div style={{minHeight:"100vh",background:`linear-gradient(150deg,#F0EBE4 0%,#EDE7E0 40%,#E8E0D6 100%)`,display:"flex",flexDirection:"column"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 28px"}}>
-<div style={{display:"flex",alignItems:"center",gap:9}}>
-<BrandLogoMain size={30} variant="dark"/>
-<span style={{fontFamily:F.display,fontSize:14,fontWeight:600,color:C.text,letterSpacing:"0.01em"}}>{BRANDING.nameMain}</span>
-</div>
-<div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:8,overflow:"hidden",background:C.surface}}>
-{["NL","EN"].map(l=>(<button key={l} onClick={()=>setLanguage(l)} style={{padding:"5px 12px",fontSize:11,fontWeight:700,border:"none",cursor:"pointer",background:language===l?C.crimson:"transparent",color:language===l?CREAM:C.secondary,transition:"background .15s,color .15s"}}>{l}</button>))}
-</div>
-</div>
-<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,maxWidth:920,width:"100%",borderRadius:22,overflow:"hidden",boxShadow:"0 32px 96px rgba(58,46,40,.18),0 8px 24px rgba(58,46,40,.10)"}}>
-{/* Left panel */}
-<div style={{background:C.espresso,padding:"52px 44px",color:CREAM,display:"flex",flexDirection:"column",gap:0}}>
-<div style={{fontSize:10,fontWeight:700,letterSpacing:"0.22em",color:"rgba(200,187,178,.6)",textTransform:"uppercase",marginBottom:16}}>Dual-Department Suite</div>
-<h1 style={{fontFamily:F.display,fontSize:36,fontWeight:300,color:CREAM,margin:"0 0 6px",lineHeight:1.15,letterSpacing:"-0.02em"}}>Business<br/><em>Intelligence</em></h1>
-<div style={{width:40,height:1,background:"rgba(200,187,178,.3)",margin:"22px 0"}}/>
-<div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
-{[{dept:"TC",sub:"Strategische Operaties"},{dept:"FF",sub:"Financiële Analyse"}].map(d=>(
-<div key={d.dept} style={{background:"rgba(255,255,255,.06)",borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,border:"1px solid rgba(255,255,255,.06)"}}>
-<BrandLogo dept={d.dept} variant="dark" size={38}/>
-<div>
-<div style={{fontSize:14,fontWeight:600,color:CREAM,letterSpacing:"-0.01em"}}>{d.dept==="TC"?BRANDING.nameTC:BRANDING.nameFF}</div>
-<div style={{fontSize:10,color:"rgba(200,187,178,.6)",letterSpacing:"0.06em",marginTop:2}}>{d.sub}</div>
-</div>
-</div>
-))}
-</div>
-<div style={{display:"flex",alignItems:"center",gap:7,marginTop:28}}><Shield size={12} color="rgba(200,187,178,.4)"/><span style={{fontSize:10,color:"rgba(200,187,178,.4)",letterSpacing:"0.1em"}}>ENCRYPTED EXECUTIVE GATEWAY</span></div>
-</div>
-{/* Right panel */}
-<div style={{background:C.surface,padding:"52px 44px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
-<div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,marginBottom:4,letterSpacing:"-0.01em"}}>{t("welcome")}</div>
-<div style={{fontSize:13,color:C.secondary,marginBottom:32,lineHeight:1.5}}>Voer uw gegevens in om toegang te krijgen tot uw portaal.</div>
-<div style={{marginBottom:16}}>
-<div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:7}}>{t("email")}</div>
-<div style={{position:"relative"}}><Mail size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:C.muted}}/><input value={email} onChange={e=>setEmail(e.target.value)} placeholder={t("emailPlaceholder")} style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",background:C.bg,transition:"border-color .15s",letterSpacing:"0.01em"}}/></div>
-</div>
-<div style={{marginBottom:22}}>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase"}}>{t("password")}</span><span style={{fontSize:11,fontWeight:700,color:C.crimson,cursor:"pointer"}}>{t("forgotPw")}</span></div>
-<div style={{position:"relative"}}><Lock size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:C.muted}}/><input type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryLogin()} placeholder="••••••••" style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",background:C.bg,transition:"border-color .15s"}}/></div>
-</div>
-{err&&<div style={{fontSize:12,color:C.amber,marginBottom:16,padding:"10px 14px",borderRadius:10,background:C.amberBg,border:`1.5px solid ${C.amber}40`,display:"flex",alignItems:"center",gap:8}}><AlertTriangle size={13} color={C.amber}/>{err}</div>}
-<button onClick={tryLogin} disabled={loading} style={{width:"100%",padding:"13px",borderRadius:11,background:loading?C.walnut:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:loading?"default":"pointer",marginBottom:24,boxShadow:loading?"none":"0 4px 16px rgba(139,26,43,.28)",transition:"background .15s,box-shadow .15s",letterSpacing:"0.02em"}}>{loading?t("loggingIn"):t("login")} {!loading&&"→"}</button>
-<div style={{borderTop:`1px solid ${C.border}`,paddingTop:22}}>
-<div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:12}}>{t("demoSelect")}</div>
-<div style={{display:"flex",flexDirection:"column",gap:8}}>
-{DEMO_USERS.map(u=>(
-<button key={u.id} onClick={()=>onLogin(u)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,background:C.bg,cursor:"pointer",textAlign:"left",transition:"background .15s,border-color .15s"}}>
-<div style={{width:32,height:32,borderRadius:"50%",background:u.role==="client"?C.walnut:u.dept==="FF"?C.taupe:C.crimson,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:CREAM,flexShrink:0}}>{u.avatar}</div>
-<div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{u.name}</div><div style={{fontSize:11,color:C.secondary,marginTop:1}}>{u.title}</div></div>
-</button>
-))}
-</div>
-</div>
-<div style={{marginTop:20,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>Beheerd door Corporate IT · © {new Date().getFullYear()} The Client Portal</div>
-</div>
-</div>
-</div>
+{/* ── Inject GlobalStyles for font-faces only ── */}
+<style>{`
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Jost:wght@300;400;500;600;700&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Jost',sans-serif;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .globe-enter{animation:fadeUp .8s ease both;}
+  .enter-btn{
+    transition:all .2s ease;
+    border: 1.5px solid rgba(255,255,255,.5);
+    background:transparent;
+    color:#fff;
+    cursor:pointer;
+    letter-spacing:.18em;
+    font-family:'Jost',sans-serif;
+    font-weight:700;
+    font-size:12px;
+  }
+  .enter-btn:hover{
+    background:rgba(255,255,255,.12);
+    border-color:rgba(255,255,255,.9);
+    box-shadow:0 0 32px rgba(255,255,255,.15),0 0 12px rgba(255,255,255,.1);
+  }
+  .glass-input{
+    width:100%;
+    background:rgba(255,255,255,.08);
+    border:1.5px solid rgba(255,255,255,.18);
+    border-radius:10px;
+    color:#fff;
+    font-family:'Jost',sans-serif;
+    font-size:13px;
+    outline:none;
+    padding:11px 14px 11px 38px;
+    transition:border-color .15s,background .15s;
+    box-sizing:border-box;
+  }
+  .glass-input::placeholder{color:rgba(255,255,255,.4);}
+  .glass-input:focus{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.12);}
+`}</style>
+
+{/* ── Full-screen globe stage ── */}
+<div style={{
+  position:"fixed",inset:0,
+  background:"linear-gradient(135deg,#0A0810 0%,#0D0B14 40%,#0A0C18 100%)",
+  overflow:"hidden",
+}}>
+  <GlobeBackground/>
+
+  {/* ── Radial vignette ── */}
+  <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at center,transparent 30%,rgba(5,4,12,.75) 100%)",pointerEvents:"none"}}/>
+
+  {/* ── Header ── */}
+  <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"22px 32px",zIndex:10}}>
+    <div style={{display:"flex",alignItems:"center",gap:10}}>
+      <BrandLogoMain size={28} variant="dark"/>
+      <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:15,fontWeight:600,color:"rgba(255,255,255,.85)",letterSpacing:"0.02em"}}>{BRANDING.nameMain}</span>
+    </div>
+    <div style={{display:"flex",border:"1px solid rgba(255,255,255,.15)",borderRadius:8,overflow:"hidden",background:"rgba(255,255,255,.05)",backdropFilter:"blur(8px)"}}>
+      {["NL","EN"].map(l=>(
+        <button key={l} onClick={()=>setLanguage(l)}
+          style={{padding:"5px 14px",fontSize:11,fontWeight:700,border:"none",cursor:"pointer",
+            background:language===l?"rgba(255,255,255,.15)":"transparent",
+            color:language===l?"#fff":"rgba(255,255,255,.5)",
+            transition:"background .15s,color .15s"}}>
+          {l}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* ── Center content ── */}
+  <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:10,gap:32}}>
+
+    {/* Wordmark */}
+    <div className="globe-enter" style={{animationDelay:".2s",textAlign:"center"}}>
+      <div style={{fontSize:10,fontWeight:700,color:"rgba(200,180,220,.55)",letterSpacing:".28em",textTransform:"uppercase",marginBottom:12}}>Dual-Department Suite</div>
+      <h1 style={{
+        fontFamily:"'Cormorant Garamond',serif",
+        fontSize:"clamp(42px,6vw,72px)",
+        fontWeight:300,
+        letterSpacing:"-0.02em",
+        lineHeight:1.1,
+        background:"linear-gradient(135deg,#fff 0%,rgba(220,210,240,.85) 50%,rgba(180,160,220,.7) 100%)",
+        WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+        backgroundClip:"text",
+      }}>The Client Portal</h1>
+      <div style={{width:48,height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",margin:"16px auto 0"}}/>
+    </div>
+
+    {/* Dept badges */}
+    <div className="globe-enter" style={{animationDelay:".4s",display:"flex",gap:12}}>
+      {[{d:"TC",l:BRANDING.nameTC,sub:"Strategische Operaties"},{d:"FF",l:BRANDING.nameFF,sub:"Financiële Analyse"}].map(b=>(
+        <div key={b.d} style={{
+          display:"flex",alignItems:"center",gap:10,
+          padding:"10px 16px",borderRadius:12,
+          background:"rgba(255,255,255,.06)",
+          border:"1px solid rgba(255,255,255,.1)",
+          backdropFilter:"blur(8px)",
+        }}>
+          <BrandLogo dept={b.d} variant="dark" size={32}/>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.85)"}}>{b.l}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.4)",marginTop:2}}>{b.sub}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* ENTER button */}
+    <div className="globe-enter" style={{animationDelay:".6s"}}>
+      <button className="enter-btn" onClick={()=>setShowModal(true)}
+        style={{padding:"14px 48px",borderRadius:50}}>
+        INLOGGEN
+      </button>
+    </div>
+
+    {/* Bottom label */}
+    <div className="globe-enter" style={{animationDelay:".8s",position:"absolute",bottom:24,display:"flex",alignItems:"center",gap:7}}>
+      <Shield size={11} color="rgba(255,255,255,.25)"/>
+      <span style={{fontSize:9,color:"rgba(255,255,255,.25)",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Jost',sans-serif"}}>Encrypted Executive Gateway</span>
+    </div>
+  </div>
+
+  {/* ── Glassmorphism login modal ── */}
+  {showModal&&(
+    <div
+      onClick={e=>{ if(e.target===e.currentTarget) setShowModal(false); }}
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(5,4,14,.35)",
+        backdropFilter:"blur(2px)",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        zIndex:100,padding:"20px",
+      }}>
+      <div style={{
+        width:"100%",maxWidth:420,
+        background:"rgba(255,255,255,.08)",
+        backdropFilter:"blur(24px) saturate(1.6)",
+        WebkitBackdropFilter:"blur(24px) saturate(1.6)",
+        border:"1px solid rgba(255,255,255,.15)",
+        borderRadius:22,
+        boxShadow:"0 32px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.15)",
+        overflow:"hidden",
+        animation:"fadeUp .35s ease",
+      }}>
+        {/* Modal header */}
+        <div style={{padding:"24px 28px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:600,color:"#fff",letterSpacing:"-0.01em"}}>Welkom terug</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.5)",marginTop:4}}>Voer uw gegevens in om toegang te krijgen</div>
+          </div>
+          <button onClick={()=>setShowModal(false)}
+            style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,width:30,height:30,cursor:"pointer",color:"rgba(255,255,255,.6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,lineHeight:1,flexShrink:0,marginTop:2}}>
+            ×
+          </button>
+        </div>
+
+        {/* Modal body */}
+        <div style={{padding:"22px 28px 28px",display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Email field */}
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,.45)",letterSpacing:".14em",textTransform:"uppercase",marginBottom:7}}>{t("email")}</div>
+            <div style={{position:"relative"}}>
+              <Mail size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,.35)"}}/>
+              <input className="glass-input" value={email} onChange={e=>setEmail(e.target.value)}
+                placeholder={t("emailPlaceholder")} type="text" autoComplete="username"/>
+            </div>
+          </div>
+
+          {/* Password field */}
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
+              <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,.45)",letterSpacing:".14em",textTransform:"uppercase"}}>{t("password")}</span>
+              <span style={{fontSize:11,fontWeight:600,color:"rgba(200,180,255,.7)",cursor:"pointer"}}>{t("forgotPw")}</span>
+            </div>
+            <div style={{position:"relative"}}>
+              <Lock size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,.35)"}}/>
+              <input className="glass-input" type="password" value={pw}
+                onChange={e=>setPw(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&tryLogin()}
+                placeholder="••••••••" autoComplete="current-password"/>
+            </div>
+          </div>
+
+          {/* Error */}
+          {err&&(
+            <div style={{fontSize:12,color:"#FBBF24",padding:"10px 14px",borderRadius:10,background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.25)",display:"flex",alignItems:"center",gap:8}}>
+              <AlertTriangle size={13} color="#FBBF24"/>
+              {err}
+            </div>
+          )}
+
+          {/* Login button */}
+          <button onClick={tryLogin} disabled={loading}
+            style={{
+              width:"100%",padding:"13px",borderRadius:11,
+              background:loading?"rgba(139,26,43,.5)":"rgba(139,26,43,.85)",
+              backdropFilter:"blur(8px)",
+              border:"1px solid rgba(255,255,255,.15)",
+              color:"#fff",fontSize:13,fontWeight:700,
+              cursor:loading?"default":"pointer",
+              boxShadow:loading?"none":"0 4px 20px rgba(139,26,43,.4)",
+              transition:"all .2s",letterSpacing:".04em",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+            }}>
+            {loading&&<div style={{width:13,height:13,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>}
+            {loading?t("loggingIn"):`${t("login")} →`}
+          </button>
+
+          {/* Footer */}
+          <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,.25)",letterSpacing:".04em",paddingTop:4}}>
+            © {new Date().getFullYear()} The Client Portal · Beheerd door Corporate IT
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
 </div>
 </LangCtx.Provider>
 );
 }
-
 // ─── CLIENT ONBOARDING ───────────────────────────────────────────────────────
 const ONBOARDING_STEPS = [
 {
