@@ -2266,8 +2266,17 @@ return(
 function ClientAssignSelect({engId,value,onChange}){
   const [clients,setClients]=useState([]);
   useEffect(()=>{
-    supabase.from("user_profiles").select("id,full_name,company_id").eq("role","client")
-      .then(({data})=>setClients(data||[]));
+    supabase.from("user_profiles").select("id,full_name,company_id,department").eq("role","client")
+      .order("full_name")
+      .then(({data})=>{
+        const seen=new Set();
+        const unique=(data||[]).filter(c=>{
+          if(!c.company_id) return true;
+          if(seen.has(c.company_id)) return false;
+          seen.add(c.company_id); return true;
+        });
+        setClients(unique);
+      });
   },[]);
   return(
     <select value={value||""} onChange={e=>onChange(e.target.value)}
@@ -2298,9 +2307,20 @@ useEffect(()=>{
   supabase.from("user_profiles").select("id,full_name,department,avatar_initials,role")
     .in("role",["super_admin","staff","finance"])
     .then(({data})=>setStaffList(data||[]));
-  supabase.from("user_profiles").select("id,full_name,company_id,avatar_initials")
+  supabase.from("user_profiles")
+    .select("id,full_name,company_id,department,avatar_initials")
     .eq("role","client")
-    .then(({data})=>setClientList(data||[]));
+    .order("full_name")
+    .then(({data})=>{
+      // Deduplicate by company_id - keep only one account per company
+      const seen=new Set();
+      const unique=(data||[]).filter(c=>{
+        if(!c.company_id) return true;
+        if(seen.has(c.company_id)) return false;
+        seen.add(c.company_id); return true;
+      });
+      setClientList(unique);
+    });
   return()=>{ window.removeEventListener("keydown",h); document.body.classList.remove("modal-open"); };
 },[]);
 const ACTION_TYPES=[
@@ -2594,16 +2614,39 @@ return(
 // ─── REVIEW QUEUE ────────────────────────────────────────────────────────────
 function ReviewQueue({showToast}){
 const t=useT();
-const [docs,setDocs]=useState(REVIEW_DOCS);
+const [docs,setDocs]=useState([]);
+const [loading,setLoading]=useState(true);
 const [reviewing,setReviewing]=useState(null); const [decision,setDecision]=useState(""); const [note,setNote]=useState("");
+
+// Load pending documents from DB
+useEffect(()=>{
+  const loadDocs=async()=>{
+    try{
+      const {data,error}=await supabase.from("documents")
+        .select("id,name,file_url,file_type,visibility,review_status,department,uploaded_at,company_id,companies(name)")
+        .eq("review_status","pending")
+        .order("uploaded_at",{ascending:false});
+      if(data) setDocs(data.map(d=>({
+        id:d.id, name:d.name, fileUrl:d.file_url, type:d.file_type,
+        uploaded:d.uploaded_at?new Date(d.uploaded_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+        client:d.companies?.name||"Intern",
+        priority:"normaal", dept:d.department,
+      })));
+    }catch(e){ console.warn("ReviewQueue load:",e.message); }
+    setLoading(false);
+  };
+  loadDocs();
+},[]);
+
 const submitReview=async()=>{
 if(!decision) return;
+const newStatus=decision==="verified"?"verified":"rejected";
 setDocs(ds=>ds.filter(d=>d.id!==reviewing.id));
 showToast(decision==="verified"?`${reviewing.name} geverifieerd`:`${reviewing.name} afgewezen`);
-// Persist to Supabase if doc has real UUID
-if(reviewing.id && reviewing.id.includes("-")) {
-updateDocumentReview(reviewing.id, decision).catch(e=>console.warn("reviewDoc:",e.message));
-}
+// Update in DB
+try{
+  await supabase.from("documents").update({review_status:newStatus}).eq("id",reviewing.id);
+}catch(e){ console.warn("reviewDoc:",e.message); }
 setReviewing(null); setDecision(""); setNote("");
 };
 const prioColor={kritiek:C.crimson,hoog:C.amber,normaal:C.secondary};
@@ -2622,7 +2665,14 @@ return(
 </div>
 </div>
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",overflow:"hidden",marginBottom:16}}>
-{docs.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><CheckCircle size={32} color={C.green} style={{marginBottom:12}}/><div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>Wachtrij leeg</div></div>):(
+{loading?(<div style={{padding:"32px 24px",textAlign:"center",color:C.secondary,fontSize:12}}>Laden...</div>)
+:docs.length===0?(
+  <div style={{padding:"48px 24px",textAlign:"center"}}>
+    <FileText size={32} color={C.mushroom} style={{marginBottom:12}}/>
+    <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text,marginBottom:6}}>Wachtrij leeg</div>
+    <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Documenten die worden geüpload via Documentbeheer verschijnen hier automatisch voor review.</div>
+  </div>
+):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{[t("docName"),t("clientCol"),t("priority"),t("action")].map(h=><th key={h} style={{padding:"10px 20px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{docs.map(d=>(
@@ -3262,7 +3312,58 @@ const [showNewFolder,setShowNewFolder]=useState(false);
 const [folderName,setFolderName]=useState("");
 const [folders,setFolders]=useState([]);
 const [activeFolder,setActiveFolder]=useState(null);
-const docs=DOCUMENTS.filter(d=>{ const vOk=visF==="ALL"||d.visibility===visF; const sOk=user.dept==="BOTH"||d.dept===user.dept; const qOk=!q||d.name.toLowerCase().includes(q.toLowerCase()); return vOk&&sOk&&qOk; });
+const [docs,setDocs]=useState([]);
+const [uploading,setUploading]=useState(false);
+const uploadRef=React.useRef();
+
+// Load documents from DB
+useEffect(()=>{
+  supabase.from("documents")
+    .select("id,name,file_url,file_type,visibility,review_status,department,uploaded_at,uploaded_by,user_profiles(full_name,avatar_initials)")
+    .order("uploaded_at",{ascending:false})
+    .then(({data})=>{ if(data?.length) setDocs(data); });
+},[]);
+
+const handleUpload=async(file)=>{
+  if(!file) return;
+  if(file.size > 50*1024*1024){ showToast("Max 50MB per bestand"); return; }
+  setUploading(true);
+  try{
+    const ext=file.name.split(".").pop().toLowerCase();
+    const path=`${user.dept||"TC"}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+    // Upload to storage
+    const uploadRes=await fetch(`${SB_URL}/storage/v1/object/documents/${path}`,{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${_authToken}`,"apikey":SB_ANON,"x-upsert":"false","Content-Type":file.type||"application/octet-stream"},
+      body:file,
+    });
+    if(!uploadRes.ok){
+      const err=await uploadRes.json().catch(()=>({}));
+      throw new Error(err.message||"Upload mislukt");
+    }
+    const fileUrl=`${SB_URL}/storage/v1/object/documents/${path}`;
+    // Insert document record
+    const {data:doc,error}=await supabase.from("documents").insert({
+      name:file.name,
+      file_url:fileUrl,
+      file_type:ext,
+      department:user.dept==="BOTH"?"TC":user.dept,
+      visibility:"internal",
+      review_status:"pending",
+      uploaded_by:user.id,
+    }).select().single();
+    if(error) throw new Error(error.message);
+    if(doc){
+      setDocs(ds=>[doc,...ds]);
+      showToast(`"${file.name}" geüpload ✓`);
+    }
+  }catch(e){
+    console.error("Upload error:",e);
+    showToast("Upload mislukt: "+e.message);
+  }
+  setUploading(false);
+};
+const filteredDocs=docs.filter(d=>{ const vOk=visF==="ALL"||d.visibility===visF; const sOk=user.dept==="BOTH"||d.department===user.dept; const qOk=!q||d.name.toLowerCase().includes(q.toLowerCase()); return vOk&&sOk&&qOk; });
 const typeIconCmp={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
 const createFolder=()=>{
   if(!folderName.trim())return;
@@ -3277,9 +3378,18 @@ return(
     <button onClick={()=>setShowNewFolder(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
       <Plus size={13}/> Nieuwe map
     </button>
-    <button onClick={()=>showToast("Upload gestarten")} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-      <Upload size={13}/> Uploaden
-    </button>
+    <div style={{position:"relative"}}>
+      <input type="file" ref={uploadRef} style={{display:"none"}} multiple
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv"
+        onChange={e=>{Array.from(e.target.files||[]).forEach(handleUpload); e.target.value="";}}/>
+      <button onClick={()=>uploadRef.current?.click()} disabled={uploading}
+        style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,
+        background:uploading?C.mushroom:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:uploading?"default":"pointer"}}>
+        {uploading
+          ? <><div style={{width:10,height:10,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Uploaden...</>
+          : <><Upload size={13}/> Uploaden</>}
+      </button>
+    </div>
   </div>
 }/>
 
