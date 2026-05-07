@@ -457,9 +457,9 @@ const THEMES = {
   light: {
     crimson:"#8B1A2B", crimsonDeep:"#6B1220", crimsonFaint:"#F9F0F1", crimsonMid:"#C4909A",
     taupe:"#9A877A", taupeLight:"#C8BBB2", taupeDeep:"#7A6860", mushroom:"#D6D3CE",
-    espresso:"#3A2E28", walnut:"#4A3C35", oak:"#5E4E45",
+    espresso:"#3A2E28", walnut:"#4A3C35", oak:"#5E4E45", darkAccent:"#3A2E28",
     bg:"#F5F1EC", surface:"#FDFCF9", warm50:"#F0EBE5",
-    text:"#3A2E28", secondary:"#7A6B60", muted:"#A89B92", border:"#E4DDD5",
+    text:"#3A2E28", secondary:"#7A6B60", muted:"#A89B92", border:"#E4DDD5", onDark:"#F0EBE4",
     amber:"#C97B1A", amberBg:"#FDF6EC",
     red:"#C83232", redBg:"#FEF2F2",
     green:"#15803D", greenBg:"#F0FDF4",
@@ -470,9 +470,9 @@ const THEMES = {
   dark: {
     crimson:"#C0283C", crimsonDeep:"#8B1A2B", crimsonFaint:"#2A1518", crimsonMid:"#7A3040",
     taupe:"#8A7B72", taupeLight:"#4A3E38", taupeDeep:"#6A5E58", mushroom:"#4A4038",
-    espresso:"#F0EBE4", walnut:"#8B6B52", oak:"#7A6B62",
+    espresso:"#F0EBE4", walnut:"#8B6B52", oak:"#7A6B62", darkAccent:"#2A2218",
     bg:"#141210", surface:"#1E1A16", warm50:"#252018",
-    text:"#F0EBE4", secondary:"#A89B92", muted:"#6A5E58", border:"#2E2820",
+    text:"#F0EBE4", secondary:"#A89B92", muted:"#6A5E58", border:"#2E2820", onDark:"#F0EBE4",
     amber:"#F59E0B", amberBg:"#1C1200",
     red:"#EF4444", redBg:"#1C0808",
     green:"#22C55E", greenBg:"#052E16",
@@ -547,6 +547,18 @@ body.dark-mode [style*="background:#EFF6FF"] {
   color: ${text} !important;
 }
 /* Dashboard dark card text: handled via C.bg token */
+/* Ensure all text inside dark-accent cards is legible */
+body.dark-mode table thead tr th {
+  color: #A89B92 !important;
+}
+/* QBO and KPI stat cards */
+body.dark-mode [style*="background: #3A2E28"],
+body.dark-mode [style*="background:#3A2E28"] {
+  background: #2A2218 !important;
+}
+body.dark-mode table thead tr {
+  color: #F0EBE4 !important;
+}
 /* Prevent white-on-white or dark-on-dark */
 input[style*="background"], textarea[style*="background"] {
   color: ${text} !important;
@@ -1305,19 +1317,19 @@ return(
     </div>
     <div style={{fontSize:10,color:C.muted,marginTop:6,fontWeight:600}}>{t("revision")}</div>
   </div>
-  <div style={{background:C.espresso,borderRadius:14,padding:"20px 22px",position:"relative"}}>
-    <div style={{fontSize:10,fontWeight:700,color:C.taupeLight,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
+  <div style={{background:C.darkAccent,borderRadius:14,padding:"20px 22px",position:"relative"}}>
+    <div style={{fontSize:10,fontWeight:700,color:"rgba(240,235,228,0.65)",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
     <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:CREAM,lineHeight:1}}>
+      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.onDark,lineHeight:1}}>
         {eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}
       </span>
-      <span style={{fontFamily:F.display,fontSize:24,color:CREAM,opacity:0.6}}>%</span>
+      <span style={{fontFamily:F.display,fontSize:24,color:C.onDark,opacity:0.6}}>%</span>
     </div>
     {/* Progress arc — different from numbers */}
     <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3}}>
       <div style={{width:`${eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}%`,height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3}}/>
     </div>
-    <div style={{fontSize:10,color:C.taupeLight,marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
+    <div style={{fontSize:10,color:"rgba(240,235,228,0.65)",marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
   </div>
 </div>
 
@@ -1340,12 +1352,12 @@ return(
         ))}</tbody>
       </table>
     </div>
-    <div style={{background:C.espresso,borderRadius:14,padding:"20px",color:CREAM,display:"flex",flexDirection:"column",gap:12}}>
-      <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:C.taupeLight,textTransform:"uppercase"}}>WERELDWIJDE POLSSLAG</div>
+    <div style={{background:C.darkAccent,borderRadius:14,padding:"20px",color:C.onDark,display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:"rgba(240,235,228,0.65)",textTransform:"uppercase"}}>WERELDWIJDE POLSSLAG</div>
       <p style={{fontFamily:F.display,fontSize:14,fontWeight:600,lineHeight:1.5,margin:0}}>Geaggregeerd risico momenteel <span style={{color:"#E87B7B"}}>Verhoogd</span>.</p>
       <div style={{display:"flex",justifyContent:"space-between"}}>
         {[{l:"TACTIGENT",v:`${eng.filter(e=>e.dept==="TC").length} actief`,up:true},{l:"FISCAL FUSE",v:`${eng.filter(e=>e.dept==="FF").length} actief`,up:false}].map(s=>(
-          <div key={s.l}><div style={{fontSize:8,color:C.taupeLight,fontWeight:700,marginBottom:3}}>{s.l}</div>
+          <div key={s.l}><div style={{fontSize:8,color:"rgba(240,235,228,0.65)",fontWeight:700,marginBottom:3}}>{s.l}</div>
           <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:s.up?"#E87B7B":CREAM_DIM}}>{s.v}{s.up?"↑":"↓"}</div></div>
         ))}
       </div>
@@ -1486,9 +1498,9 @@ return(
 <div style={{height:5,background:C.border,borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:"82%",background:C.crimson,borderRadius:3}}/></div>
 <div style={{textAlign:"right",fontSize:10,fontWeight:700,color:C.crimson}}>82%</div>
 </div>
-<div style={{background:C.espresso,borderRadius:14,padding:"16px",color:CREAM}}>
+<div style={{background:C.darkAccent,borderRadius:14,padding:"16px",color:C.onDark}}>
 <div style={{fontFamily:F.display,fontSize:14,fontWeight:600,marginBottom:7}}>Strategisch Focus</div>
-<p style={{fontSize:10,color:CREAM_DIM,lineHeight:1.6,margin:"0 0 12px"}}>Prioriteer dossiers met kritieke status in Fiscal Fuse voor de kwartaalafsluiting.</p>
+<p style={{fontSize:10,color:C.onDark_DIM,lineHeight:1.6,margin:"0 0 12px"}}>Prioriteer dossiers met kritieke status in Fiscal Fuse voor de kwartaalafsluiting.</p>
 </div>
 </div>
 <div>
@@ -2534,7 +2546,7 @@ return(
 <div>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
 <PageHeader kicker="Systeem" title="Audit Log"/>
-<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:10,background:C.espresso,color:C.bg,fontSize:11,fontWeight:700}}>
+<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:10,background:C.darkAccent,color:C.bg,fontSize:11,fontWeight:700}}>
 <Shield size={13} color={CREAM}/> Immutabel · {logs.length} Records
 </div>
 </div>
@@ -2602,9 +2614,9 @@ return(
 <PageHeader kicker="Operationele Pijplijn" title={t("reviewQueue")}/>
 <div style={{display:"flex",gap:10}}>
 {[{l:t("pending"),v:docs.length,dark:false},{l:t("processedToday"),v:118+REVIEW_DOCS.length-docs.length,dark:true}].map(s=>(
-<div key={s.l} style={{textAlign:"center",background:s.dark?C.espresso:C.surface,borderRadius:12,padding:"11px 18px",border:s.dark?"none":`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.taupeLight:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:s.dark?CREAM:C.crimson}}>{s.v}</div>
+<div key={s.l} style={{textAlign:"center",background:s.dark?C.darkAccent:C.surface,borderRadius:12,padding:"11px 18px",border:s.dark?"none":`1px solid ${C.border}`}}>
+<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.muted:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
+<div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:s.dark?C.onDark:C.crimson}}>{s.v}</div>
 </div>
 ))}
 </div>
@@ -2998,12 +3010,12 @@ return(
 <PageHeader kicker="Strategie" title={t("clientOverview")}/>
 <div style={{display:"flex",gap:10,marginTop:4}}>
 {[{l:t("totalActive"),v:src.length,dark:false},{l:t("inReview"),v:src.filter(c=>c.health==="red"||c.lifecycle==="Compliance Review").length,dark:true}].map(s=>(
-<div key={s.l} style={{textAlign:"center",background:s.dark?C.espresso:C.surface,borderRadius:12,padding:"11px 18px",border:s.dark?"none":`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.taupeLight:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:s.dark?CREAM:C.crimson}}>{s.v}</div>
+<div key={s.l} style={{textAlign:"center",background:s.dark?C.darkAccent:C.surface,borderRadius:12,padding:"11px 18px",border:s.dark?"none":`1px solid ${C.border}`}}>
+<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.muted:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
+<div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:s.dark?C.onDark:C.crimson}}>{s.v}</div>
 </div>
 ))}
-<button onClick={()=>setShowNew(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"10px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",alignSelf:"center"}}>
+<button onClick={()=>setShowNew(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"10px 16px",borderRadius:10,background:C.crimson,color:C.onDark,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",alignSelf:"center"}}>
 <Plus size={13}/> Nieuwe Cliënt
 </button>
 </div>
@@ -3439,8 +3451,8 @@ return(
 </div>
 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
 {[{l:t("totalOpen"),v:`SRD ${totalOpen.toLocaleString()}`},{l:t("overdue"),v:`SRD ${overdueAmt.toLocaleString()}`,red:true},{l:t("paidMonth"),v:`SRD ${paidAmt.toLocaleString()}`,green:true},{l:t("qboSynced"),v:`${qboLinked}/${invoices.length}`,dark:true}].map((s,i)=>(
-<div key={i} style={{background:s.dark?C.espresso:C.surface,borderRadius:12,padding:"13px 16px",border:s.dark?"none":`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.taupeLight:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
+<div key={i} style={{background:s.dark?C.darkAccent:C.surface,borderRadius:12,padding:"13px 16px",border:s.dark?"none":`1px solid ${C.border}`}}>
+<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.muted:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
 <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:s.dark?CREAM:s.red?C.red:s.green?C.green:C.text}}>{s.v}</div>
 </div>
 ))}
@@ -3608,7 +3620,7 @@ return(
 {/* Bubbles */}
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
+<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.darkAccent,color:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
 </div>
 {/* X-axis labels BELOW the grid */}
 <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
@@ -3637,8 +3649,8 @@ return(
 <div style={{fontSize:11,color:C.text,lineHeight:1.5}}>Kritieke stijging gedetecteerd in Tactigent Core blootstelling.</div>
 </div>
 </div>
-<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>MAANDELIJKSE TREND</div>
+<div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
+<div style={{fontSize:9,fontWeight:700,color:"rgba(240,235,228,0.6)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>MAANDELIJKSE TREND</div>
 <div style={{fontFamily:F.display,fontSize:32,fontWeight:600,marginBottom:6}}>+12.4%</div>
 <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:6,background:"rgba(255,255,255,.1)",fontSize:9,fontWeight:700}}>↗ INCREASED VIGILANCE</div>
 </div>
@@ -3849,8 +3861,8 @@ return(
 ))}
 <button style={{width:"100%",marginTop:12,padding:"8px",borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,color:C.text,fontSize:10,fontWeight:700,cursor:"pointer"}}>VOLLEDIG GROOTBOEK BEKIJKEN</button>
 </div>
-<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INVESTERINGSADVIES</div>
+<div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
+<div style={{fontSize:9,fontWeight:700,color:"rgba(240,235,228,0.6)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INVESTERINGSADVIES</div>
 <blockquote style={{fontFamily:F.display,fontSize:13,fontWeight:600,lineHeight:1.6,margin:"0 0 12px"}}>"De sleutel tot portfolioweerbaarheid is de bewuste afwijzing van het onmiddellijke."</blockquote>
 <div style={{fontSize:9,fontWeight:700,color:C.taupeLight}}>TACTIGENT INZICHTEN · Wekelijkse Briefing</div>
 </div>
@@ -3908,7 +3920,7 @@ return(
     <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1}}>
       {/* Document preview */}
       <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:C.bg}}>
-        <div style={{background:CREAM,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
+        <div style={{background:C.surface,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
           {/* Doc header branding */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,paddingBottom:16,borderBottom:`2px solid ${doc.dept==="TC"?C.crimson:C.taupe}`}}>
             <div>
@@ -4047,7 +4059,7 @@ return(
 
     {/* Invoice document */}
     <div style={{overflowY:"auto",padding:"28px 32px",background:C.bg}}>
-      <div style={{background:CREAM,borderRadius:14,padding:"36px 40px",boxShadow:"0 2px 16px rgba(58,46,40,.08)"}}>
+      <div style={{background:C.surface,borderRadius:14,padding:"36px 40px",boxShadow:"0 2px 16px rgba(58,46,40,.08)"}}>
         {/* Invoice header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32}}>
           <div>
@@ -4086,9 +4098,9 @@ return(
         {/* Line items */}
         <table style={{width:"100%",borderCollapse:"collapse",marginBottom:20}}>
           <thead>
-            <tr style={{background:C.espresso}}>
+            <tr style={{background:C.darkAccent}}>
               {["OMSCHRIJVING","AANTAL","BEDRAG","TOTAAL"].map(h=>(
-                <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:700,color:CREAM,letterSpacing:"0.1em",textTransform:"uppercase"}}>{h}</th>
+                <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:700,color:C.onDark,letterSpacing:"0.1em",textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -4703,10 +4715,10 @@ return(
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
 <PageHeader kicker="Marketing & Sales" title="Marketing Hub"/>
 <div style={{display:"flex",gap:8,marginTop:4}}>
-<button onClick={()=>setComposerOpen(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.espresso,color:C.bg,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<button onClick={()=>setComposerOpen(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.darkAccent,color:C.onDark,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
 <Mail size={13}/> Nieuwe Campagne
 </button>
-<button onClick={()=>setPostComposerOpen("new")} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<button onClick={()=>setPostComposerOpen("new")} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.crimson,color:C.onDark,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
 <Plus size={13}/> Social Post
 </button>
 </div>
@@ -4825,14 +4837,14 @@ return(
           ))}
         </div>
         {/* Quick actions */}
-        <div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
+        <div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
           <div style={{fontSize:12,fontWeight:700,marginBottom:12}}>Snelle Acties</div>
           {[
             {label:"Nieuwsbrief aanmaken",Icon:Mail,action:()=>setComposerOpen(true)},
             {label:"Social post plannen",Icon:Send,action:()=>setPostComposerOpen("new")},
             {label:"Analytics bekijken",Icon:BarChart3,action:()=>setTab("analytics")},
           ].map(a=>(
-            <button key={a.label} onClick={a.action} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,background:"rgba(255,255,255,.08)",border:"none",cursor:"pointer",color:CREAM,fontSize:11,fontWeight:600,marginBottom:6,textAlign:"left"}}>
+            <button key={a.label} onClick={a.action} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,background:"rgba(255,255,255,.08)",border:"none",cursor:"pointer",color:C.onDark,fontSize:11,fontWeight:600,marginBottom:6,textAlign:"left"}}>
               <a.Icon size={13}/>{a.label}
             </button>
           ))}
@@ -5126,7 +5138,7 @@ return(
 <div style={{display:"flex",flexDirection:"column",overflowY:"auto"}}>
 <div style={{padding:"16px",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.text}}>Voorbeeld e-mail</div>
 <div style={{padding:"16px",flex:1,overflowY:"auto"}}>
-<div style={{background:CREAM,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 12px rgba(58,46,40,.1)"}}>
+<div style={{background:C.surface,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 12px rgba(58,46,40,.1)"}}>
 <div style={{background:dept==="TC"?C.crimson:dept==="FF"?C.taupe:C.walnut,padding:"14px 16px"}}>
 <div style={{fontSize:12,fontWeight:700,color:CREAM}}>{dept==="TC"?"TACTIGENT CONSULTANCY":dept==="FF"?"FISCAL FUSE":"THE GLASS EXECUTIVE"}</div>
 </div>
