@@ -663,13 +663,14 @@ const PageHeader=({kicker,title,action})=>(
     {action}
   </div>
 );
-const SideSection=({label})=>(<div style={{padding:"18px 14px 5px",fontSize:9.5,fontWeight:700,color:C.mushroom,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:F.body}}>{label}</div>);
-const SideBtn=({icon:Icon,label,isActive,onClick,danger,badge})=>(
-  <button onClick={onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:isActive?"rgba(139,26,43,0.08)":"transparent",color:isActive?C.crimson:danger?"#DC2626":C.secondary,marginBottom:1,transition:"background .15s,color .15s",position:"relative",fontFamily:F.body}}>
+const SideSection=({label,collapsed})=>collapsed?<div style={{height:1,background:C.border,margin:"8px 12px"}}/>:(<div style={{padding:"18px 14px 5px",fontSize:9.5,fontWeight:700,color:C.mushroom,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:F.body}}>{label}</div>);
+const SideBtn=({icon:Icon,label,isActive,onClick,danger,badge,collapsed,title})=>(
+  <button onClick={onClick} title={collapsed?label:undefined} style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:10,padding:collapsed?"9px 0":"9px 12px",justifyContent:collapsed?"center":"flex-start",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:isActive?"rgba(139,26,43,0.08)":"transparent",color:isActive?C.crimson:danger?"#DC2626":C.secondary,marginBottom:1,transition:"background .15s,color .15s",position:"relative",fontFamily:F.body}}>
     {isActive&&<div style={{position:"absolute",left:0,top:"20%",bottom:"20%",width:3,borderRadius:"0 2px 2px 0",background:C.crimson}}/>}
     {Icon&&<Icon size={14} strokeWidth={isActive?2.2:1.6} style={{flexShrink:0}}/>}
-    <span style={{fontSize:12,fontWeight:isActive?600:400,flex:1,letterSpacing:isActive?"0.01em":"0"}}>{label}</span>
-    {badge&&<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"2px 7px",borderRadius:10,minWidth:18,textAlign:"center",letterSpacing:"0.02em"}}>{badge}</span>}
+    {!collapsed&&<span style={{fontSize:12,fontWeight:isActive?600:400,flex:1,letterSpacing:isActive?"0.01em":"0"}}>{label}</span>}
+    {!collapsed&&badge&&<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"2px 7px",borderRadius:10,minWidth:18,textAlign:"center",letterSpacing:"0.02em"}}>{badge}</span>}
+    {collapsed&&badge&&<span style={{position:"absolute",top:4,right:4,width:8,height:8,borderRadius:"50%",background:C.crimson}}/>}
   </button>
 );
 const Pill=({label,active,onClick})=>(<button onClick={onClick} style={{padding:"6px 16px",borderRadius:20,border:`1.5px solid ${active?C.crimson:C.border}`,background:active?C.crimson:"transparent",color:active?CREAM:C.secondary,fontSize:12,fontWeight:600,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s",whiteSpace:"nowrap"}}>{label}</button>);
@@ -709,54 +710,86 @@ const CLIENT_PORTAL_ACTIONS=[];
 const CLIENT_THREADS=[];
 
 // ─── SIDEBAR ────────────────────────────────────────────────────────────────
-function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng}){
+function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng,collapsed,setCollapsed}){
 const t=useT();
 const isFF=user.dept==="FF",isTC=user.dept==="TC",isBOTH=user.dept==="BOTH";
+const W=collapsed?68:228;
 return(
-<aside style={{width:228,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto",transition:"background .3s"}}>
-<div style={{padding:"20px 16px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:11}}>
-<BrandLogoMain size={36} variant="light"/>
-<div>
-<div style={{fontSize:12,fontWeight:700,color:C.text,lineHeight:1.3,letterSpacing:"-0.01em"}}>{BRANDING.nameMain}</div>
-<div style={{fontSize:10,color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginTop:2,fontWeight:500}}>{user.role==="client"?"Portaal":"Command Center"}</div>
+<aside style={{
+  width:W,minWidth:W,
+  background:C.surface,
+  borderRight:`1px solid ${C.border}`,
+  display:"flex",flexDirection:"column",
+  flexShrink:0,overflowY:"auto",overflowX:"hidden",
+  transition:"width .22s cubic-bezier(0.4,0,0.2,1),min-width .22s cubic-bezier(0.4,0,0.2,1)",
+  position:"relative",
+}}>
+{/* Brand header */}
+<div style={{padding:collapsed?"14px 0":"20px 16px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:collapsed?0:11,justifyContent:collapsed?"center":"flex-start",minHeight:64}}>
+  {collapsed
+    ? <BrandLogoMain size={30} variant="light"/>
+    : <>
+        <BrandLogoMain size={36} variant="light"/>
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,lineHeight:1.3,letterSpacing:"-0.01em"}}>{BRANDING.nameMain}</div>
+          <div style={{fontSize:10,color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase",marginTop:2,fontWeight:500}}>{user.role==="client"?"Portaal":"Command Center"}</div>
+        </div>
+      </>
+  }
 </div>
-</div>
-<nav style={{flex:1,padding:"6px 8px"}}>
+
+{/* Collapse toggle button */}
+<button
+  onClick={()=>setCollapsed(c=>!c)}
+  title={collapsed?"Uitklappen":"Inklappen"}
+  style={{
+    position:"absolute",top:16,right:-12,
+    width:24,height:24,borderRadius:"50%",
+    background:C.surface,border:`1px solid ${C.border}`,
+    display:"flex",alignItems:"center",justifyContent:"center",
+    cursor:"pointer",zIndex:10,color:C.secondary,
+    boxShadow:"0 1px 4px rgba(0,0,0,.1)",
+    transition:"transform .2s",
+  }}>
+  <ChevronRight size={12} style={{transform:collapsed?"rotate(0deg)":"rotate(180deg)",transition:"transform .22s"}}/>
+</button>
+
+<nav style={{flex:1,padding:collapsed?"6px 6px":"6px 8px",overflowY:"auto"}}>
 {user.role!=="client"&&<>
-<SideSection label={t("overview")}/>
-<SideBtn icon={Layers} label={t("dashboard")} isActive={view==="dashboard"} onClick={()=>setView("dashboard")}/>
-<SideBtn icon={BarChart3} label={t("analyses")} isActive={view==="analyses"} onClick={()=>setView("analyses")}/>
+<SideSection label={t("overview")} collapsed={collapsed}/>
+<SideBtn icon={Layers} label={t("dashboard")} isActive={view==="dashboard"} onClick={()=>setView("dashboard")} collapsed={collapsed}/>
+<SideBtn icon={BarChart3} label={t("analyses")} isActive={view==="analyses"} onClick={()=>setView("analyses")} collapsed={collapsed}/>
 {(isTC||isBOTH)&&<>
-<SideSection label={t("tc")}/>
-<SideBtn icon={Target} label={t("projects")} isActive={view==="projects"} onClick={()=>setView("projects")}/>
-<SideBtn icon={CheckSquare} label={t("tasks")} isActive={view==="tasks"} onClick={()=>setView("tasks")}/>
-<SideBtn icon={CheckCircle} label={`${t("clientActions")} (TC)`} isActive={view==="ca_tc"} onClick={()=>setView("ca_tc")}/>
+<SideSection label={t("tc")} collapsed={collapsed}/>
+<SideBtn icon={Target} label={t("projects")} isActive={view==="projects"} onClick={()=>setView("projects")} collapsed={collapsed}/>
+<SideBtn icon={CheckSquare} label={t("tasks")} isActive={view==="tasks"} onClick={()=>setView("tasks")} collapsed={collapsed}/>
+<SideBtn icon={CheckCircle} label={`${t("clientActions")} (TC)`} isActive={view==="ca_tc"} onClick={()=>setView("ca_tc")} collapsed={collapsed}/>
 </>}
 {(isFF||isBOTH)&&<>
-<SideSection label={t("ff")}/>
-<SideBtn icon={Building2} label={t("dossiers")} isActive={view==="dossiers"} onClick={()=>setView("dossiers")}/>
-<SideBtn icon={CheckCircle} label={`${t("clientActions")} (FF)`} isActive={view==="ca_ff"} onClick={()=>setView("ca_ff")}/>
+<SideSection label={t("ff")} collapsed={collapsed}/>
+<SideBtn icon={Building2} label={t("dossiers")} isActive={view==="dossiers"} onClick={()=>setView("dossiers")} collapsed={collapsed}/>
+<SideBtn icon={CheckCircle} label={`${t("clientActions")} (FF)`} isActive={view==="ca_ff"} onClick={()=>setView("ca_ff")} collapsed={collapsed}/>
 </>}
 {(isTC||isFF||isBOTH)&&<>
-<SideSection label="Documentbeheer"/>
-<SideBtn icon={ClipboardList} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")}/>
+<SideSection label="Documentbeheer" collapsed={collapsed}/>
+<SideBtn icon={ClipboardList} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")} collapsed={collapsed}/>
 </>}
-<SideSection label={t("crmLeads")}/>
-<SideBtn icon={Users} label={t("crm")} isActive={view==="crm"} onClick={()=>setView("crm")}/>
-<SideBtn icon={TrendingUp} label={t("leads")} isActive={view==="leads"} onClick={()=>setView("leads")}/>
-<SideSection label="Marketing & Sales"/>
-<SideBtn icon={Send} label="Marketing Hub" isActive={view==="marketing"} onClick={()=>setView("marketing")}/>
-<SideSection label={t("docsFinance")}/>
-<SideBtn icon={FileText} label={t("docs")} isActive={view==="docs"} onClick={()=>setView("docs")}/>
-<SideBtn icon={Receipt} label={t("invoices")} isActive={view==="invoices"} onClick={()=>setView("invoices")}/>
-<SideSection label={t("intelligence")}/>
-<SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")}/>
-{user.role==="super_admin"&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")}/>}
-<SideSection label={t("system")}/>
-<SideBtn icon={Bell} label={t("notifications")} isActive={view==="notifications"} onClick={()=>setView("notifications")} badge={unreadCount>0?unreadCount:null}/>
-{(user.role==="super_admin"||user.role==="admin")&&<SideBtn icon={ClipboardList} label="Audit Log" isActive={view==="audit_log"} onClick={()=>setView("audit_log")}/>}
-<SideBtn icon={Settings} label={t("settings")} isActive={view==="settings"} onClick={()=>setView("settings")}/>
-<SideBtn icon={LogOut} label={t("logout")} isActive={false} onClick={onLogout} danger/>
+<SideSection label={t("crmLeads")} collapsed={collapsed}/>
+<SideBtn icon={Users} label={t("crm")} isActive={view==="crm"} onClick={()=>setView("crm")} collapsed={collapsed}/>
+<SideBtn icon={TrendingUp} label={t("leads")} isActive={view==="leads"} onClick={()=>setView("leads")} collapsed={collapsed}/>
+<SideSection label="Marketing & Sales" collapsed={collapsed}/>
+<SideBtn icon={Send} label="Marketing Hub" isActive={view==="marketing"} onClick={()=>setView("marketing")} collapsed={collapsed}/>
+<SideSection label={t("docsFinance")} collapsed={collapsed}/>
+<SideBtn icon={FileText} label={t("docs")} isActive={view==="docs"} onClick={()=>setView("docs")} collapsed={collapsed}/>
+<SideBtn icon={Receipt} label={t("invoices")} isActive={view==="invoices"} onClick={()=>setView("invoices")} collapsed={collapsed}/>
+<SideSection label={t("intelligence")} collapsed={collapsed}/>
+<SideBtn icon={Shield} label={t("riskMatrix")} isActive={view==="risk_matrix"} onClick={()=>setView("risk_matrix")} collapsed={collapsed}/>
+{user.role==="super_admin"&&<SideBtn icon={Activity} label={t("assetFlow")} isActive={view==="asset_flow"} onClick={()=>setView("asset_flow")} collapsed={collapsed}/>}
+<SideSection label={t("system")} collapsed={collapsed}/>
+<SideBtn icon={Bell} label={t("notifications")} isActive={view==="notifications"} onClick={()=>setView("notifications")} badge={unreadCount>0?unreadCount:null} collapsed={collapsed}/>
+{(user.role==="super_admin"||user.role==="admin")&&<SideBtn icon={ClipboardList} label="Audit Log" isActive={view==="audit_log"} onClick={()=>setView("audit_log")} collapsed={collapsed}/>}
+<SideBtn icon={Settings} label={t("settings")} isActive={view==="settings"} onClick={()=>setView("settings")} collapsed={collapsed}/>
+<SideBtn icon={LogOut} label={t("logout")} isActive={false} onClick={onLogout} danger collapsed={collapsed}/>
 </>}
 {user.role==="client"&&<>
 <SideSection label={t("myPortal")}/>
@@ -957,6 +990,14 @@ const showToast=msg=>setToast(msg);
 const [darkMode,setDarkMode]=useState(()=>{
   try{ return localStorage.getItem("tge_theme")==="dark"; }catch(e){ return false; }
 });
+// ── Sidebar collapsed state ───────────────────────────────────────────────
+const [sideCollapsed,setSideCollapsed]=useState(()=>{
+  try{ return localStorage.getItem("tge_sidebar")==="collapsed"; }catch(e){ return false; }
+});
+const toggleSide=v=>{
+  setSideCollapsed(typeof v==="boolean"?v:c=>!c);
+  try{ localStorage.setItem("tge_sidebar",sideCollapsed?"expanded":"collapsed"); }catch(e){}
+};
 // Apply theme — update C and force re-render via key
 const theme = darkMode ? THEMES.dark : THEMES.light;
 C = theme; // update module-level C for all components
@@ -1113,7 +1154,7 @@ return(
 <LangCtx.Provider value={language}>
 <div key={themeKey} style={{display:"flex",height:"100vh",background:C.bg}}>
 <GlobalStyles darkMode={darkMode}/>
-<Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)}/>
+<Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)} collapsed={sideCollapsed} setCollapsed={setSideCollapsed}/>
 <div style={{flex:1,display:"flex",flexDirection:"column"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
 <main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}} key={view+(detailEng?.id||"")}>
@@ -2056,30 +2097,70 @@ function AssigneeSelect({value,onChange,members,label="Toewijzen aan",style={}})
 function TasksView({user}){
 const t=useT();
 const {members}=useTeamMembers(user.dept);
-const [showNewLead,setShowNewLead]=useState(false);
-const [leadData,setLeadData]=useState([]);
-const [stageF,setStageF]=useState("ALL");
-// Load leads from Supabase on mount
+const [assigneeFilter,setAssigneeFilter]=useState("");
+const [tasks,setTasks]=useState([]);
+const [statusF,setStatusF]=useState("ALL"); const [q,setQ]=useState("");
+const [showForm,setShowForm]=useState(false);
+const [newTitle,setNewTitle]=useState("");
+const [newPrio,setNewPrio]=useState("normal");
+const [newDue,setNewDue]=useState("");
+const [newAssignee,setNewAssignee]=useState("");
+
+// Load tasks from DB
 useEffect(()=>{
-  supabase.from("leads")
-    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,notes,created_at")
+  supabase.from("tasks")
+    .select("id,title,priority,status,due_date,assigned_to,engagement_id,user_profiles(full_name,avatar_initials)")
     .order("created_at",{ascending:false})
     .then(({data})=>{
-      if(data?.length) setLeadData(data.map(l=>({
-        id:l.id,name:l.company_name,contact:l.contact_name,
-        email:l.contact_email,value:l.estimated_value||0,
-        stage:l.stage||"new",dept:l.department,
-        rep:l.assigned_to?"?":"—",
+      if(data?.length) setTasks(data.map(tk=>({
+        id:tk.id,title:tk.title,priority:tk.priority||"normal",
+        status:tk.status||"open",
+        due:tk.due_date?new Date(tk.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+        assignee:tk.user_profiles?.avatar_initials||"—",
+        assignee_name:tk.user_profiles?.full_name||"",
+        assigned_to:tk.assigned_to,
       })));
-    });
+    }).catch(()=>{});
 },[]);
-const [assigneeFilter,setAssigneeFilter]=useState("");
-const [tasks,setTasks]=useState(Object.values(TASKS_BY_ENG).flat());
-const [statusF,setStatusF]=useState("ALL"); const [q,setQ]=useState("");
-const [showForm,setShowForm]=useState(false); const [newTitle,setNewTitle]=useState(""); const [newPrio,setNewPrio]=useState("normal"); const [newDue,setNewDue]=useState("");
-const filtered=tasks.filter(tk=>{ const sOk=statusF==="ALL"||tk.status===statusF; const qOk=!q||tk.title.toLowerCase().includes(q.toLowerCase()); return sOk&&qOk; });
-const toggle=(id)=>setTasks(ts=>ts.map(tk=>tk.id===id?{...tk,status:tk.status==="done"?"open":"done"}:tk));
-const addTask=()=>{ if(!newTitle.trim())return; setTasks(ts=>[...ts,{id:`t${Date.now()}`,title:newTitle,priority:newPrio,due:newDue||"—",status:"open",assignee:user.avatar}]); setNewTitle("");setNewPrio("normal");setNewDue("");setShowForm(false); };
+
+const filtered=tasks.filter(tk=>{
+  const sOk=statusF==="ALL"||tk.status===statusF;
+  const aOk=!assigneeFilter||tk.assigned_to===assigneeFilter;
+  const qOk=!q||tk.title.toLowerCase().includes(q.toLowerCase());
+  return sOk&&aOk&&qOk;
+});
+
+const toggle=async(id)=>{
+  const tk=tasks.find(t=>t.id===id);
+  if(!tk) return;
+  const newStatus=tk.status==="done"?"open":"done";
+  setTasks(ts=>ts.map(t=>t.id===id?{...t,status:newStatus}:t));
+  await supabase.from("tasks").update({status:newStatus}).eq("id",id).catch(()=>{});
+};
+
+const addTask=async()=>{
+  if(!newTitle.trim()) return;
+  const assigneeMember=members.find(m=>m.id===newAssignee);
+  const localTask={
+    id:`t${Date.now()}`,title:newTitle,priority:newPrio,
+    due:newDue?new Date(newDue).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+    status:"open",
+    assignee:assigneeMember?.avatar_initials||user.avatar,
+    assignee_name:assigneeMember?.full_name||"",
+    assigned_to:newAssignee||null,
+  };
+  // Save to Supabase
+  try{
+    const {data}=await supabase.from("tasks").insert({
+      title:newTitle.trim(),priority:newPrio,status:"open",
+      due_date:newDue||null,
+      assigned_to:newAssignee||null,
+    }).select().single();
+    if(data) localTask.id=data.id;
+  }catch(e){ console.warn("task insert:",e); }
+  setTasks(ts=>[localTask,...ts]);
+  setNewTitle("");setNewPrio("normal");setNewDue("");setNewAssignee("");setShowForm(false);
+};
 const sLabel={open:t("open"),in_progress:t("inProgress"),done:t("done")};
 const sColor={open:C.secondary,in_progress:C.amber,done:C.green};
 const sBg={open:C.warm50,in_progress:C.amberBg,done:C.greenBg};
@@ -2112,6 +2193,10 @@ return(
 <input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Nieuwe taak..." style={{flex:2,minWidth:200,padding:"8px 11px",borderRadius:8,border:"1.5px solid #6366F1",fontSize:12,outline:"none"}}/>
 <select value={newPrio} onChange={e=>setNewPrio(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer"}}>
 {[["low","Laag"],["normal","Normaal"],["high","Hoog"],["critical","Kritiek"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+</select>
+<select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
+<option value="">— Medewerker —</option>
+{members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
 </select>
 <input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none"}}/>
 <button onClick={addTask} style={{padding:"7px 16px",borderRadius:8,background:"#6366F1",color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
