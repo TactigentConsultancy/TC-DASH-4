@@ -1591,7 +1591,7 @@ useEffect(()=>{
 },[]);
 
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
   {/* Header */}
   <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
@@ -1829,7 +1829,7 @@ return(
 
 {/* Template Picker Modal */}
 {showTemplatePicker&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setShowTemplatePicker(false)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setShowTemplatePicker(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div>
@@ -2214,7 +2214,7 @@ showToast(`Cliëntactie "${title}" aangemaakt`);
 onClose();
 };
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} style={{
   background:C.surface,borderRadius:16,width:540,maxWidth:"92vw",
   boxShadow:"0 24px 60px rgba(58,46,40,.18)",
@@ -2536,7 +2536,7 @@ return(
 </div>
 </div>
 {reviewing&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setReviewing(null)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setReviewing(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:520,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{display:"flex",alignItems:"center",gap:9}}><FileText size={15} color={C.crimson}/><span style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>{reviewing.name}</span></div>
@@ -2674,7 +2674,7 @@ useEffect(()=>{
 },[]);
 
 if(createdAccount) return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}}>
 <div className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",boxShadow:"0 40px 100px rgba(0,0,0,.5)",overflow:"hidden",fontFamily:F.body,boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
   <div style={{padding:"28px 28px 24px",textAlign:"center"}}>
     <div style={{width:56,height:56,borderRadius:"50%",background:C.greenBg,border:`2px solid ${C.green}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
@@ -2716,7 +2716,7 @@ if(createdAccount) return(
 );
 
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:640,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.3)",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 
   {/* Header */}
@@ -3000,7 +3000,7 @@ const submit=async()=>{
 };
 
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
     <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw Lead Aanmaken</div>
@@ -3164,7 +3164,7 @@ return(
 
 {/* New folder modal */}
 {showNewFolder&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setShowNewFolder(false)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setShowNewFolder(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:400,maxWidth:"95vw",padding:"22px",boxShadow:"0 24px 60px rgba(0,0,0,.25)",fontFamily:F.body,boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
   <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
   <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()}
@@ -3236,7 +3236,7 @@ return(
 </div>
 </div>
 {selected&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setSelected(null)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setSelected(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <span style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{selected.name}</span>
@@ -3377,7 +3377,7 @@ return(
 
 {/* Invoice file upload modal */}
 {showUpload&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setShowUpload(null)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setShowUpload(null)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:460,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(0,0,0,.3)",overflow:"hidden",fontFamily:F.body,boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
   <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
     <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Factuurbestand uploaden</div>
@@ -3728,7 +3728,7 @@ return ()=>window.removeEventListener("keydown", handler);
 },[]);
 
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -3871,7 +3871,7 @@ const lineItems = [
 ];
 
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -4148,7 +4148,7 @@ return(
 </div>
 {done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
 {uploading&&(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={()=>setUploading(null)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setUploading(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
 <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
@@ -4914,7 +4914,7 @@ onClose();
 };
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 {/* Header */}
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
@@ -5014,7 +5014,7 @@ onClose();
 };
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 return(
-<div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
 <div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}>
