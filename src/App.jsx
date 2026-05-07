@@ -5604,14 +5604,14 @@ return(
 
 // ─── GLOBE COMPONENT (WebGL canvas, no npm required) ─────────────────────────
 function GlobeBackground(){
-  const canvasRef=useRef(null);
-  const phiRef=useRef(0);
-  const rafRef=useRef(null);
-  const pointerDown=useRef(null);
-  const pointerDelta=useRef(0);
-  const rRef=useRef(0);
+  const canvasRef=React.useRef(null);
+  const phiRef=React.useRef(0);
+  const rafRef=React.useRef(null);
+  const pointerDown=React.useRef(null);
+  const pointerDelta=React.useRef(0);
+  const rRef=React.useRef(0);
 
-  useEffect(()=>{
+  React.useEffect(()=>{
     const canvas=canvasRef.current;
     if(!canvas) return;
     const gl=canvas.getContext("webgl")||canvas.getContext("experimental-webgl");
@@ -5807,8 +5807,8 @@ function GlobeBackground(){
 // ─── LOGIN PAGE — GLOBE EDITION ───────────────────────────────────────────────
 function LoginPage({onLogin,language,setLanguage}){
 const t=useT();
-const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
-const [showModal,setShowModal]=useState(false);
+const [email,setEmail]=React.useState(""); const [pw,setPw]=React.useState(""); const [loading,setLoading]=React.useState(false); const [err,setErr]=React.useState("");
+const [showModal,setShowModal]=React.useState(false);
 
 const tryLogin=async()=>{
 if(!email.trim()||!pw.trim()){setErr("Vul uw e-mail en wachtwoord in.");return;}
@@ -5861,7 +5861,7 @@ setLoading(false);
 };
 
 // Close modal on Escape
-useEffect(()=>{
+React.useEffect(()=>{
   const h=e=>{ if(e.key==="Escape") setShowModal(false); };
   window.addEventListener("keydown",h);
   return()=>window.removeEventListener("keydown",h);
