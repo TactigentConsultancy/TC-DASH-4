@@ -463,7 +463,7 @@ const THEMES = {
     amber:"#C97B1A", amberBg:"#FDF6EC",
     red:"#C83232", redBg:"#FEF2F2",
     green:"#15803D", greenBg:"#F0FDF4",
-    blue:"#1D4ED8", blueBg:"#EFF6FF",
+    blue:"#1D4ED8", blueBg:C.blueBg,
     tagFF:"#9A877A",
     navBg:"#FDFCF9", topbarBg:"#FDFCF9",
   },
@@ -533,8 +533,23 @@ select {
   color: ${text} !important;
 }
 select option {
-  background: ${surface};
-  color: ${text};
+  background: ${surface} !important;
+  color: ${text} !important;
+}
+/* Force all inline-styled divs with hardcoded bgs to inherit dark colors */
+body.dark-mode [style*="background: #F5F3FF"],
+body.dark-mode [style*="background: #EEF2FF"],
+body.dark-mode [style*="background: #EFF6FF"],
+body.dark-mode [style*="background:#F5F3FF"],
+body.dark-mode [style*="background:#EEF2FF"],
+body.dark-mode [style*="background:#EFF6FF"] {
+  background: ${surface} !important;
+  color: ${text} !important;
+}
+/* Dashboard dark card text fix */
+body.dark-mode [style*="background: rgb(58, 46, 40)"],
+body.dark-mode [style*="background:C.espresso"] {
+  color: ${bg} !important;
 }
 /* Prevent white-on-white or dark-on-dark */
 input[style*="background"], textarea[style*="background"] {
@@ -674,7 +689,7 @@ const SideBtn=({icon:Icon,label,isActive,onClick,danger,badge,collapsed,title})=
   </button>
 );
 const Pill=({label,active,onClick})=>(<button onClick={onClick} style={{padding:"6px 16px",borderRadius:20,border:`1.5px solid ${active?C.crimson:C.border}`,background:active?C.crimson:"transparent",color:active?CREAM:C.secondary,fontSize:12,fontWeight:600,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s",whiteSpace:"nowrap"}}>{label}</button>);
-function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);return()=>clearTimeout(t);},[]);return(<div className="sir" style={{position:"fixed",bottom:28,right:28,zIndex:2000,background:C.espresso,color:CREAM,borderRadius:14,padding:"13px 20px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 20px 48px rgba(58,46,40,.32),0 4px 8px rgba(58,46,40,.16)",fontSize:13,fontWeight:500,maxWidth:360,lineHeight:1.5}}><div style={{width:20,height:20,borderRadius:"50%",background:"rgba(21,128,61,.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Check size={12} color="#4ADE80"/></div>{msg}<button onClick={onClose} style={{background:"none",border:"none",color:C.taupeLight,cursor:"pointer",marginLeft:"auto",padding:"2px",opacity:.7,lineHeight:0}}><X size={14}/></button></div>);}
+function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);return()=>clearTimeout(t);},[]);return(<div className="sir" style={{position:"fixed",bottom:28,right:28,zIndex:2000,background:C.espresso,color:C.bg,borderRadius:14,padding:"13px 20px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 20px 48px rgba(58,46,40,.32),0 4px 8px rgba(58,46,40,.16)",fontSize:13,fontWeight:500,maxWidth:360,lineHeight:1.5}}><div style={{width:20,height:20,borderRadius:"50%",background:"rgba(21,128,61,.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Check size={12} color="#4ADE80"/></div>{msg}<button onClick={onClose} style={{background:"none",border:"none",color:C.taupeLight,cursor:"pointer",marginLeft:"auto",padding:"2px",opacity:.7,lineHeight:0}}><X size={14}/></button></div>);}
 
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const DEMO_USERS=[];
@@ -720,9 +735,9 @@ return(
   background:C.surface,
   borderRight:`1px solid ${C.border}`,
   display:"flex",flexDirection:"column",
-  flexShrink:0,overflowY:"auto",overflowX:"hidden",
+  flexShrink:0,overflowY:"auto",
   transition:"width .22s cubic-bezier(0.4,0,0.2,1),min-width .22s cubic-bezier(0.4,0,0.2,1)",
-  position:"relative",
+  position:"relative",overflow:"visible",
 }}>
 {/* Brand header */}
 <div style={{padding:collapsed?"14px 0":"20px 16px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:collapsed?0:11,justifyContent:collapsed?"center":"flex-start",minHeight:64}}>
@@ -743,15 +758,15 @@ return(
   onClick={()=>setCollapsed(c=>!c)}
   title={collapsed?"Uitklappen":"Inklappen"}
   style={{
-    position:"absolute",top:16,right:-12,
-    width:24,height:24,borderRadius:"50%",
-    background:C.surface,border:`1px solid ${C.border}`,
+    position:"absolute",top:20,right:collapsed?8:12,
+    width:22,height:22,borderRadius:6,
+    background:C.warm50,border:`1px solid ${C.border}`,
     display:"flex",alignItems:"center",justifyContent:"center",
-    cursor:"pointer",zIndex:10,color:C.secondary,
-    boxShadow:"0 1px 4px rgba(0,0,0,.1)",
-    transition:"transform .2s",
+    cursor:"pointer",zIndex:20,color:C.secondary,
+    boxShadow:"0 1px 3px rgba(0,0,0,.08)",
+    transition:"right .22s",
   }}>
-  <ChevronRight size={12} style={{transform:collapsed?"rotate(0deg)":"rotate(180deg)",transition:"transform .22s"}}/>
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{transform:collapsed?"rotate(0deg)":"rotate(180deg)",transition:"transform .22s",display:"block"}}><polyline points="15,18 9,12 15,6"/></svg>
 </button>
 
 <nav style={{flex:1,padding:collapsed?"6px 6px":"6px 8px",overflowY:"auto"}}>
@@ -1337,7 +1352,7 @@ return(
       <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:C.taupeLight,textTransform:"uppercase"}}>WERELDWIJDE POLSSLAG</div>
       <p style={{fontFamily:F.display,fontSize:14,fontWeight:600,lineHeight:1.5,margin:0}}>Geaggregeerd risico momenteel <span style={{color:"#E87B7B"}}>Verhoogd</span>.</p>
       <div style={{display:"flex",justifyContent:"space-between"}}>
-        {[{l:"TACTIGENT",v:"18.4%",up:true},{l:"FISCAL FUSE",v:"4.2%",up:false}].map(s=>(
+        {[{l:"TACTIGENT",v:`${eng.filter(e=>e.dept==="TC").length} actief`,up:true},{l:"FISCAL FUSE",v:`${eng.filter(e=>e.dept==="FF").length} actief`,up:false}].map(s=>(
           <div key={s.l}><div style={{fontSize:8,color:C.taupeLight,fontWeight:700,marginBottom:3}}>{s.l}</div>
           <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:s.up?"#E87B7B":CREAM_DIM}}>{s.v}{s.up?"↑":"↓"}</div></div>
         ))}
@@ -1850,7 +1865,7 @@ return(
 <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
 <div>
 <div style={{display:"flex",gap:4,marginBottom:14,background:C.bg,borderRadius:10,padding:4}}>
-{[{id:"tasks",label:`${t("internalTasks")} (${localTasks.length})`,Icon:Lock,bc:"#EEF2FF",bt:"#6366F1"},{id:"actions",label:`Cliëntacties (${localActions.length})`,Icon:CheckSquare,bc:C.greenBg,bt:C.green}].map(tb=>(
+{[{id:"tasks",label:`${t("internalTasks")} (${localTasks.length})`,Icon:Lock,bc:C.blueBg,bt:"#6366F1"},{id:"actions",label:`Cliëntacties (${localActions.length})`,Icon:CheckSquare,bc:C.greenBg,bt:C.green}].map(tb=>(
 <button key={tb.id} onClick={()=>setActiveTab(tb.id)} style={{flex:1,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,fontWeight:activeTab===tb.id?700:400,fontSize:12,transition:"background .15s,color .15s,border-color .15s,opacity .15s",boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none"}}>
 <tb.Icon size={13}/>{tb.label}
 <span style={{fontSize:8,background:tb.bc,color:tb.bt,padding:"2px 6px",borderRadius:4,fontWeight:700}}>{tb.id==="tasks"?"INTERN":"PORTAAL"}</span>
@@ -1860,11 +1875,11 @@ return(
 {activeTab==="tasks"&&(
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {/* Header */}
-<div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:"#EEF2FF"}}>
-<div style={{display:"flex",alignItems:"center",gap:8}}><Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:"#4338CA"}}>Interne Taken — NIET zichtbaar voor cliënten</span></div>
+<div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:C.blueBg}}>
+<div style={{display:"flex",alignItems:"center",gap:8}}><Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.blue||"#4338CA"}}>Interne Taken — NIET zichtbaar voor cliënten</span></div>
 <div style={{display:"flex",gap:7}}>
 <button onClick={()=>setShowTemplatePicker(true)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"#6366F1",color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}><Layers size={11}/> Van template</button>
-<button onClick={()=>setShowTaskForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"transparent",color:"#4338CA",border:"1.5px solid #6366F1",fontSize:10,fontWeight:700,cursor:"pointer"}}><Plus size={11}/> Leeg</button>
+<button onClick={()=>setShowTaskForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"transparent",color:C.blue||"#4338CA",border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:10,fontWeight:700,cursor:"pointer"}}><Plus size={11}/> Leeg</button>
 </div>
 </div>
 
@@ -1915,8 +1930,8 @@ onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.sty
 
 {/* Quick task form */}
 {showTaskForm&&(
-<div style={{padding:"14px 16px",background:"#F5F3FF",borderBottom:`1px solid ${C.border}`,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Taakomschrijving..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:"1.5px solid #6366F1",fontSize:12,outline:"none"}}/>
+<div style={{padding:"14px 16px",background:C.warm50,borderBottom:`1px solid ${C.border}`,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+<input value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Taakomschrijving..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
 <select value={newTaskPrio} onChange={e=>setNewTaskPrio(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer"}}>
 {[["low","Laag"],["normal","Normaal"],["high","Hoog"],["critical","Kritiek"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
 </select>
@@ -1968,7 +1983,7 @@ return(
 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
 <Avatar initials={tk.assignee} size={24} bg={C.walnut}/>
 {subTotal>0&&(
-<button onClick={()=>setExpandedTask(isExpanded?null:tk.id)} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:6,background:isExpanded?"#EEF2FF":"transparent",border:`1px solid ${isExpanded?"#6366F1":C.border}`,color:isExpanded?"#4338CA":C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",transition:"background .15s,border-color .15s"}}>
+<button onClick={()=>setExpandedTask(isExpanded?null:tk.id)} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:6,background:isExpanded?C.blueBg:"transparent",border:`1px solid ${isExpanded?"#6366F1":C.border}`,color:isExpanded?"#4338CA":C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",transition:"background .15s,border-color .15s"}}>
 <ChevronRight size={11} style={{transform:isExpanded?"rotate(90deg)":"none",transition:"transform .2s"}}/>
 {subTotal} subtaken
 </button>
@@ -1978,8 +1993,8 @@ return(
 
 {/* Expandable subtasks */}
 {isExpanded&&subTotal>0&&(
-<div style={{background:"#F5F3FF",borderTop:`1px solid #E0E7FF`,padding:"8px 16px 12px 48px"}}>
-<div style={{fontSize:9,fontWeight:700,color:"#4338CA",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>SUBTAKEN</div>
+<div style={{background:C.warm50,borderTop:`1px solid #E0E7FF`,padding:"8px 16px 12px 48px"}}>
+<div style={{fontSize:9,fontWeight:700,color:C.blue||"#4338CA",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>SUBTAKEN</div>
 {(tk.subtasks||[]).map(sub=>(
 <div key={sub.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:8,marginBottom:4,background:sub.status==="done"?"rgba(21,128,61,.06)":"rgba(255,255,255,.7)",border:`1px solid ${sub.status==="done"?"rgba(21,128,61,.15)":"rgba(99,102,241,.12)"}`}}>
 <div onClick={()=>toggleSubtask(tk.id,sub.id)} style={{width:15,height:15,borderRadius:4,border:`2px solid ${sub.status==="done"?C.green:"#6366F1"}`,background:sub.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
@@ -1988,10 +2003,10 @@ return(
 <span style={{fontSize:12,color:sub.status==="done"?C.secondary:C.text,textDecoration:sub.status==="done"?"line-through":"none",flex:1,fontWeight:sub.status==="done"?400:500}}>{sub.title}</span>
 {sub.status==="done"
 ?<span style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,padding:"2px 7px",borderRadius:4}}>KLAAR</span>
-:<span style={{fontSize:9,fontWeight:700,color:"#4338CA",background:"#EEF2FF",padding:"2px 7px",borderRadius:4}}>OPEN</span>}
+:<span style={{fontSize:9,fontWeight:700,color:C.blue||"#4338CA",background:C.blueBg,padding:"2px 7px",borderRadius:4}}>OPEN</span>}
 </div>
 ))}
-<div style={{marginTop:8,fontSize:10,color:"#6366F1",fontWeight:700}}>
+<div style={{marginTop:8,fontSize:10,color:C.blue||"#6366F1",fontWeight:700}}>
 {pctDone===100?"✓ Alle subtaken voltooid":`${subTotal-subDone} subtaken resterend`}
 </div>
 </div>
@@ -2105,6 +2120,9 @@ const [newTitle,setNewTitle]=useState("");
 const [newPrio,setNewPrio]=useState("normal");
 const [newDue,setNewDue]=useState("");
 const [newAssignee,setNewAssignee]=useState("");
+const [newEngId,setNewEngId]=useState("");
+const [engList,setEngList]=useState([]);
+useEffect(()=>{ supabase.from("engagements").select("id,name,department").then(({data})=>setEngList(data||[])); },[]);
 
 // Load tasks from DB
 useEffect(()=>{
@@ -2148,18 +2166,28 @@ const addTask=async()=>{
     assignee:assigneeMember?.avatar_initials||user.avatar,
     assignee_name:assigneeMember?.full_name||"",
     assigned_to:newAssignee||null,
+    engagement_id:newEngId||null,
   };
-  // Save to Supabase
+  // Save to Supabase - use first available engagement if none selected
   try{
+    // Load first engagement to use as fallback (engagement_id required by DB)
+    let engId=newEngId;
+    if(!engId){
+      const {data:engs}=await supabase.from("engagements").select("id").limit(1);
+      engId=engs?.[0]?.id||null;
+    }
+    if(!engId){ setTasks(ts=>[localTask,...ts]); setNewTitle("");setNewPrio("normal");setNewDue("");setNewAssignee("");setShowForm(false); return; }
     const {data}=await supabase.from("tasks").insert({
       title:newTitle.trim(),priority:newPrio,status:"open",
       due_date:newDue||null,
       assigned_to:newAssignee||null,
+      engagement_id:engId,
+      department:user.dept==="BOTH"?"TC":user.dept,
     }).select().single();
     if(data) localTask.id=data.id;
   }catch(e){ console.warn("task insert:",e); }
   setTasks(ts=>[localTask,...ts]);
-  setNewTitle("");setNewPrio("normal");setNewDue("");setNewAssignee("");setShowForm(false);
+  setNewTitle("");setNewPrio("normal");setNewDue("");setNewAssignee("");setNewEngId("");setShowForm(false);
 };
 const sLabel={open:t("open"),in_progress:t("inProgress"),done:t("done")};
 const sColor={open:C.secondary,in_progress:C.amber,done:C.green};
@@ -2176,8 +2204,8 @@ return(
 </div>
 </div>
 </div>
-<div style={{padding:"10px 16px",borderRadius:10,background:"#EEF2FF",border:"1px solid #C7D2FE",display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-<Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:"#4338CA"}}>Interne taken — beveiligd, nooit zichtbaar voor cliënten</span>
+<div style={{padding:"10px 16px",borderRadius:10,background:C.blueBg,border:`1px solid ${C.blue||"#6366F1"}30`,display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+<Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.blue||"#4338CA"}}>Interne taken — beveiligd, nooit zichtbaar voor cliënten</span>
 </div>
 <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
 <div style={{position:"relative",flex:1,minWidth:180,maxWidth:280}}>
@@ -2189,10 +2217,14 @@ return(
 <button onClick={()=>setShowForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",marginLeft:"auto"}}><Plus size={11}/> Nieuwe taak</button>
 </div>
 {showForm&&(
-<div style={{background:"#F5F3FF",border:"1.5px solid #6366F1",borderRadius:12,padding:"14px 16px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Nieuwe taak..." style={{flex:2,minWidth:200,padding:"8px 11px",borderRadius:8,border:"1.5px solid #6366F1",fontSize:12,outline:"none"}}/>
+<div style={{background:C.warm50,border:`1.5px solid ${C.blue||"#6366F1"}`,borderRadius:12,padding:"14px 16px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+<input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Nieuwe taak..." style={{flex:2,minWidth:200,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
 <select value={newPrio} onChange={e=>setNewPrio(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer"}}>
 {[["low","Laag"],["normal","Normaal"],["high","Hoog"],["critical","Kritiek"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+</select>
+<select value={newEngId} onChange={e=>setNewEngId(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${newEngId?C.crimson:C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
+<option value="">— Project —</option>
+{engList.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
 </select>
 <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
 <option value="">— Medewerker —</option>
@@ -2406,7 +2438,7 @@ const qOk=!q||a.title.toLowerCase().includes(q.toLowerCase())||a.client.toLowerC
 return sOk&&qOk;
 });
 const statusMeta={pending:{label:"OPENSTAAND",color:C.amber,bg:C.amberBg},overdue:{label:"ACHTERSTALLIG",color:C.red,bg:C.redBg},completed:{label:"VOLTOOID",color:C.green,bg:C.greenBg}};
-const typeMeta={upload:{label:"Upload",color:"#6366F1",bg:"#EEF2FF"},approve:{label:"Goedkeuring",color:C.green,bg:C.greenBg},sign:{label:"Ondertekening",color:C.amber,bg:C.amberBg},review:{label:"Beoordeling",color:C.secondary,bg:C.warm50}};
+const typeMeta={upload:{label:"Upload",color:C.blue||"#6366F1",bg:C.blueBg},approve:{label:"Goedkeuring",color:C.green,bg:C.greenBg},sign:{label:"Ondertekening",color:C.amber,bg:C.amberBg},review:{label:"Beoordeling",color:C.secondary,bg:C.warm50}};
 const setStatus=(id,status)=>{setActions(as=>as.map(a=>a.id===id?{...a,status}:a));if(showToast)showToast(`Status bijgewerkt`);};
 const overdue=actions.filter(a=>a.status==="overdue").length;
 const pending=actions.filter(a=>a.status==="pending").length;
@@ -2496,7 +2528,7 @@ return(
 }
 // ─── AUDIT LOG VIEW ──────────────────────────────────────────────────────────
 const DEMO_AUDIT=[];
-const AUDIT_COLOR={FASE_BIJGEWERKT:{c:"#6366F1",bg:"#EEF2FF"},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:"#EFF6FF"}};
+const AUDIT_COLOR={FASE_BIJGEWERKT:{c:"#6366F1",bg:C.blueBg},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:C.blueBg}};
 
 function AuditLogView({user}){
 const [deptF,setDeptF]=useState("ALL");
@@ -2510,7 +2542,7 @@ return(
 <div>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
 <PageHeader kicker="Systeem" title="Audit Log"/>
-<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:10,background:C.espresso,color:CREAM,fontSize:11,fontWeight:700}}>
+<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:10,background:C.espresso,color:C.bg,fontSize:11,fontWeight:700}}>
 <Shield size={13} color={CREAM}/> Immutabel · {logs.length} Records
 </div>
 </div>
@@ -3422,8 +3454,8 @@ return(
 ))}
 </div>
 {showNew&&(
-<div style={{background:"#F5F3FF",border:"1.5px solid #6366F1",borderRadius:12,padding:"16px",marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newClient} onChange={e=>setNewClient(e.target.value)} placeholder="Cliëntnaam..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:"1.5px solid #6366F1",fontSize:12,outline:"none"}}/>
+<div style={{background:C.warm50,border:`1.5px solid ${C.blue||"#6366F1"}`,borderRadius:12,padding:"16px",marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+<input value={newClient} onChange={e=>setNewClient(e.target.value)} placeholder="Cliëntnaam..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
 <input value={newAmount} onChange={e=>setNewAmount(e.target.value)} placeholder="Bedrag (SRD)..." type="number" style={{flex:1,minWidth:120,padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
 <input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={{padding:"8px 9px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
 <button onClick={addInvoice} style={{padding:"8px 16px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
@@ -3584,7 +3616,7 @@ return(
 {/* Bubbles */}
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
 <div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
+<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
 </div>
 {/* X-axis labels BELOW the grid */}
 <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
@@ -3720,8 +3752,52 @@ return(
 // ─── CLIENT PORTAL VIEWS ─────────────────────────────────────────────────────
 function ClientDashboard({user}){
 const t=useT();
-const [actions,setActions]=useState(CLIENT_PORTAL_ACTIONS);
-const pending=actions.filter(a=>a.status!=="done");
+const [actions,setActions]=useState([]);
+const [docs,setDocs]=useState([]);
+const [invoices,setInvoices]=useState([]);
+const [loading,setLoading]=useState(true);
+
+// Load all client data from DB
+useEffect(()=>{
+  const load=async()=>{
+    try{
+      // Load client_actions visible to this client
+      const {data:acts}=await supabase
+        .from("client_actions")
+        .select("id,title,description,action_type,deadline,status,is_visible_to_client,engagement_id,engagements(name)")
+        .eq("client_id",user.id)
+        .eq("is_visible_to_client",true)
+        .order("created_at",{ascending:false});
+      if(acts) setActions(acts.map(a=>({
+        id:a.id,title:a.title,desc:a.description,
+        type:a.action_type,status:a.status||"pending",
+        deadline:a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+        engagement:a.engagements?.name||"—",
+      })));
+
+      // Load documents shared with this client
+      const {data:ds}=await supabase
+        .from("documents")
+        .select("id,name,file_url,file_type,uploaded_at,visibility")
+        .in("visibility",["client","shared"])
+        .order("uploaded_at",{ascending:false});
+      if(ds) setDocs(ds);
+
+      // Load invoices for this company
+      const {data:inv}=await supabase
+        .from("invoices")
+        .select("id,reference_code,amount,currency,status,due_date")
+        .eq("company_id",user.company_id||"")
+        .order("created_at",{ascending:false});
+      if(inv) setInvoices(inv);
+    }catch(e){ console.warn("client load error",e); }
+    setLoading(false);
+  };
+  load();
+},[user.id]);
+
+const pending=actions.filter(a=>a.status==="pending"||a.status==="overdue");
+const overdue=actions.filter(a=>a.status==="overdue");
 return(
 <div>
 <div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>STAATSOLIE N.V.</span></div>
@@ -3773,7 +3849,7 @@ return(
 <div style={{fontSize:9,color:C.secondary,marginBottom:3}}>BESCHIKBARE LIQUIDITEIT</div>
 <div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,marginBottom:12}}>SRD 4.281.090</div>
 <div style={{fontSize:9,color:C.secondary,marginBottom:8}}>QBO Sync Status: <span style={{color:C.green,fontWeight:700}}>ACTIEF</span></div>
-{[["Burn Rate","-SRD 142k/md"],[" Runway","30.2 Maanden"],["Netto Marge","18.4%"]].map(([l,v])=>(
+{[["Burn Rate","-SRD 142k/md"],[" Runway","30.2 Maanden"],["Netto Marge","—"]].map(([l,v])=>(
 <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
 <span style={{fontSize:11,color:C.secondary}}>{l}</span>
 <span style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</span>
@@ -4635,7 +4711,7 @@ return(
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
 <PageHeader kicker="Marketing & Sales" title="Marketing Hub"/>
 <div style={{display:"flex",gap:8,marginTop:4}}>
-<button onClick={()=>setComposerOpen(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.espresso,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<button onClick={()=>setComposerOpen(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.espresso,color:C.bg,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
 <Mail size={13}/> Nieuwe Campagne
 </button>
 <button onClick={()=>setPostComposerOpen("new")} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
