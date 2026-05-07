@@ -1563,19 +1563,16 @@ useEffect(()=>{
         .select("id,full_name,department,title,avatar_initials")
         .in("role",["super_admin","staff","finance"]);
       setStaff(staffData||[]);
-      // Load clients
-      const {data:clientData}=await supabase
-        .from("user_profiles")
-        .select("id,full_name,company_id,avatar_initials")
-        .eq("role","client");
-      // Also load companies without portal users
+      // Load from permanent view — always shows every company
       const {data:compData}=await supabase
-        .from("companies")
-        .select("id,name,department,portal_user_id");
-      const compClients=(compData||[]).filter(c=>!c.portal_user_id).map(c=>({
-        id:c.id,full_name:c.name,company_id:c.id,avatar_initials:(c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
-      }));
-      setClients([...(clientData||[]),...compClients]);
+        .from("v_client_dropdown")
+        .select("company_id,display_name,department,assignable_id");
+      setClients((compData||[]).map(c=>({
+        id: c.assignable_id,
+        company_id: c.company_id,
+        full_name: c.display_name,
+        avatar_initials: (c.display_name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
+      })));
     }catch(e){ console.warn("load error",e); }
   };
   load();
@@ -2088,10 +2085,19 @@ function useTeamMembers(dept){
       .select("id,full_name,role,department,avatar_initials,company_id")
       .in("role",["super_admin","staff","finance"])
       .then(({data})=>setMembers((data||[]).filter(m=>dept==="BOTH"||m.department===dept||m.department==="BOTH")));
-    supabase.from("user_profiles")
-      .select("id,full_name,role,department,avatar_initials,company_id")
-      .eq("role","client")
-      .then(({data})=>setClients(data||[]));
+      // Load from permanent view — always includes every company
+  supabase.from("v_client_dropdown")
+        .select("company_id,display_name,department,assignable_id,has_portal")
+        .order("display_name")
+        .then(({data})=>{
+          if(data) setClientList(data.map(c=>({
+            id: c.assignable_id,
+            company_id: c.company_id,
+            full_name: c.display_name,
+            department: c.department,
+            has_portal: c.has_portal,
+          })));
+        });
   },[dept]);
   return {members,clients};
 }
@@ -2266,16 +2272,15 @@ return(
 function ClientAssignSelect({engId,value,onChange}){
   const [clients,setClients]=useState([]);
   useEffect(()=>{
-    supabase.from("user_profiles").select("id,full_name,company_id,department").eq("role","client")
-      .order("full_name")
+    supabase.from("v_client_dropdown")
+      .select("company_id,display_name,department,assignable_id")
+      .order("display_name")
       .then(({data})=>{
-        const seen=new Set();
-        const unique=(data||[]).filter(c=>{
-          if(!c.company_id) return true;
-          if(seen.has(c.company_id)) return false;
-          seen.add(c.company_id); return true;
-        });
-        setClients(unique);
+        if(data) setClients(data.map(c=>({
+          id: c.assignable_id,
+          company_id: c.company_id,
+          full_name: c.display_name,
+        })));
       });
   },[]);
   return(
@@ -2307,19 +2312,17 @@ useEffect(()=>{
   supabase.from("user_profiles").select("id,full_name,department,avatar_initials,role")
     .in("role",["super_admin","staff","finance"])
     .then(({data})=>setStaffList(data||[]));
-  supabase.from("user_profiles")
-    .select("id,full_name,company_id,department,avatar_initials")
-    .eq("role","client")
-    .order("full_name")
+  // Permanent fix: v_client_dropdown view always includes every company
+  supabase.from("v_client_dropdown")
+    .select("company_id,display_name,department,assignable_id,has_portal")
     .then(({data})=>{
-      // Deduplicate by company_id - keep only one account per company
-      const seen=new Set();
-      const unique=(data||[]).filter(c=>{
-        if(!c.company_id) return true;
-        if(seen.has(c.company_id)) return false;
-        seen.add(c.company_id); return true;
-      });
-      setClientList(unique);
+      if(data) setClientList(data.map(c=>({
+        id: c.assignable_id,
+        company_id: c.company_id,
+        full_name: c.display_name,
+        department: c.department,
+        has_portal: c.has_portal,
+      })));
     });
   return()=>{ window.removeEventListener("keydown",h); document.body.classList.remove("modal-open"); };
 },[]);
