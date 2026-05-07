@@ -463,7 +463,7 @@ const THEMES = {
     amber:"#C97B1A", amberBg:"#FDF6EC",
     red:"#C83232", redBg:"#FEF2F2",
     green:"#15803D", greenBg:"#F0FDF4",
-    blue:"#1D4ED8", blueBg:C.blueBg,
+    blue:"#1D4ED8", blueBg:"#EFF6FF", indigo:"#6366F1", indigoBg:"#EEF2FF", indigoDark:"#4338CA",
     tagFF:"#9A877A",
     navBg:"#FDFCF9", topbarBg:"#FDFCF9",
   },
@@ -476,7 +476,7 @@ const THEMES = {
     amber:"#F59E0B", amberBg:"#1C1200",
     red:"#EF4444", redBg:"#1C0808",
     green:"#22C55E", greenBg:"#052E16",
-    blue:"#60A5FA", blueBg:"#0A1628",
+    blue:"#60A5FA", blueBg:"#0A1628", indigo:"#818CF8", indigoBg:"#1E1B4B", indigoDark:"#6366F1",
     tagFF:"#8A7B72",
     navBg:"#1A1612", topbarBg:"#1A1612",
   }
@@ -546,11 +546,7 @@ body.dark-mode [style*="background:#EFF6FF"] {
   background: ${surface} !important;
   color: ${text} !important;
 }
-/* Dashboard dark card text fix */
-body.dark-mode [style*="background: rgb(58, 46, 40)"],
-body.dark-mode [style*="background:C.espresso"] {
-  color: ${bg} !important;
-}
+/* Dashboard dark card text: handled via C.bg token */
 /* Prevent white-on-white or dark-on-dark */
 input[style*="background"], textarea[style*="background"] {
   color: ${text} !important;
@@ -592,7 +588,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #8B1A2B;outline-offset:2p
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);}}
 
 .fu{animation:fadeUp .28s var(--ease-out-expo) both;}
@@ -710,11 +706,7 @@ const MESSAGES_INIT={"1":[
 ]};
 const DOCUMENTS=[];
 const INVOICES_INIT=[];
-const TRANSACTIONS=[
-{},
-{id:"tr2",desc:"Belastingreservering Q1",dept:"FF",amount:-8500,dir:"out",status:"In Afwachting",date:"25 Mrt"},
-{id:"tr3",desc:"Fernandes Retainer Apr",dept:"FF",amount:38400,dir:"in",status:"Afgerond",date:"12 Apr"},
-];
+const TRANSACTIONS=[];
 const NOTIFICATIONS_INIT=[];
 const LEADS=[];
 const MARKETING_CAMPAIGNS=[];
@@ -1266,7 +1258,7 @@ const FALLBACK_NEWS=[
 {id:"1",tag:"WETGEVING",tagColor:"#8B1A2B",title:"Nieuwe belastingwetgeving voor Surinaamse ondernemers",body:"De Centrale Bank van Suriname heeft nieuwe rapportage-eisen gepubliceerd voor bedrijven met omzet boven SRD 500.000.",time:"Recent",dept:"FF",urgent:true,source:"CBvS"},
 {id:"2",tag:"MARKT",tagColor:"#C97B1A",title:"SRD/USD wisselkoers: hedging-strategie aanbevolen",body:"De Surinaamse dollar toont volatiliteit. Analyse wijst op marktdruk vanuit de oliesector.",time:"Recent",dept:"BOTH",urgent:false,source:"Marktanalyse"},
 {id:"3",tag:"CARICOM",tagColor:"#15803D",title:"CARICOM-handelsakkoord biedt kansen voor Surinaamse bedrijven",body:"Nieuwe handelsprotocollen versterken de marktpositie van Suriname in de regio.",time:"Recent",dept:"TC",urgent:false,source:"Regionaal Rapport"},
-{id:"4",tag:"COMPLIANCE",tagColor:"#6366F1",title:"KKF jaaropgave: check actuele deadlines",body:"De Kamer van Koophandel Suriname heeft deadlines gepubliceerd voor jaaropgaven.",time:"Recent",dept:"BOTH",urgent:true,source:"KKF"},
+{id:"4",tag:"COMPLIANCE",tagColor:C.indigo,title:"KKF jaaropgave: check actuele deadlines",body:"De Kamer van Koophandel Suriname heeft deadlines gepubliceerd voor jaaropgaven.",time:"Recent",dept:"BOTH",urgent:true,source:"KKF"},
 {id:"5",tag:"OFFSHORE",tagColor:"#4A3C35",title:"Offshore kansen voor lokale toeleveranciers",body:"Nieuwe offshore ontdekkingen bieden groeikansen voor MKB-bedrijven.",time:"Recent",dept:"TC",urgent:false,source:"Energie Rapport"},
 ];
 
@@ -1865,7 +1857,7 @@ return(
 <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
 <div>
 <div style={{display:"flex",gap:4,marginBottom:14,background:C.bg,borderRadius:10,padding:4}}>
-{[{id:"tasks",label:`${t("internalTasks")} (${localTasks.length})`,Icon:Lock,bc:C.blueBg,bt:"#6366F1"},{id:"actions",label:`Cliëntacties (${localActions.length})`,Icon:CheckSquare,bc:C.greenBg,bt:C.green}].map(tb=>(
+{[{id:"tasks",label:`${t("internalTasks")} (${localTasks.length})`,Icon:Lock,bc:C.blueBg,bt:C.indigo},{id:"actions",label:`Cliëntacties (${localActions.length})`,Icon:CheckSquare,bc:C.greenBg,bt:C.green}].map(tb=>(
 <button key={tb.id} onClick={()=>setActiveTab(tb.id)} style={{flex:1,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,fontWeight:activeTab===tb.id?700:400,fontSize:12,transition:"background .15s,color .15s,border-color .15s,opacity .15s",boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none"}}>
 <tb.Icon size={13}/>{tb.label}
 <span style={{fontSize:8,background:tb.bc,color:tb.bt,padding:"2px 6px",borderRadius:4,fontWeight:700}}>{tb.id==="tasks"?"INTERN":"PORTAAL"}</span>
@@ -1876,10 +1868,10 @@ return(
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {/* Header */}
 <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:C.blueBg}}>
-<div style={{display:"flex",alignItems:"center",gap:8}}><Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.blue||"#4338CA"}}>Interne Taken — NIET zichtbaar voor cliënten</span></div>
+<div style={{display:"flex",alignItems:"center",gap:8}}><Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.indigo}}>Interne Taken — NIET zichtbaar voor cliënten</span></div>
 <div style={{display:"flex",gap:7}}>
-<button onClick={()=>setShowTemplatePicker(true)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"#6366F1",color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}><Layers size={11}/> Van template</button>
-<button onClick={()=>setShowTaskForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"transparent",color:C.blue||"#4338CA",border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:10,fontWeight:700,cursor:"pointer"}}><Plus size={11}/> Leeg</button>
+<button onClick={()=>setShowTemplatePicker(true)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:C.indigo,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}><Layers size={11}/> Van template</button>
+<button onClick={()=>setShowTaskForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:7,background:"transparent",color:C.indigo,border:`1.5px solid ${C.blue||C.indigo}`,fontSize:10,fontWeight:700,cursor:"pointer"}}><Plus size={11}/> Leeg</button>
 </div>
 </div>
 
@@ -1931,12 +1923,12 @@ onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.sty
 {/* Quick task form */}
 {showTaskForm&&(
 <div style={{padding:"14px 16px",background:C.warm50,borderBottom:`1px solid ${C.border}`,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Taakomschrijving..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
+<input value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Taakomschrijving..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||C.indigo}`,fontSize:12,outline:"none"}}/>
 <select value={newTaskPrio} onChange={e=>setNewTaskPrio(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer"}}>
 {[["low","Laag"],["normal","Normaal"],["high","Hoog"],["critical","Kritiek"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
 </select>
 <input type="date" value={newTaskDue} onChange={e=>setNewTaskDue(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none"}}/>
-<button onClick={addTask} style={{padding:"7px 14px",borderRadius:7,background:"#6366F1",color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>Opslaan</button>
+<button onClick={addTask} style={{padding:"7px 14px",borderRadius:7,background:C.indigo,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>Opslaan</button>
 <button onClick={()=>setShowTaskForm(false)} style={{padding:"7px 10px",borderRadius:7,background:"transparent",color:C.secondary,border:`1px solid ${C.border}`,fontSize:11,cursor:"pointer"}}><X size={12}/></button>
 </div>
 )}
@@ -1947,7 +1939,7 @@ onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.sty
 <Layers size={28} color={C.mushroom} style={{marginBottom:10}}/>
 <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,marginBottom:4}}>Nog geen taken</div>
 <div style={{fontSize:12,color:C.secondary,marginBottom:14}}>Kies een template of maak een losse taak aan.</div>
-<button onClick={()=>setShowTemplatePicker(true)} style={{padding:"8px 18px",borderRadius:9,background:"#6366F1",color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+<button onClick={()=>setShowTemplatePicker(true)} style={{padding:"8px 18px",borderRadius:9,background:C.indigo,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
 <Layers size={12} style={{marginRight:6,verticalAlign:"middle"}}/> Kies template
 </button>
 </div>
@@ -1972,7 +1964,7 @@ return(
 <div style={{display:"flex",alignItems:"center",gap:8}}>
 {/* Progress bar */}
 <div style={{flex:1,maxWidth:120,height:4,borderRadius:2,background:C.mushroom}}>
-<div style={{width:`${pctDone}%`,height:"100%",background:pctDone===100?C.green:"#6366F1",borderRadius:2,transition:"width .3s"}}/>
+<div style={{width:`${pctDone}%`,height:"100%",background:pctDone===100?C.green:C.indigo,borderRadius:2,transition:"width .3s"}}/>
 </div>
 <span style={{fontSize:10,fontWeight:700,color:pctDone===100?C.green:C.secondary}}>{subDone}/{subTotal}</span>
 <PriorityDot level={tk.priority}/>
@@ -1983,7 +1975,7 @@ return(
 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
 <Avatar initials={tk.assignee} size={24} bg={C.walnut}/>
 {subTotal>0&&(
-<button onClick={()=>setExpandedTask(isExpanded?null:tk.id)} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:6,background:isExpanded?C.blueBg:"transparent",border:`1px solid ${isExpanded?"#6366F1":C.border}`,color:isExpanded?"#4338CA":C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",transition:"background .15s,border-color .15s"}}>
+<button onClick={()=>setExpandedTask(isExpanded?null:tk.id)} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:6,background:isExpanded?C.blueBg:"transparent",border:`1px solid ${isExpanded?"#6366F1":C.border}`,color:isExpanded?C.indigoDark:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",transition:"background .15s,border-color .15s"}}>
 <ChevronRight size={11} style={{transform:isExpanded?"rotate(90deg)":"none",transition:"transform .2s"}}/>
 {subTotal} subtaken
 </button>
@@ -1994,19 +1986,19 @@ return(
 {/* Expandable subtasks */}
 {isExpanded&&subTotal>0&&(
 <div style={{background:C.warm50,borderTop:`1px solid #E0E7FF`,padding:"8px 16px 12px 48px"}}>
-<div style={{fontSize:9,fontWeight:700,color:C.blue||"#4338CA",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>SUBTAKEN</div>
+<div style={{fontSize:9,fontWeight:700,color:C.indigo,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>SUBTAKEN</div>
 {(tk.subtasks||[]).map(sub=>(
 <div key={sub.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:8,marginBottom:4,background:sub.status==="done"?"rgba(21,128,61,.06)":"rgba(255,255,255,.7)",border:`1px solid ${sub.status==="done"?"rgba(21,128,61,.15)":"rgba(99,102,241,.12)"}`}}>
-<div onClick={()=>toggleSubtask(tk.id,sub.id)} style={{width:15,height:15,borderRadius:4,border:`2px solid ${sub.status==="done"?C.green:"#6366F1"}`,background:sub.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
+<div onClick={()=>toggleSubtask(tk.id,sub.id)} style={{width:15,height:15,borderRadius:4,border:`2px solid ${sub.status==="done"?C.green:C.indigo}`,background:sub.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
 {sub.status==="done"&&<Check size={9} color={CREAM}/>}
 </div>
 <span style={{fontSize:12,color:sub.status==="done"?C.secondary:C.text,textDecoration:sub.status==="done"?"line-through":"none",flex:1,fontWeight:sub.status==="done"?400:500}}>{sub.title}</span>
 {sub.status==="done"
 ?<span style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,padding:"2px 7px",borderRadius:4}}>KLAAR</span>
-:<span style={{fontSize:9,fontWeight:700,color:C.blue||"#4338CA",background:C.blueBg,padding:"2px 7px",borderRadius:4}}>OPEN</span>}
+:<span style={{fontSize:9,fontWeight:700,color:C.indigo,background:C.blueBg,padding:"2px 7px",borderRadius:4}}>OPEN</span>}
 </div>
 ))}
-<div style={{marginTop:8,fontSize:10,color:C.blue||"#6366F1",fontWeight:700}}>
+<div style={{marginTop:8,fontSize:10,color:C.blue||C.indigo,fontWeight:700}}>
 {pctDone===100?"✓ Alle subtaken voltooid":`${subTotal-subDone} subtaken resterend`}
 </div>
 </div>
@@ -2204,8 +2196,8 @@ return(
 </div>
 </div>
 </div>
-<div style={{padding:"10px 16px",borderRadius:10,background:C.blueBg,border:`1px solid ${C.blue||"#6366F1"}30`,display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-<Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.blue||"#4338CA"}}>Interne taken — beveiligd, nooit zichtbaar voor cliënten</span>
+<div style={{padding:"10px 16px",borderRadius:10,background:C.blueBg,border:`1px solid ${C.blue||C.indigo}30`,display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+<Lock size={13} color="#6366F1"/><span style={{fontSize:11,fontWeight:700,color:C.indigo}}>Interne taken — beveiligd, nooit zichtbaar voor cliënten</span>
 </div>
 <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
 <div style={{position:"relative",flex:1,minWidth:180,maxWidth:280}}>
@@ -2217,8 +2209,8 @@ return(
 <button onClick={()=>setShowForm(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",marginLeft:"auto"}}><Plus size={11}/> Nieuwe taak</button>
 </div>
 {showForm&&(
-<div style={{background:C.warm50,border:`1.5px solid ${C.blue||"#6366F1"}`,borderRadius:12,padding:"14px 16px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Nieuwe taak..." style={{flex:2,minWidth:200,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
+<div style={{background:C.warm50,border:`1.5px solid ${C.blue||C.indigo}`,borderRadius:12,padding:"14px 16px",marginBottom:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+<input value={newTitle} onChange={e=>setNewTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Nieuwe taak..." style={{flex:2,minWidth:200,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||C.indigo}`,fontSize:12,outline:"none"}}/>
 <select value={newPrio} onChange={e=>setNewPrio(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer"}}>
 {[["low","Laag"],["normal","Normaal"],["high","Hoog"],["critical","Kritiek"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
 </select>
@@ -2231,7 +2223,7 @@ return(
 {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
 </select>
 <input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={{padding:"7px 9px",borderRadius:7,border:`1px solid ${C.border}`,fontSize:11,outline:"none"}}/>
-<button onClick={addTask} style={{padding:"7px 16px",borderRadius:8,background:"#6366F1",color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
+<button onClick={addTask} style={{padding:"7px 16px",borderRadius:8,background:C.indigo,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
 <button onClick={()=>setShowForm(false)} style={{padding:"7px 10px",borderRadius:8,background:"transparent",color:C.secondary,border:`1px solid ${C.border}`,fontSize:11,cursor:"pointer"}}><X size={12}/></button>
 </div>
 )}
@@ -2438,7 +2430,7 @@ const qOk=!q||a.title.toLowerCase().includes(q.toLowerCase())||a.client.toLowerC
 return sOk&&qOk;
 });
 const statusMeta={pending:{label:"OPENSTAAND",color:C.amber,bg:C.amberBg},overdue:{label:"ACHTERSTALLIG",color:C.red,bg:C.redBg},completed:{label:"VOLTOOID",color:C.green,bg:C.greenBg}};
-const typeMeta={upload:{label:"Upload",color:C.blue||"#6366F1",bg:C.blueBg},approve:{label:"Goedkeuring",color:C.green,bg:C.greenBg},sign:{label:"Ondertekening",color:C.amber,bg:C.amberBg},review:{label:"Beoordeling",color:C.secondary,bg:C.warm50}};
+const typeMeta={upload:{label:"Upload",color:C.blue||C.indigo,bg:C.blueBg},approve:{label:"Goedkeuring",color:C.green,bg:C.greenBg},sign:{label:"Ondertekening",color:C.amber,bg:C.amberBg},review:{label:"Beoordeling",color:C.secondary,bg:C.warm50}};
 const setStatus=(id,status)=>{setActions(as=>as.map(a=>a.id===id?{...a,status}:a));if(showToast)showToast(`Status bijgewerkt`);};
 const overdue=actions.filter(a=>a.status==="overdue").length;
 const pending=actions.filter(a=>a.status==="pending").length;
@@ -2528,7 +2520,7 @@ return(
 }
 // ─── AUDIT LOG VIEW ──────────────────────────────────────────────────────────
 const DEMO_AUDIT=[];
-const AUDIT_COLOR={FASE_BIJGEWERKT:{c:"#6366F1",bg:C.blueBg},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:C.blueBg}};
+const AUDIT_COLOR={FASE_BIJGEWERKT:{c:C.indigo,bg:C.blueBg},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:C.blueBg}};
 
 function AuditLogView({user}){
 const [deptF,setDeptF]=useState("ALL");
@@ -3454,8 +3446,8 @@ return(
 ))}
 </div>
 {showNew&&(
-<div style={{background:C.warm50,border:`1.5px solid ${C.blue||"#6366F1"}`,borderRadius:12,padding:"16px",marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newClient} onChange={e=>setNewClient(e.target.value)} placeholder="Cliëntnaam..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||"#6366F1"}`,fontSize:12,outline:"none"}}/>
+<div style={{background:C.warm50,border:`1.5px solid ${C.blue||C.indigo}`,borderRadius:12,padding:"16px",marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+<input value={newClient} onChange={e=>setNewClient(e.target.value)} placeholder="Cliëntnaam..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||C.indigo}`,fontSize:12,outline:"none"}}/>
 <input value={newAmount} onChange={e=>setNewAmount(e.target.value)} placeholder="Bedrag (SRD)..." type="number" style={{flex:1,minWidth:120,padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
 <input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={{padding:"8px 9px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
 <button onClick={addInvoice} style={{padding:"8px 16px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
@@ -3849,7 +3841,7 @@ return(
 <div style={{fontSize:9,color:C.secondary,marginBottom:3}}>BESCHIKBARE LIQUIDITEIT</div>
 <div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,marginBottom:12}}>SRD 4.281.090</div>
 <div style={{fontSize:9,color:C.secondary,marginBottom:8}}>QBO Sync Status: <span style={{color:C.green,fontWeight:700}}>ACTIEF</span></div>
-{[["Burn Rate","-SRD 142k/md"],[" Runway","30.2 Maanden"],["Netto Marge","—"]].map(([l,v])=>(
+{[["Burn Rate","-SRD 142k/md"],[" Runway","—"],["Netto Marge","—"]].map(([l,v])=>(
 <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
 <span style={{fontSize:11,color:C.secondary}}>{l}</span>
 <span style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</span>
@@ -3915,7 +3907,7 @@ return(
     {/* Body: preview left, metadata right */}
     <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1}}>
       {/* Document preview */}
-      <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:"#F8F7F5"}}>
+      <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:C.bg}}>
         <div style={{background:CREAM,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
           {/* Doc header branding */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,paddingBottom:16,borderBottom:`2px solid ${doc.dept==="TC"?C.crimson:C.taupe}`}}>
@@ -4054,7 +4046,7 @@ return(
 
 
     {/* Invoice document */}
-    <div style={{overflowY:"auto",padding:"28px 32px",background:"#F8F7F5"}}>
+    <div style={{overflowY:"auto",padding:"28px 32px",background:C.bg}}>
       <div style={{background:CREAM,borderRadius:14,padding:"36px 40px",boxShadow:"0 2px 16px rgba(58,46,40,.08)"}}>
         {/* Invoice header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32}}>
@@ -5599,7 +5591,7 @@ return(
 ))}
 </div>
 </div>
-<div style={{marginTop:20,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>Beheerd door Corporate IT · © 2025 The Client Portal</div>
+<div style={{marginTop:20,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>Beheerd door Corporate IT · © {new Date().getFullYear()} The Client Portal</div>
 </div>
 </div>
 </div>
