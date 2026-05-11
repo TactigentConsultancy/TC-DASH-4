@@ -1552,6 +1552,8 @@ const [clientId,setClientId]=useState("");
 const [saving,setSaving]=useState(false);
 const [staff,setStaff]=useState([]);
 const [clients,setClients]=useState([]);
+const [templates,setTemplates]=useState([]);
+const [selectedTemplate,setSelectedTemplate]=useState("");
 
 // Load staff and clients from Supabase
 useEffect(()=>{
@@ -1572,6 +1574,12 @@ useEffect(()=>{
         full_name: c.display_name,
         avatar_initials: (c.display_name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
       })));
+      // Load task templates
+      const {data:tmplData}=await supabase
+        .from("task_templates")
+        .select("id,name,department,description,items")
+        .order("name");
+      setTemplates(tmplData||[]);
     }catch(e){ console.warn("load error",e); }
   };
   load();
@@ -1585,9 +1593,9 @@ const submit=async()=>{
   if(!name.trim()||saving)return;
   setSaving(true);
   try{
-    // Find company_id from selected client
     const selectedClient=clients.find(c=>c.id===clientId);
-    const companyId=selectedClient?.company_id||null;
+    // Use selected company_id, or "Intern" fallback (00000000-...)
+    const companyId=selectedClient?.company_id||'00000000-0000-0000-0000-000000000000';
 
     const {data,error}=await supabase
       .from("engagements")
@@ -1609,6 +1617,26 @@ const submit=async()=>{
 
     const clientName=selectedClient?.full_name||"—";
     const staffMember=staff.find(s=>s.id===assignedTo);
+
+    // Create tasks from selected template
+    if(selectedTemplate && data?.id){
+      const tmpl=templates.find(t=>t.id===selectedTemplate);
+      if(tmpl?.items?.length>0){
+        const now=new Date();
+        const taskRows=tmpl.items.map(item=>({
+          title:item.title,
+          priority:item.priority||"normal",
+          status:"open",
+          engagement_id:data.id,
+          department:dept,
+          due_date:item.due_days?new Date(now.getTime()+item.due_days*86400000).toISOString().split("T")[0]:null,
+          assigned_to:assignedTo||null,
+        }));
+        supabase.from("tasks").insert(taskRows).then(({error:te})=>{
+          if(te) console.warn("Template tasks insert:",te.message);
+        });
+      }
+    }
 
     onCreated({
       id:data.id,
@@ -1677,6 +1705,45 @@ return(
         ))}
       </div>
     </div>
+
+    {/* Template selector */}
+    {templates.length>0&&(
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>TAKENPAKKET TEMPLATE</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+        {templates.filter(t=>t.department===dept||t.department==="BOTH").map(t=>(
+          <button key={t.id} onClick={()=>setSelectedTemplate(selectedTemplate===t.id?"":t.id)}
+            title={t.description}
+            style={{
+              padding:"7px 13px",borderRadius:9,fontSize:11,fontWeight:selectedTemplate===t.id?700:400,
+              border:`1.5px solid ${selectedTemplate===t.id?C.crimson:C.border}`,
+              background:selectedTemplate===t.id?C.crimsonFaint:C.bg,
+              color:selectedTemplate===t.id?C.crimson:C.secondary,
+              cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+              transition:"all .15s",
+            }}>
+            <CheckSquare size={11} style={{opacity:selectedTemplate===t.id?1:0.4}}/>
+            {t.name}
+            {t.items?.length>0&&<span style={{fontSize:9,opacity:0.6}}>({t.items.length} taken)</span>}
+          </button>
+        ))}
+      </div>
+      {selectedTemplate&&(()=>{
+        const tmpl=templates.find(t=>t.id===selectedTemplate);
+        return tmpl?.items?.length>0?(
+          <div style={{marginTop:8,padding:"8px 12px",borderRadius:8,background:C.warm50,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:9,fontWeight:700,color:C.secondary,marginBottom:5}}>TAKEN IN TEMPLATE:</div>
+            {(tmpl.items||[]).map((item,i)=>(
+              <div key={i} style={{fontSize:11,color:C.text,display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:item.priority==="high"?C.red:item.priority==="normal"?C.amber:C.green,flexShrink:0}}/>
+                {item.title} <span style={{color:C.muted,fontSize:10}}>+{item.due_days}d</span>
+              </div>
+            ))}
+          </div>
+        ):null;
+      })()}
+    </div>
+    )}
 
     {/* Name */}
     <div>
