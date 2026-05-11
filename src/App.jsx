@@ -1557,11 +1557,10 @@ const [clients,setClients]=useState([]);
 useEffect(()=>{
   const load=async()=>{
     try{
-      // Load staff
+      // Load staff from permanent view
       const {data:staffData}=await supabase
-        .from("user_profiles")
-        .select("id,full_name,department,title,avatar_initials")
-        .in("role",["super_admin","staff","finance"]);
+        .from("v_staff_dropdown")
+        .select("id,full_name,department,title,avatar_initials");
       setStaff(staffData||[]);
       // Load from permanent view — always shows every company
       const {data:compData}=await supabase
@@ -2081,9 +2080,8 @@ function useTeamMembers(dept){
   const [members,setMembers]=useState([]);
   const [clients,setClients]=useState([]);
   useEffect(()=>{
-    supabase.from("user_profiles")
-      .select("id,full_name,role,department,avatar_initials,company_id")
-      .in("role",["super_admin","staff","finance"])
+    supabase.from("v_staff_dropdown")
+      .select("id,full_name,role,department,avatar_initials")
       .then(({data})=>setMembers((data||[]).filter(m=>dept==="BOTH"||m.department===dept||m.department==="BOTH")));
       // Load from permanent view — always includes every company
   supabase.from("v_client_dropdown")
@@ -2309,8 +2307,8 @@ useEffect(()=>{
   window.addEventListener("keydown",h);
   document.body.classList.add("modal-open");
   // Load staff and clients
-  supabase.from("user_profiles").select("id,full_name,department,avatar_initials,role")
-    .in("role",["super_admin","staff","finance"])
+  supabase.from("v_staff_dropdown")
+    .select("id,full_name,department,avatar_initials,role")
     .then(({data})=>setStaffList(data||[]));
   // Permanent fix: v_client_dropdown view always includes every company
   supabase.from("v_client_dropdown")
