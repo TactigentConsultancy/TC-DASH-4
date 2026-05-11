@@ -1676,9 +1676,9 @@ useEffect(()=>{
 
 return(
 <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(58,46,40,.28)",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:700,maxWidth:"96vw",maxHeight:"92vh",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08)",fontFamily:F.body,display:"flex",flexDirection:"column"}}>
   {/* Header */}
-  <div style={{padding:"18px 22px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+  <div style={{padding:"14px 20px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
     <div>
       <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:4}}>CEO — Nieuw aanmaken</div>
       <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw {dept==="TC"?"Project":"Dossier"}</div>
@@ -1709,7 +1709,7 @@ return(
     {/* Template selector */}
     {templates.length>0&&(
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>TAKENPAKKET TEMPLATE</div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>TAKENPAKKET TEMPLATE</div>
       <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
         {templates.filter(t=>t.department===dept||t.department==="BOTH").map(t=>(
           <button key={t.id} onClick={()=>setSelectedTemplate(selectedTemplate===t.id?"":t.id)}
@@ -1747,14 +1747,14 @@ return(
 
     {/* Name */}
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>{dept==="TC"?"PROJECTNAAM":"DOSSIERNAAM"} <span style={{color:C.crimson}}>*</span></div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{dept==="TC"?"PROJECTNAAM":"DOSSIERNAAM"} <span style={{color:C.crimson}}>*</span></div>
       <input value={name} onChange={e=>setName(e.target.value)} placeholder={dept==="TC"?"Bijv. Jaarplan 2026":"Bijv. Belastingaangifte 2025"}
         style={{width:"100%",padding:"10px 14px",borderRadius:9,border:`1.5px solid ${name.length>2?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,transition:"border-color .15s"}}/>
     </div>
 
     {/* Phase */}
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>STARTFASE</div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>STARTFASE</div>
       <select value={phase} onChange={e=>setPhase(e.target.value)}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
         {phases.map(p=><option key={p} value={p}>{p}</option>)}
@@ -1763,7 +1763,7 @@ return(
 
     {/* Assign staff */}
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN MEDEWERKER</div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>TOEWIJZEN AAN MEDEWERKER</div>
       {filteredStaff.length===0?(
         <div style={{fontSize:11,color:C.muted,padding:"10px 14px",background:C.warm50,borderRadius:8}}>
           Geen {dept} medewerkers gevonden. Controleer of de accounts zijn aangemaakt.
@@ -1787,7 +1787,7 @@ return(
 
     {/* Assign client */}
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:6}}>KOPPEL AAN CLIËNT <span style={{color:C.muted,fontWeight:400,textTransform:"none",fontSize:9}}>(optioneel)</span></div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>KOPPEL AAN CLIËNT <span style={{color:C.muted,fontWeight:400,textTransform:"none",fontSize:9}}>(optioneel)</span></div>
       <select value={clientId} onChange={e=>setClientId(e.target.value)}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
         <option value="">— Geen cliënt koppelen —</option>
@@ -1797,7 +1797,7 @@ return(
   </div>
 
   {/* Footer */}
-  <div style={{padding:"14px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
+  <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
     <button onClick={submit} disabled={!name.trim()||saving}
       style={{flex:1,padding:"11px",borderRadius:10,background:name.trim()?C.crimson:"#D6D3CE",color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:name.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:name.trim()?"0 4px 12px rgba(139,26,43,.24)":"none",transition:"background .15s"}}>
       <Plus size={14}/>{saving?"Aanmaken…":`${dept==="TC"?"Project":"Dossier"} aanmaken`}
@@ -3312,7 +3312,7 @@ return(
         rows={3} style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",background:C.bg,color:C.text}}/>
     </FormField>
   </div>
-  <div style={{padding:"14px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+  <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
     <button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"11px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
       {saving?<><div style={{width:12,height:12,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>:<><Plus size={13}/> Lead aanmaken</>}
     </button>
@@ -5446,7 +5446,7 @@ return(
 </div>
 )}
 </div>
-<div style={{padding:"14px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+<div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
 <button onClick={submit} disabled={!text.trim()||!selChannels.length} style={{flex:1,padding:"11px",borderRadius:9,background:text&&selChannels.length?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:text&&selChannels.length?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
 <Send size={14}/> {schedDate?"Inplannen":"Nu Publiceren"}
 </button>
