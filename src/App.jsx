@@ -2624,14 +2624,22 @@ useEffect(()=>{
   const loadDocs=async()=>{
     try{
       const {data,error}=await supabase.from("documents")
-        .select("id,name,file_url,file_type,visibility,review_status,department,uploaded_at,company_id,companies(name)")
+        .select("id,name,file_url,file_type,visibility,review_status,department,uploaded_at,company_id,review_type,source_id,engagement_id,companies(name)")
         .eq("review_status","pending")
         .order("uploaded_at",{ascending:false});
       if(data) setDocs(data.map(d=>({
-        id:d.id, name:d.name, fileUrl:d.file_url, type:d.file_type,
+        id:d.id,
+        name:d.name,
+        fileUrl:d.file_url,
+        type:d.file_type||"—",
         uploaded:d.uploaded_at?new Date(d.uploaded_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
         client:d.companies?.name||"Intern",
-        priority:"normaal", dept:d.department,
+        priority:"normaal",
+        dept:d.department,
+        reviewType:d.review_type||"document",
+        sourceId:d.source_id,
+        // Icon/badge based on type
+        typeLabel:d.review_type==="engagement"?"Engagement Review":d.review_type==="client_action"?"Cliëntactie Review":"Document",
       })));
     }catch(e){ console.warn("ReviewQueue load:",e.message); }
     setLoading(false);
@@ -2671,16 +2679,37 @@ return(
   <div style={{padding:"48px 24px",textAlign:"center"}}>
     <FileText size={32} color={C.mushroom} style={{marginBottom:12}}/>
     <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text,marginBottom:6}}>Wachtrij leeg</div>
-    <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Documenten die worden geüpload via Documentbeheer verschijnen hier automatisch voor review.</div>
+    <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Items verschijnen hier automatisch wanneer:<br/>
+    • Een engagement op <strong>"In Review"</strong> wordt gezet<br/>
+    • Een cliëntactie op <strong>"In Review"</strong> wordt gezet<br/>
+    • Een document wordt geüpload via Documentbeheer</div>
   </div>
 ):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{[t("docName"),t("clientCol"),t("priority"),t("action")].map(h=><th key={h} style={{padding:"10px 20px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<thead><tr style={{background:C.warm50}}>{["ITEM","TYPE","CLIËNT","DATUM",t("action")].map(h=><th key={h} style={{padding:"10px 20px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{docs.map(d=>(
 <tr key={d.id} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"13px 19px"}}><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:30,height:30,borderRadius:8,background:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center"}}><FileText size={13} color={C.crimson}/></div><div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div><div style={{fontSize:10,color:C.secondary}}>{d.uploaded}</div></div></div></td>
+<td style={{padding:"13px 19px"}}>
+  <div style={{display:"flex",alignItems:"center",gap:9}}>
+    <div style={{width:30,height:30,borderRadius:8,background:d.reviewType==="engagement"?C.indigoBg:d.reviewType==="client_action"?C.amberBg:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      {d.reviewType==="engagement"?<Target size={13} color={C.indigo}/>:d.reviewType==="client_action"?<CheckSquare size={13} color={C.amber}/>:<FileText size={13} color={C.crimson}/>}
+    </div>
+    <div>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div>
+      <div style={{fontSize:10,color:C.secondary}}>{d.dept}</div>
+    </div>
+  </div>
+</td>
+<td style={{padding:"13px 19px"}}>
+  <span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,
+    background:d.reviewType==="engagement"?C.indigoBg:d.reviewType==="client_action"?C.amberBg:C.crimsonFaint,
+    color:d.reviewType==="engagement"?C.indigo:d.reviewType==="client_action"?C.amber:C.crimson,
+    textTransform:"uppercase"}}>
+    {d.typeLabel||"Document"}
+  </span>
+</td>
 <td style={{padding:"13px 19px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><CompanyLogo name={d.client} size={26} dept="FF"/><span style={{fontSize:12,fontWeight:600,color:C.text}}>{d.client}</span></div></td>
-<td style={{padding:"13px 19px"}}><span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,background:prioBg[d.priority]||C.warm50,color:prioColor[d.priority]||C.secondary,textTransform:"uppercase"}}>{d.priority}</span></td>
+<td style={{padding:"13px 19px",fontSize:11,color:C.secondary}}>{d.uploaded}</td>
 <td style={{padding:"13px 19px"}}><button onClick={()=>{setReviewing(d);setDecision("");setNote("");}} style={{padding:"6px 13px",borderRadius:8,background:C.walnut,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><CheckSquare size={12}/> {t("review2")}</button></td>
 </tr>
 ))}</tbody>
