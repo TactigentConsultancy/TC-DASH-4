@@ -1602,7 +1602,7 @@ const submit=async()=>{
       .insert({
         name:name.trim(),
         department:dept,
-        type:dept==="TC"?"Project":"Matter",
+        type:dept==="TC"?"project":"matter",
         phase,
         status:"active",
         health:"green",
@@ -1653,17 +1653,8 @@ const submit=async()=>{
     showToast(`${typeLabel} "${name}" aangemaakt ✓`);
     onClose();
   }catch(e){
-    console.warn("Engagement insert failed:",e.message);
-    // Local fallback
-    onCreated({
-      id:`eng${Date.now()}`,
-      ref:`${dept}-${Date.now().toString().slice(-4)}`,
-      name:name.trim(),dept,phase,status:"active",health:"green",
-      client:clients.find(c=>c.id===clientId)?.full_name||"—",
-      assignee:staff.find(s=>s.id===assignedTo)?.avatar_initials||"—",
-    });
-    showToast(`${typeLabel} "${name}" aangemaakt (lokaal)`);
-    onClose();
+    console.error("Engagement insert failed:",e.message);
+    showToast(`Fout: ${e.message}`);
   }finally{ setSaving(false); }
 };
 
