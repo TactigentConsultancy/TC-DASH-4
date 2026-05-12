@@ -1849,6 +1849,35 @@ const updateEng=async(changes)=>{
 if(setEngData) setEngData(es=>es.map(e=>e.id===eng.id?{...e,...changes}:e));
 try { await updateEngagement(eng.id, changes); } catch(e){ console.warn("updateEng failed:",e.message); }
 };
+
+// ── Add to Beoordelingswachtrij directly ──────────────────────────────────
+const [addingToQueue,setAddingToQueue]=useState(false);
+const [inQueue,setInQueue]=useState(false);
+const addToReviewQueue=async()=>{
+  setAddingToQueue(true);
+  try{
+    // First set status to In Review
+    await updateEng({status:"In Review"});
+    // Then directly insert into documents table as pending review
+    const {data,error}=await supabase.from("documents").insert({
+      name:"Review: "+eng.name,
+      department:eng.dept||eng.department,
+      visibility:"internal",
+      review_status:"pending",
+      review_type:"engagement",
+      source_id:eng.id,
+      company_id:eng.company_id||"00000000-0000-0000-0000-000000000000",
+      engagement_id:eng.id,
+    }).select("id").single();
+    if(error) throw new Error(error.message||JSON.stringify(error));
+    setInQueue(true);
+    showToast(`"${eng.name}" toegevoegd aan Beoordelingswachtrij ✓`);
+  }catch(e){
+    console.error("addToReviewQueue:",e);
+    showToast("Fout: "+( e?.message||"Onbekend"));
+  }
+  setAddingToQueue(false);
+};
 const phases=eng.dept==="TC"?TC_PHASES:FF_PHASES;
 const phaseIdx=Math.max(0,phases.indexOf(liveEng.phase));
 const sendMsg=()=>{if(!newMsg.trim())return;setMessages(m=>[...m,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,time:"Nu",body:newMsg,visible:vis}]);setNewMsg("");showToast("Bericht verzonden");};
@@ -1909,6 +1938,27 @@ return(
 ))}
 </div>
 </div>
+{/* ── Beoordelingswachtrij knop ─────────────────────── */}
+<button
+  onClick={addToReviewQueue}
+  disabled={addingToQueue||inQueue}
+  style={{
+    display:"flex",alignItems:"center",gap:7,
+    padding:"9px 14px",borderRadius:10,width:"100%",justifyContent:"center",
+    background:inQueue?C.greenBg:addingToQueue?C.warm50:C.indigo,
+    border:`1.5px solid ${inQueue?C.green:addingToQueue?C.border:"#6366F1"}`,
+    color:inQueue?C.green:addingToQueue?C.secondary:CREAM,
+    fontSize:11,fontWeight:700,
+    cursor:inQueue||addingToQueue?"default":"pointer",
+    transition:"all .2s",
+  }}>
+  {addingToQueue
+    ? <><div style={{width:11,height:11,border:"2px solid rgba(0,0,0,.15)",borderTopColor:C.secondary,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Toevoegen...</>
+    : inQueue
+    ? <><CheckCircle size={13}/> In Wachtrij ✓</>
+    : <><ClipboardList size={13}/> Voeg toe aan Wachtrij</>
+  }
+</button>
 </div>
 </div>
 <div style={{background:C.surface,borderRadius:14,padding:"16px 20px",border:`1px solid ${C.border}`,marginBottom:18}}>
