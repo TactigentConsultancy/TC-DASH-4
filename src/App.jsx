@@ -1594,8 +1594,13 @@ const submit=async()=>{
   setSaving(true);
   try{
     const selectedClient=clients.find(c=>c.id===clientId);
-    // Use selected company_id, or "Intern" fallback (00000000-...)
+    // company_id for engagement (required NOT NULL)
     const companyId=selectedClient?.company_id||'00000000-0000-0000-0000-000000000000';
+    // client_id = portal_user_id only (must be a user_profiles UUID or null)
+    // assignable_id can be company_id when no portal account exists — don't use it as client_id
+    const portalUserId=selectedClient?.has_portal!==false ? (
+      selectedClient?.id === selectedClient?.company_id ? null : clientId||null
+    ) : null;
 
     const {data,error}=await supabase
       .from("engagements")
@@ -1607,7 +1612,7 @@ const submit=async()=>{
         status:"active",
         health:"green",
         assigned_to:assignedTo||null,
-        client_id:clientId||null,
+        client_id:portalUserId,
         company_id:companyId,
       })
       .select("id,name,department,phase,status,health,company_id,assigned_to")
@@ -1653,8 +1658,9 @@ const submit=async()=>{
     showToast(`${typeLabel} "${name}" aangemaakt ✓`);
     onClose();
   }catch(e){
-    console.error("Engagement insert failed:",e.message);
-    showToast(`Fout: ${e.message}`);
+    console.error("Engagement insert failed:",e);
+    const errMsg = e?.message || (e?.error?.message) || "Onbekende DB fout";
+    showToast(`Fout: ${errMsg}`);
   }finally{ setSaving(false); }
 };
 
