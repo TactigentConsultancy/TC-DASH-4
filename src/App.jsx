@@ -2690,38 +2690,42 @@ useEffect(()=>{
   const loadAll=async()=>{
     try{
       const items=[];
+      // Pre-load company names for lookup
+      const {data:compList}=await supabase.from("companies").select("id,name");
+      const compMap={};
+      (compList||[]).forEach(c=>{ compMap[c.id]=c.name; });
       // 1. Documents with review_status = 'pending'
       const {data:pendingDocs}=await supabase.from("documents")
-        .select("id,name,department,review_status,uploaded_at,company_id,companies(name)")
+        .select("id,name,department,review_status,uploaded_at,company_id")
         .eq("review_status","pending")
         .order("uploaded_at",{ascending:false});
       (pendingDocs||[]).forEach(d=>items.push({
         id:d.id, name:d.name, dept:d.department,
         uploaded:d.uploaded_at?new Date(d.uploaded_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—",
-        client:d.companies?.name||"Intern", priority:"normaal",
+        client:compMap[d.company_id]||"Intern", priority:"normaal",
         sourceType:"document", reviewType:"document", typeLabel:"Document",
       }));
       // 2. Engagements with status = 'In Review'
       const {data:reviewEngs}=await supabase.from("engagements")
-        .select("id,name,department,status,updated_at,company_id,companies(name)")
+        .select("id,name,department,status,updated_at,company_id")
         .eq("status","In Review")
         .order("updated_at",{ascending:false});
       (reviewEngs||[]).forEach(e=>items.push({
         id:e.id, name:e.name, dept:e.department,
         uploaded:e.updated_at?new Date(e.updated_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
-        client:e.companies?.name||"—", priority:"hoog",
+        client:compMap[e.company_id]||"—", priority:"hoog",
         sourceType:"engagement", reviewType:"engagement", typeLabel:"Engagement Review",
       }));
       // 3. Client actions with action_type = 'review'
       const {data:reviewActions}=await supabase.from("client_actions")
-        .select("id,title,action_type,status,created_at,department,company_id,companies(name)")
+        .select("id,title,action_type,status,created_at,department,company_id")
         .eq("action_type","review")
         .eq("status","pending")
         .order("created_at",{ascending:false});
       (reviewActions||[]).forEach(a=>items.push({
         id:a.id, name:a.title, dept:a.department,
         uploaded:a.created_at?new Date(a.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
-        client:a.companies?.name||"—", priority:"normaal",
+        client:compMap[a.company_id]||"—", priority:"normaal",
         sourceType:"client_action", reviewType:"client_action", typeLabel:"Cliëntactie Review",
       }));
       // Count today's processed items
