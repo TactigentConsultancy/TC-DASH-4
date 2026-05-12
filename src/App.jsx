@@ -704,9 +704,9 @@ const DEMO_USERS=[];
 const COMPANIES_INIT=[];
 const TC_PHASES=["Intake","Informatieverzameling","Scoping","Uitvoering","Review","Oplevering","Afgerond"];
 const FF_PHASES=["Assessment","Technische Analyse","Draft Advies","Review","Retainer Monitoring","Afgerond"];
-const ENGAGEMENT_STATUSES=["Actief","Prioriteit","Geblokkeerd","Wacht op Cliënt","Gepauzeerd","Gesloten"];
-const STATUS_COLOR={Actief:C.green,Prioriteit:C.crimson,Geblokkeerd:C.red,GepauzeerD:C.secondary,"Wacht op Cliënt":C.amber,Gepauzeerd:C.secondary,Gesloten:C.mushroom};
-const STATUS_BG={Actief:C.greenBg,Prioriteit:C.crimsonFaint,Geblokkeerd:C.redBg,"Wacht op Cliënt":C.amberBg,Gepauzeerd:C.warm50,Gesloten:C.warm50};
+const ENGAGEMENT_STATUSES=["Actief","Prioriteit","In Review","Geblokkeerd","Wacht op Cliënt","Gepauzeerd","Gesloten"];
+const STATUS_COLOR={Actief:C.green,Prioriteit:C.crimson,"In Review":C.indigo,Geblokkeerd:C.red,GepauzeerD:C.secondary,"Wacht op Cliënt":C.amber,Gepauzeerd:C.secondary,Gesloten:C.mushroom};
+const STATUS_BG={Actief:C.greenBg,Prioriteit:C.crimsonFaint,"In Review":C.indigoBg,Geblokkeerd:C.redBg,"Wacht op Cliënt":C.amberBg,Gepauzeerd:C.warm50,Gesloten:C.warm50};
 
 const ENGAGEMENTS_INIT=[];
 const TASKS_BY_ENG={};
