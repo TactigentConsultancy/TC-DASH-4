@@ -1618,7 +1618,7 @@ const submit=async()=>{
       .select("id,name,department,phase,status,health,company_id,assigned_to")
       .single();
 
-    if(error) throw new Error(error.message);
+    if(error) throw new Error(error.message||error.details||JSON.stringify(error));
 
     const clientName=selectedClient?.full_name||"—";
     const staffMember=staff.find(s=>s.id===assignedTo);
@@ -1656,6 +1656,7 @@ const submit=async()=>{
       assignee:staffMember?.avatar_initials||"—",
     });
     showToast(`${typeLabel} "${name}" aangemaakt ✓`);
+    setSelectedTemplate("");
     onClose();
   }catch(e){
     console.error("Engagement insert failed:",e);
@@ -3446,7 +3447,7 @@ const handleUpload=async(file)=>{
       review_status:"pending",
       uploaded_by:user.id,
     }).select().single();
-    if(error) throw new Error(error.message);
+    if(error) throw new Error(error.message||error.details||JSON.stringify(error));
     if(doc){
       setDocs(ds=>[doc,...ds]);
       showToast(`"${file.name}" geüpload ✓`);
