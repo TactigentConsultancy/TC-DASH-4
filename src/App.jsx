@@ -697,7 +697,7 @@ const SideBtn=({icon:Icon,label,isActive,onClick,danger,badge,collapsed,title})=
   </button>
 );
 const Pill=({label,active,onClick})=>(<button onClick={onClick} style={{padding:"6px 16px",borderRadius:20,border:`1.5px solid ${active?C.crimson:C.border}`,background:active?C.crimson:"transparent",color:active?CREAM:C.secondary,fontSize:12,fontWeight:600,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s",whiteSpace:"nowrap"}}>{label}</button>);
-function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);return()=>clearTimeout(t);},[]);return(<div className="sir" style={{position:"fixed",bottom:28,right:28,zIndex:2000,background:C.espresso,color:C.bg,borderRadius:14,padding:"13px 20px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 20px 48px rgba(58,46,40,.32),0 4px 8px rgba(58,46,40,.16)",fontSize:13,fontWeight:500,maxWidth:360,lineHeight:1.5}}><div style={{width:20,height:20,borderRadius:"50%",background:"rgba(21,128,61,.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Check size={12} color="#4ADE80"/></div>{msg}<button onClick={onClose} style={{background:"none",border:"none",color:C.taupeLight,cursor:"pointer",marginLeft:"auto",padding:"2px",opacity:.7,lineHeight:0}}><X size={14}/></button></div>);}
+function Toast({msg,onClose}){useEffect(()=>{const t=setTimeout(onClose,3400);return()=>clearTimeout(t);},[]);return(<div className="sir" style={{position:"fixed",bottom:28,right:28,zIndex:2000,background:C.espresso,color:C.bg,borderRadius:14,padding:"13px 20px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 20px 48px rgba(58,46,40,.32),0 4px 8px rgba(58,46,40,.16)",fontSize:13,fontWeight:500,maxWidth:360,lineHeight:1.5}}><div style={{width:20,height:20,borderRadius:"50%",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Check size={12} color="#4ADE80"/></div>{msg}<button onClick={onClose} style={{background:"none",border:"none",color:C.taupeLight,cursor:"pointer",marginLeft:"auto",padding:"2px",opacity:.7,lineHeight:0}}><X size={14}/></button></div>);}
 
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const DEMO_USERS=[];
@@ -3144,7 +3144,7 @@ return(
 </div>
 </div>
 {reviewing&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto"}} onClick={()=>{setReviewing(null);setDecision("");setNote("");}}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto"}} onClick={()=>{setReviewing(null);setDecision("");setNote("");}}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.18)",fontFamily:F.body,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Header */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",alignItems:"center",gap:12}}>
@@ -3989,7 +3989,7 @@ const submit=async()=>{
 };
 
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:580,maxWidth:"95vw",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
   {/* Header */}
   <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
@@ -4544,7 +4544,7 @@ return(
 
 {/* New folder modal */}
 {showNewFolder&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setShowNewFolder(false)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setShowNewFolder(false)}>
 <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:380,maxWidth:"95vw",padding:"24px",boxShadow:"0 24px 60px rgba(0,0,0,.2)"}}>
   <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
   <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addFolder()}
@@ -4560,7 +4560,7 @@ return(
 
 {/* Document detail panel */}
 {selected&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:620,maxWidth:"95vw",maxHeight:"88vh",boxShadow:"0 4px 32px rgba(0,0,0,.18)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
   {/* Header */}
   <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -4897,7 +4897,7 @@ return(
 
   {/* Invoice detail modal */}
   {selected&&(
-    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
+    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
       <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:640,maxWidth:"95vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden"}}>
         {/* Header */}
         <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
@@ -5055,7 +5055,7 @@ const filtCos=companies.filter(c=>dept==="BOTH"||c.department===dept);
 const filtEngs=engagements.filter(e=>dept==="BOTH"||e.department===dept);
 
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:620,maxWidth:"95vw",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
     <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Factuur</div>
@@ -5766,7 +5766,7 @@ return(
 
   {/* ── CAMPAIGN DETAIL MODAL ── */}
   {selectedCampaign&&(
-    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelectedCampaign(null)}>
+    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelectedCampaign(null)}>
       <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",maxHeight:"88vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden"}}>
         <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
@@ -5856,7 +5856,7 @@ const submit=async()=>{
 };
 
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
     <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Campagne</div>
@@ -5964,7 +5964,7 @@ const submit=async()=>{
 };
 
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
   <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
     <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Social Post</div>
@@ -6608,7 +6608,7 @@ return(
 </div>
 {done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
 {uploading&&(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setUploading(null)}>
+<div style={{position:"fixed",inset:0,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setUploading(null)}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
 <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
@@ -6705,7 +6705,7 @@ return ()=>window.removeEventListener("keydown", handler);
 },[]);
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -6847,7 +6847,7 @@ const lineItems = [
 ];
 
 return(
-<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div style={{position:"fixed",inset:0,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
 <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 {/* Topbar */}
 <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
