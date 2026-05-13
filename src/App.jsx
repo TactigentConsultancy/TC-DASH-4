@@ -7,7 +7,8 @@ ChevronLeft, Users, CheckSquare, Upload, X, Shield, Clock,
 Send, Layers, Receipt, RefreshCw, Check, Info, ImageOff,
 Activity, FileSpreadsheet, FileType, Pen,
 ScanSearch, ClipboardList, Scale, BookOpen, FolderOpen, HelpCircle,
-Building, LayoutDashboard
+Building, LayoutDashboard,
+ArrowRight
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
