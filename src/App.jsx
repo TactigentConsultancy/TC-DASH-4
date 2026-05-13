@@ -1902,9 +1902,27 @@ const toggleTask=(id)=>setLocalTasks(ts=>ts.map(t=>t.id===id?{...t,status:t.stat
 const toggleSubtask=(taskId,subId)=>setLocalTasks(ts=>ts.map(t=>t.id===taskId?{...t,subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,status:s.status==="done"?"open":"done"}:s)}:t));
 return(
 <div>
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:14,padding:0}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,padding:0}}>
 <ChevronLeft size={15}/> {t("back")}
 </button>
+{(user.role==="super_admin"||user.role==="staff")&&(
+<button onClick={async()=>{
+  if(!window.confirm(`Weet je zeker dat je "${eng.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+  try{
+    await supabase.from("engagements").update({status:"deleted"}).eq("id",eng.id);
+    // Soft delete via status, then hard delete
+    const {error}=await supabase.from("engagements").update({}).eq("id","__force_delete__");
+    await fetch(`${SB_URL}/rest/v1/engagements?id=eq.${eng.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`,"Content-Type":"application/json"}});
+    if(setEngData) setEngData(es=>es.filter(e=>e.id!==eng.id));
+    showToast(`"${eng.name}" verwijderd`);
+    onBack();
+  }catch(e){ showToast("Fout bij verwijderen: "+e.message); }
+}} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,border:`1px solid ${C.red}40`,background:C.redBg,color:C.red,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<X size={12}/> Verwijderen
+</button>
+)}
+</div>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
 <div>
 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><DeptTag dept={eng.dept}/><HealthDot status={liveEng.health}/><span style={{fontSize:10,color:C.secondary,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>{eng.ref}</span></div>
@@ -2078,8 +2096,13 @@ return(
 <div key={tk.id} style={{borderTop:`1px solid ${C.border}`}}>
 {/* Task row */}
 <div style={{padding:"13px 16px",display:"flex",alignItems:"center",gap:12}}>
+<div style={{display:"flex",alignItems:"center",gap:6}}>
 <div onClick={()=>toggleTask(tk.id)} style={{width:18,height:18,borderRadius:5,border:`2px solid ${tk.status==="done"?C.green:C.border}`,background:tk.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
 {tk.status==="done"&&<Check size={11} color={CREAM}/>}
+</div>
+<button onClick={()=>{setLocalTasks(ts=>ts.filter(t=>t.id!==tk.id));showToast("Taak verwijderd");}} title="Verwijder taak" style={{width:16,height:16,borderRadius:4,border:"none",background:"transparent",cursor:"pointer",color:C.mushroom,display:"flex",alignItems:"center",justifyContent:"center",padding:0,opacity:0.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>
+<X size={10}/>
+</button>
 </div>
 <div style={{flex:1,minWidth:0}}>
 <div style={{fontSize:13,fontWeight:600,color:tk.status==="done"?C.secondary:C.text,textDecoration:tk.status==="done"?"line-through":"none",marginBottom:subTotal>0?5:0}}>{tk.title}</div>
@@ -2148,7 +2171,15 @@ return(
 <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
 <Badge label={a.status==="overdue"?"ACHTERSTALLIG":a.status==="completed"?"VOLTOOID":"OPENSTAAND"} color={a.status==="overdue"?C.red:a.status==="completed"?C.green:C.amber} bg={a.status==="overdue"?C.redBg:a.status==="completed"?C.greenBg:C.amberBg}/>
 <span style={{fontSize:10,color:C.secondary}}>Termijn: {a.deadline}</span>
+<div style={{display:"flex",gap:5}}>
 {a.status!=="completed"&&(<button onClick={()=>setLocalActions(as=>as.map(x=>x.id===a.id?{...x,status:"completed"}:x))} style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>Markeer voltooid</button>)}
+<button onClick={async()=>{
+  if(!window.confirm(`Cliëntactie "${a.title}" verwijderen?`)) return;
+  setLocalActions(as=>as.filter(x=>x.id!==a.id));
+  try{ await fetch(`${SB_URL}/rest/v1/client_actions?id=eq.${a.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}}); }catch(e){}
+  showToast("Cliëntactie verwijderd");
+}} style={{fontSize:9,fontWeight:700,color:C.red,background:C.redBg,border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>Verwijder</button>
+</div>
 </div>
 </div>
 ))}
@@ -2361,7 +2392,7 @@ return(
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {filtered.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen taken gevonden</div></div>):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["","TAAK","PRIO","STATUS","DATUM","MGR"].map((h,i)=><th key={i} style={{padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<thead><tr style={{background:C.warm50}}>{["","TAAK","PRIO","STATUS","DATUM","MGR",""].map((h,i)=><th key={i} style={{padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{filtered.map(tk=>(
 <tr key={tk.id} style={{borderTop:`1px solid ${C.border}`,opacity:tk.status==="done"?0.65:1}}>
 <td style={{padding:"12px 14px",width:36}}><div onClick={()=>toggle(tk.id)} style={{width:18,height:18,borderRadius:5,border:`2px solid ${tk.status==="done"?C.green:C.border}`,background:tk.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{tk.status==="done"&&<CheckCircle size={11} color={CREAM}/>}</div></td>
@@ -2370,6 +2401,15 @@ return(
 <td style={{padding:"12px 14px"}}><Badge label={sLabel[tk.status]||tk.status} color={sColor[tk.status]||C.secondary} bg={sBg[tk.status]||C.warm50}/></td>
 <td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{tk.due}</td>
 <td style={{padding:"12px 14px"}}><Avatar initials={tk.assignee} size={26} bg={C.walnut}/></td>
+<td style={{padding:"12px 14px"}}>
+<button onClick={async()=>{
+  if(!window.confirm(`Taak "${tk.title}" verwijderen?`)) return;
+  setTasks(ts=>ts.filter(t=>t.id!==tk.id));
+  try{ await fetch(`${SB_URL}/rest/v1/tasks?id=eq.${tk.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}}); }catch(e){}
+}} style={{padding:"4px 8px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:3}}>
+<X size={10}/> Del
+</button>
+</td>
 </tr>
 ))}</tbody>
 </table>
@@ -2652,6 +2692,14 @@ return(
 {a.status==="completed"&&(
 <button onClick={()=>setStatus(a.id,"pending")} style={{padding:"5px 10px",borderRadius:7,background:C.warm50,border:`1px solid ${C.border}`,color:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer"}}>Heropenen</button>
 )}
+<button onClick={async()=>{
+  if(!window.confirm(`Actie "${a.title}" verwijderen?`)) return;
+  setActions(as=>as.filter(x=>x.id!==a.id));
+  try{ await fetch(`${SB_URL}/rest/v1/client_actions?id=eq.${a.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}}); }catch(e){}
+  if(showToast) showToast("Actie verwijderd");
+}} style={{padding:"5px 10px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+<X size={11}/> Verwijder
+</button>
 </div>
 </td>
 </tr>
@@ -3404,7 +3452,22 @@ return(
 <td style={{padding:"13px 19px"}}>
 <div style={{display:"flex",alignItems:"center",gap:7}}><HealthDot status={c.health}/><span style={{fontSize:12,color:c.alert?C.crimson:C.text,fontWeight:c.alert?700:400}}>{c.lifecycle}</span></div>
 </td>
-<td style={{padding:"13px 19px"}}><ChevronRight size={15} color={C.secondary}/></td>
+<td style={{padding:"13px 19px",display:"flex",alignItems:"center",gap:8}}>
+<ChevronRight size={15} color={C.secondary}/>
+{(user.role==="super_admin")&&(
+<button onClick={async(e)=>{
+  e.stopPropagation();
+  if(!window.confirm(`Cliënt "${c.name}" verwijderen? Alle gekoppelde data wordt ook verwijderd.`)) return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/companies?id=eq.${c.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+    setCompanyData(cs=>cs.filter(x=>x.id!==c.id));
+    showToast(`"${c.name}" verwijderd`);
+  }catch(e){ showToast("Fout: "+e.message); }
+}} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",borderRadius:7,border:`1px solid ${C.red}30`,background:C.redBg,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+<X size={10}/> Verwijder
+</button>
+)}
+</td>
 </tr>
 ))}</tbody>
 </table>
