@@ -2719,61 +2719,210 @@ const DEMO_AUDIT=[];
 const AUDIT_COLOR={FASE_BIJGEWERKT:{c:C.indigo,bg:C.blueBg},DOCUMENT_GEVERIFIEERD:{c:"#15803D",bg:"#F0FDF4"},CLIËNT_AANGEMAAKT:{c:"#C97B1A",bg:"#FDF6EC"},QBO_BETALING_ONTVANGEN:{c:"#15803D",bg:"#F0FDF4"},GEZONDHEID_BIJGEWERKT:{c:"#C83232",bg:"#FEF2F2"},GEZONDHEID_AUTO_ROOD:{c:"#C83232",bg:"#FEF2F2"},CLIËNTACTIE_AANGEMAAKT:{c:"#8B1A2B",bg:"#F9F0F1"},FACTUUR_AANGEMAAKT:{c:"#1D4ED8",bg:C.blueBg}};
 
 function AuditLogView({user}){
+const [logs,setLogs]=useState([]);
+const [loading,setLoading]=useState(true);
 const [deptF,setDeptF]=useState("ALL");
+const [typeF,setTypeF]=useState("ALL");
 const [q,setQ]=useState("");
-const logs=DEMO_AUDIT.filter(l=>{
-const dOk=deptF==="ALL"||l.dept===deptF;
-const qOk=!q||l.action.toLowerCase().includes(q.toLowerCase())||l.actor.toLowerCase().includes(q.toLowerCase())||l.entityId.toLowerCase().includes(q.toLowerCase());
-return dOk&&qOk;
+const [dateF,setDateF]=useState("all");
+
+useEffect(()=>{
+  supabase.from("audit_log")
+    .select("id,actor_name,actor_role,action,entity_type,entity_id,entity_name,department,delta,created_at")
+    .order("created_at",{ascending:false})
+    .limit(200)
+    .then(({data})=>{
+      setLogs(data||[]);
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+},[]);
+
+const ACTION_META={
+  ENGAGEMENT_AANGEMAAKT:{c:C.crimson,bg:C.crimsonFaint,Icon:Target,label:"Engagement aangemaakt"},
+  STATUS_BIJGEWERKT:{c:C.indigo,bg:C.indigoBg,Icon:RefreshCw,label:"Status bijgewerkt"},
+  FASE_BIJGEWERKT:{c:C.amber,bg:C.amberBg,Icon:ArrowRight,label:"Fase bijgewerkt"},
+  GEZONDHEID_BIJGEWERKT:{c:C.amber,bg:C.amberBg,Icon:Activity,label:"Gezondheid bijgewerkt"},
+  ENGAGEMENT_VERWIJDERD:{c:C.red,bg:C.redBg,Icon:X,label:"Engagement verwijderd"},
+  DOCUMENT_GEUPLOAD:{c:C.blue,bg:C.blueBg,Icon:Upload,label:"Document geüpload"},
+  DOCUMENT_BEOORDEELD:{c:C.green,bg:C.greenBg,Icon:CheckCircle,label:"Document beoordeeld"},
+  CLIËNT_AANGEMAAKT:{c:C.walnut,bg:C.warm50,Icon:Users,label:"Cliënt aangemaakt"},
+  CLIËNT_VERWIJDERD:{c:C.red,bg:C.redBg,Icon:X,label:"Cliënt verwijderd"},
+  ACTIE_BIJGEWERKT:{c:C.green,bg:C.greenBg,Icon:CheckSquare,label:"Actie bijgewerkt"},
+};
+
+const now=new Date();
+const filtered=logs.filter(l=>{
+  const dOk=deptF==="ALL"||l.department===deptF;
+  const tOk=typeF==="ALL"||l.entity_type===typeF;
+  const qOk=!q||l.actor_name?.toLowerCase().includes(q.toLowerCase())||l.entity_name?.toLowerCase().includes(q.toLowerCase())||l.action?.toLowerCase().includes(q.toLowerCase());
+  let dateOk=true;
+  if(dateF!=="all"){
+    const d=new Date(l.created_at);
+    const diff=(now-d)/(1000*60*60);
+    if(dateF==="1h") dateOk=diff<=1;
+    else if(dateF==="24h") dateOk=diff<=24;
+    else if(dateF==="7d") dateOk=diff<=168;
+  }
+  return dOk&&tOk&&qOk&&dateOk;
 });
+
+const formatTime=(ts)=>{
+  if(!ts) return "—";
+  const d=new Date(ts);
+  const diff=(now-d)/1000;
+  if(diff<60) return "Zojuist";
+  if(diff<3600) return `${Math.floor(diff/60)} min geleden`;
+  if(diff<86400) return `${Math.floor(diff/3600)} uur geleden`;
+  return d.toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+};
+
+const exportCSV=()=>{
+  const rows=[["Tijdstip","Acteur","Actie","Entiteit","Naam","Afdeling","Details"],...filtered.map(l=>[
+    new Date(l.created_at).toISOString(),
+    l.actor_name||"—",l.action,l.entity_type,l.entity_name||"—",l.department||"—",
+    l.delta?JSON.stringify(l.delta):"",
+  ])];
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+  a.download=`audit_log_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+};
+
+// Group by date
+const groups={};
+filtered.forEach(l=>{
+  const d=new Date(l.created_at);
+  const key=d.toLocaleDateString("nl-SR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  if(!groups[key]) groups[key]=[];
+  groups[key].push(l);
+});
+
 return(
 <div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-<PageHeader kicker="Systeem" title="Audit Log"/>
-<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:10,background:C.darkAccent,color:C.bg,fontSize:11,fontWeight:700}}>
-<Shield size={13} color={CREAM}/> Immutabel · {logs.length} Records
-</div>
-</div>
-<div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
-<div style={{position:"relative",flex:1,maxWidth:320}}>
-<Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
-<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek actie, acteur, entiteit..." style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
-{q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
-</div>
-{[["ALL","Alle"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
-<button key={v} onClick={()=>setDeptF(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${deptF===v?C.crimson:C.border}`,background:deptF===v?C.crimson:"transparent",color:deptF===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>{l}</button>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-{logs.map((l,i)=>{
-const meta=AUDIT_COLOR[l.action]||{c:C.secondary,bg:C.warm50};
-return(
-<div key={l.id} style={{padding:"14px 20px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",alignItems:"flex-start",gap:14}}>
-<div style={{width:36,height:36,borderRadius:9,background:meta.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-<Activity size={14} color={meta.c}/>
-</div>
-<div style={{flex:1,minWidth:0}}>
-<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:3}}>
-<span style={{fontSize:12,fontWeight:700,color:C.text}}>{l.actor}</span>
-<span style={{fontSize:9,fontWeight:700,background:meta.bg,color:meta.c,padding:"2px 8px",borderRadius:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>{l.action.replace(/_/g," ")}</span>
-<span style={{fontSize:11,color:C.secondary}}>{l.entityId}</span>
-</div>
-{l.delta&&(<div style={{fontSize:11,color:C.secondary,background:C.warm50,borderRadius:6,padding:"3px 9px",display:"inline-block",marginTop:2}}>{l.delta}</div>)}
-</div>
-<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-<span style={{fontSize:10,color:C.muted}}>{l.time}</span>
-<DeptTag dept={l.dept}/>
-</div>
-</div>
-);
-})}
-</div>
-<div style={{display:"flex",alignItems:"center",gap:6,marginTop:14,fontSize:10,color:C.muted}}>
-<Shield size={11}/> Audit log is immutabel — records kunnen niet worden verwijderd of gewijzigd door gebruikers.
-</div>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="Systeem" title="Audit Log"/>
+    <div style={{display:"flex",gap:8,marginTop:4}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:C.darkAccent,color:CREAM,fontSize:11,fontWeight:700}}>
+        <Shield size={13} color={CREAM}/> {filtered.length} Records
+      </div>
+      <button onClick={exportCSV} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+        <Download size={13}/> CSV Export
+      </button>
+    </div>
+  </div>
+
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+  {[
+    {l:"VANDAAG",v:logs.filter(l=>(now-new Date(l.created_at))<86400000).length,c:C.text},
+    {l:"ENGAGEMENTS",v:logs.filter(l=>l.entity_type==="engagement").length,c:C.crimson},
+    {l:"DOCUMENTEN",v:logs.filter(l=>l.entity_type==="document").length,c:C.blue},
+    {l:"CLIËNTEN",v:logs.filter(l=>l.entity_type==="company").length,c:C.walnut},
+  ].map(k=>(
+    <div key={k.l} style={{background:C.surface,borderRadius:12,padding:"12px 16px",border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+      <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:k.c}}>{k.v}</div>
+    </div>
+  ))}
+  </div>
+
+  {/* Filter bar */}
+  <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+    <div style={{position:"relative",flex:1,minWidth:200}}>
+      <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek op acteur, entiteit of actie..."
+        style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+      {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+    </div>
+    {[["all","Alle tijd"],["1h","Laatste uur"],["24h","Laatste 24u"],["7d","Laatste 7d"]].map(([v,l])=>(
+      <button key={v} onClick={()=>setDateF(v)} style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${dateF===v?C.crimson:C.border}`,background:dateF===v?C.crimson:"transparent",color:dateF===v?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {l}
+      </button>
+    ))}
+    <select value={typeF} onChange={e=>setTypeF(e.target.value)}
+      style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.surface,color:C.text}}>
+      <option value="ALL">Alle entiteiten</option>
+      <option value="engagement">Engagements</option>
+      <option value="document">Documenten</option>
+      <option value="company">Cliënten</option>
+      <option value="client_action">Cliëntacties</option>
+    </select>
+    {user.dept==="BOTH"&&(
+      <select value={deptF} onChange={e=>setDeptF(e.target.value)}
+        style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.surface,color:C.text}}>
+        <option value="ALL">Alle afdelingen</option>
+        <option value="TC">Tactigent</option>
+        <option value="FF">Fiscal Fuse</option>
+      </select>
+    )}
+  </div>
+
+  {/* Timeline grouped by date */}
+  {loading?(
+    <div style={{background:C.surface,borderRadius:14,padding:"40px 24px",textAlign:"center",color:C.secondary,border:`1px solid ${C.border}`}}>Laden...</div>
+  ):filtered.length===0?(
+    <div style={{background:C.surface,borderRadius:14,padding:"52px 24px",textAlign:"center",border:`1px solid ${C.border}`}}>
+      <Activity size={32} color={C.mushroom} style={{marginBottom:12}}/>
+      <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen activiteit gevonden</div>
+      <div style={{fontSize:12,color:C.secondary}}>Acties worden automatisch gelogd als medewerkers wijzigingen maken.</div>
+    </div>
+  ):(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {Object.entries(groups).map(([dateLabel,groupLogs])=>(
+        <div key={dateLabel}>
+          {/* Date divider */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase",whiteSpace:"nowrap"}}>{dateLabel}</div>
+            <div style={{flex:1,height:1,background:C.border}}/>
+            <div style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{groupLogs.length} activiteiten</div>
+          </div>
+          {/* Log items */}
+          <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.06)"}}>
+            {groupLogs.map((l,i)=>{
+              const meta=ACTION_META[l.action]||{c:C.secondary,bg:C.warm50,Icon:Activity,label:l.action};
+              const IconComp=meta.Icon;
+              return(
+                <div key={l.id} style={{padding:"14px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",alignItems:"flex-start",gap:14}}>
+                  {/* Icon */}
+                  <div style={{width:36,height:36,borderRadius:9,background:meta.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
+                    <IconComp size={14} color={meta.c}/>
+                  </div>
+                  {/* Content */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text}}>{l.actor_name||"Systeem"}</span>
+                      <span style={{fontSize:9,fontWeight:700,background:meta.bg,color:meta.c,padding:"2px 8px",borderRadius:4,textTransform:"uppercase",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{meta.label}</span>
+                      {l.entity_name&&<span style={{fontSize:11,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>— {l.entity_name}</span>}
+                    </div>
+                    {l.delta&&(
+                      <div style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:C.secondary,background:C.warm50,borderRadius:6,padding:"4px 10px",display:"inline-flex",flexWrap:"wrap",gap:6}}>
+                        {l.delta.van&&<><span style={{color:C.red,fontWeight:600}}>{l.delta.van}</span><ArrowRight size={10}/></>}
+                        {l.delta.naar&&<span style={{color:C.green,fontWeight:600}}>{l.delta.naar}</span>}
+                        {l.delta.note&&<span style={{color:C.secondary}}>· "{l.delta.note}"</span>}
+                      </div>
+                    )}
+                  </div>
+                  {/* Right: time + dept */}
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
+                    <span style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{formatTime(l.created_at)}</span>
+                    {l.department&&<DeptTag dept={l.department}/>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:14,fontSize:10,color:C.muted}}>
+    <Shield size={11}/> Audit log is immutabel — records worden automatisch aangemaakt door het systeem.
+  </div>
 </div>
 );
 }
+
 
 // ─── REVIEW QUEUE ────────────────────────────────────────────────────────────
 function ReviewQueue({showToast}){
@@ -3481,19 +3630,23 @@ return(
 // ─── LEADS VIEW ──────────────────────────────────────────────────────────────
 
 // ─── NEW LEAD MODAL ───────────────────────────────────────────────────────────
-function NewLeadModal({user,members,onClose,onCreated,showToast}){
-const [companyName,setCompanyName]=useState("");
-const [contactName,setContactName]=useState("");
-const [contactEmail,setContactEmail]=useState("");
-const [value,setValue]=useState("");
-const [stage,setStage]=useState("new");
+
+function NewLeadModal({user,members,initialStage,onClose,onCreated,showToast}){
+const [name,setName]=useState("");
+const [contact,setContact]=useState("");
+const [email,setEmail]=useState("");
+const [phone,setPhone]=useState("");
 const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
+const [stage,setStage]=useState(initialStage||"new");
+const [value,setValue]=useState("");
 const [assignedTo,setAssignedTo]=useState("");
+const [source,setSource]=useState("");
+const [expectedClose,setExpectedClose]=useState("");
 const [notes,setNotes]=useState("");
 const [saving,setSaving]=useState(false);
 
-const STAGES=[["new","Nieuw"],["contacted","Gecontacteerd"],["proposal","Offerte"],["strategy_review","Strategie Review"],["won","Gewonnen"],["lost","Verloren"]];
-const isValid=companyName.trim()&&contactName.trim();
+const stages=dept==="FF"?FF_STAGES:TC_STAGES;
+const isValid=name.trim().length>1;
 
 useEffect(()=>{
   const h=e=>{if(e.key==="Escape")onClose();};
@@ -3502,1820 +3655,1222 @@ useEffect(()=>{
 },[]);
 
 const submit=async()=>{
-  if(!isValid||saving)return;
+  if(!isValid||saving) return;
   setSaving(true);
   try{
     const {data,error}=await supabase.from("leads").insert({
-      company_name:companyName.trim(),
-      contact_name:contactName.trim(),
-      contact_email:contactEmail.trim()||null,
-      estimated_value:value?parseFloat(value):null,
-      stage, department:dept,
+      company_name:name.trim(),
+      contact_name:contact.trim()||null,
+      contact_email:email.trim()||null,
+      phone:phone.trim()||null,
+      department:dept,
+      stage,
+      estimated_value:Number(value)||0,
       assigned_to:assignedTo||null,
-      notes:notes||null,
+      source:source||null,
+      expected_close:expectedClose||null,
+      notes:notes.trim()||null,
       created_by:user.id,
     }).select().single();
-    if(!error&&data){
-      onCreated({id:data.id,name:companyName,contact:contactName,email:contactEmail,
-        value:parseFloat(value)||0,stage,dept,rep:members.find(m=>m.id===assignedTo)?.avatar_initials||"—"});
-      onClose();
-    } else throw new Error(error?.message||"Insert failed");
-  }catch(e){
-    onCreated({id:`l${Date.now()}`,name:companyName,contact:contactName,
-      email:contactEmail,value:parseFloat(value)||0,stage,dept,
-      rep:members.find(m=>m.id===assignedTo)?.avatar_initials||"—"});
+    if(error) throw new Error(error.message);
+    onCreated({
+      id:data.id,name:data.company_name,contact:data.contact_name||"",
+      email:data.contact_email||"",phone:data.phone||"",
+      value:Number(data.estimated_value)||0,stage:data.stage,
+      dept:data.department,assignedTo:data.assigned_to,
+      source:data.source||"",notes:data.notes||"",
+      expectedClose:data.expected_close||null,priority:"normal",
+    });
     onClose();
+  }catch(e){
+    if(showToast) showToast("Fout: "+e.message);
   }finally{setSaving(false);}
 };
 
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:520,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 32px 80px rgba(58,46,40,.28)",display:"flex",flexDirection:"column",overflow:"hidden",fontFamily:F.body,display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-  <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
-    <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuw Lead Aanmaken</div>
-    <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:580,maxWidth:"95vw",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
+  {/* Header */}
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:3}}>Leads Pipeline</div>
+      <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Nieuwe Lead aanmaken</div>
+    </div>
+    <button onClick={onClose} style={{width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.secondary}}><X size={14}/></button>
   </div>
-  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14,flex:1}}>
+  {/* Body */}
+  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    {/* Dept */}
     {user.dept==="BOTH"&&(
-      <div style={{display:"flex",gap:8}}>
-        {["TC","FF"].map(d=>(
-          <button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-            {d==="TC"?"Tactigent":"Fiscal Fuse"}
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>AFDELING</div>
+        <div style={{display:"flex",gap:8}}>
+          {["TC","FF"].map(d=>(
+            <button key={d} onClick={()=>setDept(d)}
+              style={{flex:1,padding:"9px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {d==="TC"?"Tactigent Consultancy":"Fiscal Fuse"}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+    {/* Company + Value */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>BEDRIJFSNAAM <span style={{color:C.crimson}}>*</span></div>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Bijv. Volkskrant N.V."
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${name.length>1?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+      </div>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>GESCHATTE WAARDE (SRD)</div>
+        <input type="number" value={value} onChange={e=>setValue(e.target.value)} placeholder="0"
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+      </div>
+    </div>
+    {/* Contact */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>CONTACTPERSOON</div>
+        <input value={contact} onChange={e=>setContact(e.target.value)} placeholder="Naam contactpersoon"
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+      </div>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>E-MAILADRES</div>
+        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="naam@bedrijf.sr"
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+      </div>
+    </div>
+    {/* Stage */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>STARTSTADIUM</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {stages.map(s=>(
+          <button key={s.id} onClick={()=>setStage(s.id)}
+            style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${stage===s.id?s.color:C.border}`,background:stage===s.id?s.bg:"transparent",color:stage===s.id?s.color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+            {s.label}
           </button>
         ))}
       </div>
-    )}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FormField label="Bedrijfsnaam" required><FormInput val={companyName} set={setCompanyName} placeholder="Bijv. Wrokomang N.V."/></FormField>
-      <FormField label="Contactpersoon" required><FormInput val={contactName} set={setContactName} placeholder="Bijv. Jan Jansen"/></FormField>
     </div>
+    {/* Source + Close date */}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FormField label="E-mailadres"><FormInput val={contactEmail} set={setContactEmail} placeholder="naam@bedrijf.sr" type="email"/></FormField>
-      <FormField label="Geschatte waarde (SRD)"><FormInput val={value} set={setValue} placeholder="0" type="number"/></FormField>
-    </div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FormField label="Stadium">
-        <select value={stage} onChange={e=>setStage(e.target.value)}
-          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,cursor:"pointer"}}>
-          {STAGES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>BRON</div>
+        <select value={source} onChange={e=>setSource(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+          <option value="">Selecteer bron...</option>
+          {["Website","Referral","Netwerkevenement","Cold outreach","Social media","Anders"].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
-      </FormField>
-      <FormField label="Toewijzen aan">
-        <select value={assignedTo} onChange={e=>setAssignedTo(e.target.value)}
-          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,cursor:"pointer"}}>
-          <option value="">— Niet toegewezen —</option>
-          {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
-        </select>
-      </FormField>
+      </div>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>VERWACHTE SLUITDATUM</div>
+        <input type="date" value={expectedClose} onChange={e=>setExpectedClose(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,boxSizing:"border-box"}}/>
+      </div>
     </div>
-    <FormField label="Notities">
-      <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Context, bron van lead, bijzonderheden..."
-        rows={3} style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",background:C.bg,color:C.text}}/>
-    </FormField>
-  </div>
-  <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
-    <button onClick={submit} disabled={!isValid||saving} style={{flex:1,padding:"11px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
-      {saving?<><div style={{width:12,height:12,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Aanmaken...</>:<><Plus size={13}/> Lead aanmaken</>}
-    </button>
-    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
-  </div>
-</div>
-</div>
-);
-}
-
-function LeadsView({user,setDetailLead,showToast}){
-const {members}=useTeamMembers(user.dept);
-const [showNewLead,setShowNewLead]=useState(false);
-const [leadData,setLeadData]=useState([]);
-const [stageF,setStageF]=useState("ALL");
-const [leadsLoading,setLeadsLoading]=useState(true);
-
-// Load leads from DB on mount
-useEffect(()=>{
-  supabase.from("leads")
-    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,created_at")
-    .order("created_at",{ascending:false})
-    .then(({data})=>{
-      if(data?.length) setLeadData(data.map(l=>({
-        id:l.id, name:l.company_name, contact:l.contact_name,
-        email:l.contact_email, value:l.estimated_value||0,
-        stage:l.stage||"new", dept:l.department,
-        rep:l.assigned_to?.slice(0,2).toUpperCase()||"—",
-      })));
-      setLeadsLoading(false);
-    }).catch(()=>setLeadsLoading(false));
-},[]);
-// Load leads from Supabase on mount
-useEffect(()=>{
-  supabase.from("leads")
-    .select("id,company_name,contact_name,contact_email,estimated_value,stage,department,assigned_to,notes,created_at")
-    .order("created_at",{ascending:false})
-    .then(({data})=>{
-      if(data?.length) setLeadData(data.map(l=>({
-        id:l.id,name:l.company_name,contact:l.contact_name,
-        email:l.contact_email,value:l.estimated_value||0,
-        stage:l.stage||"new",dept:l.department,
-        rep:l.assigned_to?"?":"—",
-      })));
-    });
-},[]);
-const t=useT();
-const [q,setQ]=useState(""); const [deptF,setDeptF]=useState("ALL");
-const sL={new:"Nieuw",qualified:"Gekwalificeerd",proposal:"Voorstel",won:"Gewonnen",inquiry:"Aanvraag",strategy_review:"Strategie Review",engaged:"Betrokken"};
-const sC={new:C.secondary,qualified:C.amber,proposal:C.crimson,won:C.green,inquiry:C.secondary,strategy_review:C.amber,engaged:C.green};
-const leads=(Array.isArray(LEADS)?LEADS:[]).filter(l=>{ const dOk=(user.dept==="BOTH"||l.dept===user.dept)&&(deptF==="ALL"||l.dept===deptF); const qOk=!q||l.name.toLowerCase().includes(q.toLowerCase()); return dOk&&qOk; });
-return(
-<div>
-<PageHeader kicker="CRM" title={t("leadsTitle")}/>
-<div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-<div style={{position:"relative",flex:1,minWidth:200,maxWidth:320}}>
-<Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
-<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek op bedrijfsnaam..." style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
-{q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
-</div>
-{user.dept==="BOTH"&&["ALL","TC","FF"].map(f=>(<Pill key={f} label={f==="ALL"?"Alle":f==="TC"?"Tactigent":"Fiscal Fuse"} active={deptF===f} onClick={()=>setDeptF(f)}/>))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-{leads.length===0?(
-<div style={{padding:"52px 24px",textAlign:"center"}}>
-<Users size={32} color={C.mushroom} style={{marginBottom:12}}/>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen leads gevonden</div>
-<div style={{fontSize:12,color:C.secondary}}>Voeg uw eerste lead toe om te beginnen.</div>
-</div>
-):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{[t("company"),"AFDELING",t("stage"),t("value"),t("advisor")].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{leads.filter(l=>l&&l.id&&l.name).map(l=>(
-<tr key={l.id} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>setDetailLead&&setDetailLead(l)}>
-<td style={{padding:"12px 18px",fontSize:13,fontWeight:600,color:C.text}}>{l.name}</td>
-<td style={{padding:"14px 18px"}}><DeptTag dept={l.dept}/></td>
-<td style={{padding:"14px 18px"}}><Badge label={sL[l.stage]||l.stage} color={sC[l.stage]||C.secondary} bg={C.warm50}/></td>
-<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>SRD {(l.value||0).toLocaleString()}</td>
-<td style={{padding:"14px 18px"}}><Avatar initials={l.rep||"?"} size={26} bg={l.dept==="TC"?C.crimson:C.taupe}/></td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-</div>
-);
-}
-
-// ─── DMS VIEW ────────────────────────────────────────────────────────────────
-function DMSView({user,showToast}){
-const t=useT();
-const [visF,setVisF]=useState("ALL"); const [q,setQ]=useState(""); const [selected,setSelected]=useState(null);
-const [showNewFolder,setShowNewFolder]=useState(false);
-const [folderName,setFolderName]=useState("");
-const [folders,setFolders]=useState([]);
-const [activeFolder,setActiveFolder]=useState(null);
-const [docs,setDocs]=useState([]);
-const [uploading,setUploading]=useState(false);
-const uploadRef=React.useRef();
-
-// Load documents from DB
-useEffect(()=>{
-  supabase.from("documents")
-    .select("id,name,file_url,file_type,visibility,review_status,department,uploaded_at,uploaded_by,user_profiles(full_name,avatar_initials)")
-    .order("uploaded_at",{ascending:false})
-    .then(({data})=>{ if(data?.length) setDocs(data); });
-},[]);
-
-const handleUpload=async(file)=>{
-  if(!file) return;
-  if(file.size > 50*1024*1024){ showToast("Max 50MB per bestand"); return; }
-  setUploading(true);
-  try{
-    const ext=file.name.split(".").pop().toLowerCase();
-    const path=`${user.dept||"TC"}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
-    // Upload to storage
-    const uploadRes=await fetch(`${SB_URL}/storage/v1/object/documents/${path}`,{
-      method:"POST",
-      headers:{"Authorization":`Bearer ${_authToken}`,"apikey":SB_ANON,"x-upsert":"false","Content-Type":file.type||"application/octet-stream"},
-      body:file,
-    });
-    if(!uploadRes.ok){
-      const err=await uploadRes.json().catch(()=>({}));
-      throw new Error(err.message||"Upload mislukt");
-    }
-    const fileUrl=`${SB_URL}/storage/v1/object/documents/${path}`;
-    // Insert document record
-    const {data:doc,error}=await supabase.from("documents").insert({
-      name:file.name,
-      file_url:fileUrl,
-      file_type:ext,
-      department:user.dept==="BOTH"?"TC":user.dept,
-      visibility:"internal",
-      review_status:"pending",
-      uploaded_by:user.id,
-    }).select().single();
-    if(error) throw new Error(error.message||error.details||JSON.stringify(error));
-    if(doc){
-      setDocs(ds=>[doc,...ds]);
-      showToast(`"${file.name}" geüpload ✓`);
-    }
-  }catch(e){
-    console.error("Upload error:",e);
-    showToast("Upload mislukt: "+e.message);
-  }
-  setUploading(false);
-};
-const filteredDocs=docs.filter(d=>{ const vOk=visF==="ALL"||d.visibility===visF; const sOk=user.dept==="BOTH"||d.department===user.dept; const qOk=!q||d.name.toLowerCase().includes(q.toLowerCase()); return vOk&&sOk&&qOk; });
-const typeIconCmp={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
-const createFolder=()=>{
-  if(!folderName.trim())return;
-  setFolders(fs=>[...fs,{id:`f${Date.now()}`,name:folderName.trim(),docs:[]}]);
-  setFolderName(""); setShowNewFolder(false);
-  showToast(`Map "${folderName}" aangemaakt`);
-};
-return(
-<div>
-<PageHeader kicker="Documenten" title={t("docLib")} action={
-  <div style={{display:"flex",gap:8}}>
-    <button onClick={()=>setShowNewFolder(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
-      <Plus size={13}/> Nieuwe map
-    </button>
-    <div style={{position:"relative"}}>
-      <input type="file" ref={uploadRef} style={{display:"none"}} multiple
-        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv"
-        onChange={e=>{Array.from(e.target.files||[]).forEach(handleUpload); e.target.value="";}}/>
-      <button onClick={()=>uploadRef.current?.click()} disabled={uploading}
-        style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,
-        background:uploading?C.mushroom:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:uploading?"default":"pointer"}}>
-        {uploading
-          ? <><div style={{width:10,height:10,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Uploaden...</>
-          : <><Upload size={13}/> Uploaden</>}
-      </button>
-    </div>
-  </div>
-}/>
-
-{/* New folder modal */}
-{showNewFolder&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setShowNewFolder(false)}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:400,maxWidth:"95vw",padding:"22px",boxShadow:"0 24px 60px rgba(0,0,0,.25)",fontFamily:F.body,boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-  <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
-  <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createFolder()}
-    placeholder="Mapnaam..." autoFocus
-    style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${C.crimson}`,fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:14,background:C.bg,color:C.text}}/>
-  <div style={{display:"flex",gap:8}}>
-    <button onClick={createFolder} style={{flex:1,padding:"10px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Aanmaken</button>
-    <button onClick={()=>setShowNewFolder(false)} style={{padding:"10px 16px",borderRadius:9,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,cursor:"pointer"}}>Annuleren</button>
-  </div>
-</div>
-</div>
-)}
-
-{/* Folder list */}
-{folders.length>0&&(
-<div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-  <div onClick={()=>setActiveFolder(null)}
-    style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,border:`1.5px solid ${activeFolder===null?C.crimson:C.border}`,background:activeFolder===null?C.crimsonFaint:C.surface,cursor:"pointer",fontSize:12,color:activeFolder===null?C.crimson:C.text,fontWeight:activeFolder===null?700:400}}>
-    Alle documenten
-  </div>
-  {folders.map(f=>(
-    <div key={f.id} onClick={()=>setActiveFolder(f.id)}
-      style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,border:`1.5px solid ${activeFolder===f.id?C.crimson:C.border}`,background:activeFolder===f.id?C.crimsonFaint:C.surface,cursor:"pointer",fontSize:12,color:activeFolder===f.id?C.crimson:C.text,fontWeight:activeFolder===f.id?700:400}}>
-      📁 {f.name}
-    </div>
-  ))}
-</div>
-)}
-<div style={{display:"grid",gridTemplateColumns:"1fr 220px",gap:16}}>
-<div>
-<div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-<div style={{position:"relative",flex:1,minWidth:180}}>
-<Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
-<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek document..." style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
-</div>
-{["ALL","internal","client","shared"].map(v=>(<Pill key={v} label={v==="ALL"?t("all"):v==="internal"?t("internal"):v==="client"?t("client"):t("shared")} active={visF===v} onClick={()=>setVisF(v)}/>))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","ZICHTBAARHEID","STATUS",""].map((h,i)=><th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{docs.map(d=>(
-<tr key={d.id} onClick={()=>setSelected(d)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"14px 18px"}}><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:30,height:30,borderRadius:7,background:d.dept==="TC"?C.crimsonFaint:"#F0EDE8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{typeIconCmp[d.type]||<FileText size={14} color={C.secondary}/>}</div><div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div><div style={{fontSize:10,color:C.secondary}}>{d.size}</div></div></div></td>
-<td style={{padding:"14px 18px"}}><DeptTag dept={d.dept}/></td>
-<td style={{padding:"12px 16px",fontSize:11,color:C.secondary}}>{d.date}</td>
-<td style={{padding:"14px 18px"}}><VisChip vis={d.visibility}/></td>
-<td style={{padding:"14px 18px"}}><ReviewChip status={d.status}/></td>
-<td style={{padding:"14px 18px"}}><button onClick={e=>{e.stopPropagation();showToast(`${d.name} gedownload`);}} style={{padding:"5px 10px",borderRadius:7,background:C.bg,border:`1px solid ${C.border}`,fontSize:10,fontWeight:700,color:C.secondary,cursor:"pointer"}}><Download size={11}/></button></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10}}>
-<div style={{background:C.crimson,borderRadius:14,padding:"16px",color:CREAM}}>
-<div style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,color:"rgba(255,255,255,.7)"}}>{t("quickUpload")}</div>
-<div style={{border:"2px dashed rgba(255,255,255,.4)",borderRadius:10,padding:"20px 12px",textAlign:"center",cursor:"pointer"}} onClick={()=>showToast("Upload gestarten")}>
-<Upload size={20} color="rgba(255,255,255,.8)" style={{marginBottom:8}}/>
-<div style={{fontSize:11,fontWeight:700,marginBottom:4}}>{t("selectFile")}</div>
-<div style={{fontSize:9,color:"rgba(255,255,255,.6)"}}>{t("dragDrop")}</div>
-</div>
-</div>
-{[{label:"Tactigent",count:DOCUMENTS.filter(d=>d.dept==="TC").length,c:C.crimson},{label:"Fiscal Fuse",count:DOCUMENTS.filter(d=>d.dept==="FF").length,c:C.taupe},{label:"Gedeeld",count:DOCUMENTS.filter(d=>d.visibility==="shared").length,c:C.walnut}].map(cat=>(
-<div key={cat.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<span style={{fontSize:12,color:C.text,fontWeight:600}}>{cat.label}</span>
-<span style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:cat.c}}>{cat.count}</span>
-</div>
-))}
-</div>
-</div>
-{selected&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setSelected(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-<div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<span style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{selected.name}</span>
-<button onClick={()=>setSelected(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 160px",gap:0}}>
-<div style={{padding:"20px",borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:10}}>
-<div style={{height:120,background:selected.dept==="TC"?C.crimsonFaint:"#F0EDE8",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>{selected.type==="Excel"?<FileSpreadsheet size={48} color={C.green}/>:selected.type==="Word"?<FileType size={48} color={C.blue}/>:<FileText size={48} color={C.crimson}/>}</div>
-<div style={{fontSize:12,color:C.secondary}}>Engagement: <strong style={{color:C.text}}>{selected.engagement}</strong></div>
-<VisChip vis={selected.visibility}/>
-<ReviewChip status={selected.status}/>
-</div>
-<div style={{padding:"20px",display:"flex",flexDirection:"column",gap:12}}>
-{[["Grootte",selected.size],["Type",selected.type],["Datum",selected.date],["Geüpload door",selected.uploadedBy]].map(([l,v])=>(
-<div key={l}><div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:2}}>{l}</div><div style={{fontSize:12,color:C.text,fontWeight:600}}>{v}</div></div>
-))}
-<button onClick={()=>{showToast(`${selected.name} gedownload`);setSelected(null);}} style={{marginTop:"auto",width:"100%",padding:"9px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Download size={13}/> Downloaden</button>
-</div>
-</div>
-</div>
-</div>
-)}
-</div>
-);
-}
-
-// ─── INVOICES VIEW ───────────────────────────────────────────────────────────
-function InvoicesView({user,invData,setInvData,showToast}){
-const [showUpload,setShowUpload]=useState(null);
-const [invoiceNotes,setInvoiceNotes]=useState({});
-const [uploading,setUploading]=useState(false);
-const uploadInvoiceFile=async(invId,file)=>{
-  if(!file||file.size>10*1024*1024){showToast("Max 10MB");return;}
-  setUploading(true);
-  try{
-    const ext=file.name.split(".").pop();
-    const path=`${invId}.${ext}`;
-    const SB="https://qjlijtlqtyzytxcmzwvu.supabase.co";
-    const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbGlqdGxxdHl6eXR4Y216d3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NTE3MjAsImV4cCI6MjA5MjEyNzcyMH0.EwHl1enE8b5LBXUBQTMSDT4Mv0O6Kkdjbtg1LooH4f8";
-    const res=await fetch(`${SB}/storage/v1/object/invoices/${path}`,{
-      method:"POST",
-      headers:{"Authorization":`Bearer ${_authToken}`,"apikey":SB_KEY,"x-upsert":"true","Content-Type":file.type},
-      body:file,
-    });
-    if(res.ok){
-      const url=`${SB}/storage/v1/object/invoices/${path}`;
-      await supabase.from("invoices").update({file_url:url,notes:invoiceNotes[invId]||null}).eq("id",invId);
-      setInvData(ids=>ids.map(i=>i.id===invId?{...i,file_url:url}:i));
-      showToast("Factuur geüpload ✓"); setShowUpload(null);
-    } else showToast("Upload mislukt");
-  }catch(e){showToast("Upload mislukt: "+e.message);}
-  setUploading(false);
-};
-const t=useT();
-const [showNew,setShowNew]=useState(false);
-const [newClient,setNewClient]=useState(""); const [newAmount,setNewAmount]=useState(""); const [newDue,setNewDue]=useState("");
-const invoices=user.dept==="BOTH"?invData:invData.filter(i=>i.dept===user.dept);
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const sLabel={paid:t("paid"),sent:t("sent"),overdue:"ACHTERSTALLIG",draft:t("draft")};
-const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
-const overdueAmt=invoices.filter(i=>i.status==="overdue").reduce((s,i)=>s+i.amount,0);
-const paidAmt=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+i.amount,0);
-const qboLinked=invoices.filter(i=>i.qbo).length;
-const pushQBO=async(inv)=>{
-try {
-const qboId=await pushInvoiceQBO(inv.id);
-setInvData(ids=>ids.map(i=>i.id===inv.id?{...i,qbo:qboId}:i));
-} catch(e){
-setInvData(ids=>ids.map(i=>i.id===inv.id?{...i,qbo:`QBO-SR-${Date.now()}`}:i));
-}
-showToast(`${inv.ref} naar QBO gepushed`);
-};
-const addInvoice=()=>{
-if(!newClient||!newAmount)return;
-const inv={id:`inv${Date.now()}`,ref:`INV-2025-0${50+invData.length}`,client:newClient,dept:user.dept==="BOTH"?"TC":user.dept,amount:parseInt(newAmount)||0,status:"draft",due:newDue||"—",paid:null,qbo:null};
-setInvData(ids=>[...ids,inv]);setShowNew(false);setNewClient("");setNewAmount("");setNewDue("");showToast(`${inv.ref} aangemaakt`);
-};
-return(
-<>
-<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-<PageHeader kicker="Financiën" title={t("invoicesTitle")}/>
-<div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
-<div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 11px",borderRadius:8,background:C.greenBg,border:`1px solid ${C.green}30`}}>
-<div style={{width:7,height:7,borderRadius:"50%",background:C.green,animation:"pulse 2s infinite"}}/>
-<span style={{fontSize:10,fontWeight:700,color:C.green}}>{t("qboActive")}</span>
-</div>
-<button onClick={()=>setShowNew(v=>!v)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}><Plus size={12}/> {t("newInvoice")}</button>
-</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
-{[{l:t("totalOpen"),v:`SRD ${totalOpen.toLocaleString()}`},{l:t("overdue"),v:`SRD ${overdueAmt.toLocaleString()}`,red:true},{l:t("paidMonth"),v:`SRD ${paidAmt.toLocaleString()}`,green:true},{l:t("qboSynced"),v:`${qboLinked}/${invoices.length}`,dark:true}].map((s,i)=>(
-<div key={i} style={{background:s.dark?C.darkAccent:C.surface,borderRadius:12,padding:"13px 16px",border:s.dark?"none":`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:s.dark?C.muted:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:s.dark?CREAM:s.red?C.red:s.green?C.green:C.text}}>{s.v}</div>
-</div>
-))}
-</div>
-{showNew&&(
-<div style={{background:C.warm50,border:`1.5px solid ${C.blue||C.indigo}`,borderRadius:12,padding:"16px",marginBottom:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-<input value={newClient} onChange={e=>setNewClient(e.target.value)} placeholder="Cliëntnaam..." style={{flex:2,minWidth:180,padding:"8px 11px",borderRadius:8,border:`1.5px solid ${C.blue||C.indigo}`,fontSize:12,outline:"none"}}/>
-<input value={newAmount} onChange={e=>setNewAmount(e.target.value)} placeholder="Bedrag (SRD)..." type="number" style={{flex:1,minWidth:120,padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={{padding:"8px 9px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<button onClick={addInvoice} style={{padding:"8px 16px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Opslaan</button>
-<button onClick={()=>setShowNew(false)} style={{padding:"8px 10px",borderRadius:8,background:"transparent",color:C.secondary,border:`1px solid ${C.border}`,fontSize:11,cursor:"pointer"}}><X size={12}/></button>
-</div>
-)}
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["REF","CLIËNT","AFDELING",t("amount"),t("dueCol"),"STATUS","QBO"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{invoices.map(inv=>(
-<tr key={inv.id} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"11px 16px",fontSize:11,fontWeight:700,color:C.secondary}}>{inv.ref}</td>
-<td style={{padding:"11px 16px",fontSize:12,fontWeight:600,color:C.text}}>{inv.client}</td>
-<td style={{padding:"11px 16px"}}><DeptTag dept={inv.dept}/></td>
-<td style={{padding:"11px 16px",fontFamily:F.display,fontSize:14,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
-<td style={{padding:"11px 16px",fontSize:11,color:C.secondary}}>{inv.due}</td>
-<td style={{padding:"11px 16px"}}>
-  <div style={{display:"flex",alignItems:"center",gap:8}}>
-    <Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
-    <button onClick={()=>setShowUpload(inv.id)} title="Upload factuurbestand"
-      style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:inv.file_url?C.greenBg:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:inv.file_url?C.green:C.secondary}}>
-      {inv.file_url?<CheckCircle size={11}/>:<Upload size={11}/>}
-    </button>
-  </div>
-</td>
-<td style={{padding:"11px 16px"}}>
-{inv.qbo?(<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> SYNC</span>):(
-<button onClick={()=>pushQBO(inv)} style={{padding:"3px 8px",borderRadius:6,background:C.amberBg,border:`1px solid ${C.amber}30`,color:C.amber,fontSize:9,fontWeight:700,cursor:"pointer"}}>PUSH</button>
-)}
-</td>
-</tr>
-))}</tbody>
-</table>
-</div>
-</div>
-
-{/* Invoice file upload modal */}
-{showUpload&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setShowUpload(null)}>
-<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:460,maxWidth:"95vw",boxShadow:"0 32px 80px rgba(0,0,0,.3)",overflow:"hidden",fontFamily:F.body,boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-  <div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Factuurbestand uploaden</div>
-    <button onClick={()=>setShowUpload(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={16}/></button>
-  </div>
-  <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
-    <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,padding:"28px",borderRadius:12,border:`2px dashed ${C.border}`,cursor:"pointer",background:C.bg,transition:"border-color .15s"}}
-      onMouseEnter={e=>e.currentTarget.style.borderColor=C.crimson}
-      onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-      <Upload size={28} color={C.secondary}/>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Klik om bestand te kiezen</div>
-      <div style={{fontSize:11,color:C.secondary}}>PDF, JPG, PNG · Max 10MB</div>
-      <input type="file" accept=".pdf,image/jpeg,image/png,image/jpg" style={{display:"none"}}
-        onChange={e=>{const f=e.target.files?.[0];if(f)uploadInvoiceFile(showUpload,f);}}/>
-    </label>
+    {/* Assign */}
     <div>
-      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>NOTITIE</div>
-      <textarea rows={3} value={invoiceNotes[showUpload]||""} onChange={e=>setInvoiceNotes(n=>({...n,[showUpload]:e.target.value}))}
-        placeholder="Bijv. Q1 2026, goedgekeurd door directie..."
-        style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:"inherit"}}/>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN</div>
+      <select value={assignedTo} onChange={e=>setAssignedTo(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+        <option value="">— Selecteer adviseur —</option>
+        {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+      </select>
     </div>
-    {uploading&&(
-      <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"8px",color:C.secondary,fontSize:12}}>
-        <div style={{width:14,height:14,border:"2px solid rgba(139,26,43,.3)",borderTopColor:C.crimson,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-        Uploaden...
-      </div>
-    )}
-    <button onClick={()=>{
-      const note=invoiceNotes[showUpload];
-      if(note){supabase.from("invoices").update({notes:note}).eq("id",showUpload).then(()=>showToast("Notitie opgeslagen"));}
-      setShowUpload(null);
-    }} style={{width:"100%",padding:"11px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-      Notitie opslaan & sluiten
+    {/* Notes */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>NOTITIES</div>
+      <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} placeholder="Eerste indruk, context, aantekeningen..."
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6}}/>
+    </div>
+  </div>
+  {/* Footer */}
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+    <button onClick={submit} disabled={!isValid||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:isValid?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <TrendingUp size={14}/>{saving?"Aanmaken...":"Lead aanmaken"}
     </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
   </div>
 </div>
-</div>
-)}
-</>
-);
-}
-
-// ─── NOTIFICATIONS VIEW ──────────────────────────────────────────────────────
-function NotificationsView({notifData,setNotifData}){
-const t=useT();
-const icons={warning:<AlertTriangle size={15} color={C.amber}/>,success:<CheckCircle size={15} color={C.green}/>,info:<Info size={15} color={C.blue}/>};
-return(
-<div>
-<PageHeader kicker="Systeem" title={t("notifTitle")} action={
-<button onClick={()=>{setNotifData(ns=>ns.map(n=>({...n,read:true,is_read:true})));
-    supabase.from("notifications").update({is_read:true}).eq("user_id",user?.id||"").then(()=>{});}} style={{padding:"7px 14px",borderRadius:9,border:`1.5px solid ${C.border}`,background:C.surface,fontSize:11,fontWeight:700,color:C.secondary,cursor:"pointer"}}>{t("markAllRead")}</button>
-}/>
-<div style={{display:"flex",flexDirection:"column",gap:8}}>
-{notifData.map(n=>(
-<div key={n.id} style={{background:C.surface,borderRadius:12,border:`1px solid ${n.read?C.border:C.crimson}30`,padding:"14px 18px",display:"flex",alignItems:"flex-start",gap:12,opacity:n.read?0.7:1}}>
-<div style={{marginTop:2,flexShrink:0}}>{icons[n.type]||icons.info}</div>
-<div style={{flex:1}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>{n.title}</div>
-<div style={{fontSize:12,color:C.secondary,lineHeight:1.5}}>{n.body}</div>
-<div style={{fontSize:10,color:C.muted,marginTop:5}}>{n.time}</div>
-</div>
-{!n.read&&<div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,flexShrink:0,marginTop:4}}/>}
-</div>
-))}
-</div>
-</div>
-);
-}
-
-// ─── RISK MATRIX VIEW ────────────────────────────────────────────────────────
-function RiskMatrixView({user,engData}){
-// Real risk items derived from engagement health
-const riskItems=React.useMemo(()=>{
-  const items=[];
-  (engData||[]).forEach((e,i)=>{
-    if(e.health==="red") items.push({id:e.id,dept:e.dept,title:e.name,prob:4,impact:4,client:e.client,label:"HOOG"});
-    else if(e.health==="amber") items.push({id:e.id,dept:e.dept,title:e.name,prob:3,impact:3,client:e.client,label:"MIDDEN"});
-  });
-  return items;
-},[engData]);
-const GRID=5;
-const cells=[];
-for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
-const heat=(r+c)/(GRID*2-2);
-cells.push({r,c,heat});
-}
-const sectors=[];
-return(
-<div>
-<PageHeader kicker="Intelligence" title="Strategische Risicomatrix"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time dreigingsanalyse en sectorale kwetsbaarheden binnen de Tactigent en Fiscal Fuse ecosystemen.</p>
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"20px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-<div>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Dreigingsniveau Matrix</div>
-<div style={{fontSize:10,color:C.secondary}}>Visualisatie van Impact vs. Waarschijnlijkheid</div>
-</div>
-<div style={{display:"flex",gap:12}}>
-{[{c:C.crimson,l:"TACTIGENT"},{c:C.espresso,l:"FISCAL FUSE"}].map(b=>(
-<div key={b.l} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c}}/><span style={{fontSize:9,fontWeight:600,color:C.secondary}}>{b.l}</span></div>
-))}
-</div>
-</div>
-<div style={{display:"flex",gap:10,alignItems:"center"}}>
-{/* Y-axis label */}
-<div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",height:340,paddingTop:4,paddingBottom:4,flexShrink:0}}>
-  <span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",writingMode:"vertical-rl",transform:"rotate(180deg)"}}>HOGE IMPACT</span>
-  <span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",writingMode:"vertical-rl",transform:"rotate(180deg)"}}>LAGE IMPACT</span>
-</div>
-<div style={{flex:1}}>
-<div style={{position:"relative",aspectRatio:"1",maxHeight:340}}>
-
-<div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gridTemplateRows:`repeat(${GRID},1fr)`,gap:4,height:"100%"}}>
-{cells.map(({r,c,heat})=>(
-<div key={`${r}-${c}`} style={{borderRadius:6,background:`rgba(139,26,43,${heat*0.35+0.05})`}}/>
-))}
-</div>
-{/* Bubbles */}
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.darkAccent,color:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
-</div>
-{/* X-axis labels BELOW the grid */}
-<div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
-<span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>LAGE WAARSCHIJNLIJKHEID</span>
-<span style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>HOGE WAARSCHIJNLIJKHEID</span>
-</div>
-</div>{/* end flex:1 */}
-</div>{/* end flex row with Y-axis */}
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Sectorale Analyse</div>
-{sectors.map(s=>(
-<div key={s.l} style={{marginBottom:12}}>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-<span style={{fontSize:11,color:C.text}}>{s.l}</span>
-<span style={{fontSize:11,fontWeight:700,color:s.red?C.crimson:C.text}}>{s.v}% Risico</span>
-</div>
-<div style={{height:4,background:C.border,borderRadius:2}}>
-<div style={{height:"100%",width:`${s.v}%`,background:s.red?C.crimson:C.walnut,borderRadius:2}}/>
-</div>
-</div>
-))}
-<div style={{marginTop:14,padding:"12px",borderRadius:9,background:C.warm50,border:`1px solid ${C.border}`}}>
-<div style={{fontSize:9,fontWeight:700,color:C.crimson,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>SYSTEEM ALERT</div>
-<div style={{fontSize:11,color:C.text,lineHeight:1.5}}>Kritieke stijging gedetecteerd in Tactigent Core blootstelling.</div>
-</div>
-</div>
-<div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
-<div style={{fontSize:9,fontWeight:700,color:"rgba(240,235,228,0.6)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>MAANDELIJKSE TREND</div>
-<div style={{fontFamily:F.display,fontSize:32,fontWeight:600,marginBottom:6}}>+12.4%</div>
-<div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:6,background:"rgba(255,255,255,.1)",fontSize:9,fontWeight:700}}>↗ INCREASED VIGILANCE</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-{[{Icon:Shield,label:"VEILIGHEIDS INDEX",value:"88.4"},{Icon:Scale,label:"JURIDISCHE DRUK",value:"Medium"}].map(k=>(
-<div key={k.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`}}>
-<k.Icon size={18} color={C.secondary} style={{marginBottom:4}}/>
-<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{k.label}</div>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>{k.value}</div>
-</div>
-))}
-</div>
-</div>
-</div>
-</div>
-);
-}
-
-// ─── ASSET FLOW VIEW ─────────────────────────────────────────────────────────
-function AssetFlowView(){
-const months=["JAN","FEB","MRT","APR","MEI","JUN"];
-const tcBars=[22,28,35,30,42,48];
-const ffBars=[12,16,18,22,20,26];
-const maxBar=Math.max(...tcBars.map((t,i)=>t+ffBars[i]));
-const movements=[];
-return(
-<div>
-<PageHeader kicker="Intelligence" title="Vermogensstroom"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time visualisatie van uw kapitaalallocatie en liquide middelen binnen het Tactigent en Fiscal Fuse ecosysteem.</p>
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
-{[{l:"TOTAAL VERMOGEN",v:"SRD 4.281.090",s:"USD"},{l:"LIQUIDE MIDDELEN",v:"SRD 1.12M",s:"Gedekt door FF Reserves"},{l:"INVESTERINGSRENDEMENT",v:"+12.4% YTD",s:"Gedreven door Tactigent Projects",accent:true}].map(k=>(
-<div key={k.l} style={{background:k.accent?C.crimsonFaint:C.surface,borderRadius:14,padding:"16px 18px",border:`1.5px solid ${k.accent?C.crimson:C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:k.accent?C.crimson:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>{k.l}</div>
-<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.accent?C.crimson:C.text,marginBottom:3}}>{k.v}</div>
-<div style={{fontSize:10,color:C.secondary}}>{k.s}</div>
-</div>
-))}
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Kapitaalallocatie</div>
-<div style={{display:"flex",alignItems:"center",gap:20}}>
-<div style={{position:"relative",width:120,height:120,flexShrink:0}}>
-<svg viewBox="0 0 120 120" style={{transform:"rotate(-90deg)"}}>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.border} strokeWidth="18"/>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.espresso} strokeWidth="18" strokeDasharray={`${35*3.14} ${65*3.14}`} strokeDashoffset="0"/>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.crimson} strokeWidth="18" strokeDasharray={`${65*3.14} ${35*3.14}`} strokeDashoffset={`${-35*3.14}`}/>
-</svg>
-<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>65%</div>
-<div style={{fontSize:9,color:C.secondary}}>TACTIGENT</div>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10}}>
-{[{c:C.crimson,l:"TC PROJECTS",v:"SRD 2.78M"},{c:C.espresso,l:"FF MATTERS",v:"SRD 1.50M"}].map(b=>(
-<div key={b.l} style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c,flexShrink:0}}/><div><div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.07em"}}>{b.l}</div><div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{b.v}</div></div></div>
-))}
-</div>
-</div>
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Cashflow Trend</div>
-<div style={{display:"flex",gap:6}}>
-{["6 MAANDEN","1 JAAR"].map((l,i)=><button key={l} style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${i===0?C.crimson:C.border}`,background:i===0?C.crimsonFaint:"transparent",color:i===0?C.crimson:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>{l}</button>)}
-</div>
-</div>
-<div style={{display:"flex",gap:6,alignItems:"flex-end",height:80,marginBottom:8}}>
-{months.map((m,i)=>(
-<div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"stretch",gap:2}}>
-<div style={{flex:tcBars[i],background:C.crimson,borderRadius:"3px 3px 0 0",opacity:0.8}}/>
-<div style={{flex:ffBars[i],background:C.espresso,opacity:0.6}}/>
-</div>
-))}
-</div>
-<div style={{display:"flex",gap:6}}>
-{months.map(m=>(<div key={m} style={{flex:1,textAlign:"center",fontSize:8.5,color:C.secondary,fontWeight:600}}>{m}</div>))}
-</div>
-</div>
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Vermogensbewegingen</div>
-<button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Exporteren ↓</button>
-</div>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DATUM","OMSCHRIJVING","AFDELING","BEDRAG","STATUS"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{movements.map((m,i)=>(
-<tr key={i} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"13px 18px",fontSize:11,color:C.secondary}}>{m.date}</td>
-<td style={{padding:"13px 18px",fontSize:13,fontWeight:600,color:C.text}}>{m.desc}</td>
-<td style={{padding:"13px 18px"}}><DeptTag dept={m.dept}/></td>
-<td style={{padding:"13px 18px",fontFamily:F.display,fontSize:14,fontWeight:600,color:m.amount.startsWith("+")?C.green:C.red}}>{m.amount}</td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:9,fontWeight:700,color:C.secondary,background:C.warm50,padding:"3px 8px",borderRadius:4}}>{m.status}</span></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-</div>
-);
-}
-
-// ─── CLIENT PORTAL VIEWS ─────────────────────────────────────────────────────
-function ClientDashboard({user}){
-const t=useT();
-const [actions,setActions]=useState([]);
-const [docs,setDocs]=useState([]);
-const [invoices,setInvoices]=useState([]);
-const [loading,setLoading]=useState(true);
-
-// Load all client data from DB
-useEffect(()=>{
-  const load=async()=>{
-    try{
-      // Load client_actions visible to this client
-      const {data:acts}=await supabase
-        .from("client_actions")
-        .select("id,title,description,action_type,deadline,status,is_visible_to_client,engagement_id,engagements(name)")
-        .eq("client_id",user.id)
-        .eq("is_visible_to_client",true)
-        .order("created_at",{ascending:false});
-      if(acts) setActions(acts.map(a=>({
-        id:a.id,title:a.title,desc:a.description,
-        type:a.action_type,status:a.status||"pending",
-        deadline:a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
-        engagement:a.engagements?.name||"—",
-      })));
-
-      // Load documents shared with this client
-      const {data:ds}=await supabase
-        .from("documents")
-        .select("id,name,file_url,file_type,uploaded_at,visibility")
-        .in("visibility",["client","shared"])
-        .order("uploaded_at",{ascending:false});
-      if(ds) setDocs(ds);
-
-      // Load invoices for this company
-      const {data:inv}=await supabase
-        .from("invoices")
-        .select("id,reference_code,amount,currency,status,due_date")
-        .eq("company_id",user.company_id||"")
-        .order("created_at",{ascending:false});
-      if(inv) setInvoices(inv);
-    }catch(e){ console.warn("client load error",e); }
-    setLoading(false);
-  };
-  load();
-},[user.id]);
-
-const pending=actions.filter(a=>a.status==="pending"||a.status==="overdue");
-const overdue=actions.filter(a=>a.status==="overdue");
-return(
-<div>
-<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>STAATSOLIE N.V.</span></div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-<div>
-<h1 style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,margin:"0 0 4px"}}>Het Ethereal Commando</h1>
-<div style={{fontSize:12,color:C.secondary}}>Huidige Betrokkenheidsfase: <strong style={{color:C.crimson}}>Uitvoeringsfase Alpha</strong></div>
-</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
-<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-<div style={{fontSize:14,fontWeight:700,color:C.text}}>Belangrijkste Actiepunten</div>
-<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20}}>{pending.length} PRIORITEITEN</span>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-{pending.map((a,i)=>(
-<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${i===0?C.crimson:C.border}`,padding:"16px 20px",display:"flex",alignItems:"center",gap:16}}>
-<div style={{width:40,height:40,borderRadius:10,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-{a.type==="upload"?<Upload size={16}/>:a.type==="approve"?<CheckSquare size={16}/>:<ClipboardList size={16}/>}
-</div>
-<div style={{flex:1}}>
-<div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text,marginBottom:4}}>{a.title}</div>
-<div style={{fontSize:12,color:C.secondary}}>{a.desc}</div>
-</div>
-<button onClick={()=>setActions(as=>as.map(x=>x.id===a.id?{...x,status:"done"}:x))} style={{padding:"9px 16px",borderRadius:10,background:i===0?C.crimson:C.walnut,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-{i===0?"NU UITVOEREN":"BEKIJKEN"} →
-</button>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"16px 20px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Voortgang Dossier</div>
-<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.crimson}}>68%</div>
-</div>
-<div style={{fontSize:11,color:C.secondary,marginBottom:10}}>Mijlpaal: Strategie Implementatie</div>
-<div style={{height:8,background:C.border,borderRadius:4}}>
-<div style={{height:"100%",width:"68%",background:C.crimson,borderRadius:4}}/>
-</div>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Financieel Overzicht</div>
-<div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:7,height:7,borderRadius:"50%",background:C.green,animation:"pulse 2s infinite"}}/><span style={{fontSize:9,fontWeight:700,color:C.secondary}}>LIVE SYNC</span></div>
-</div>
-<div style={{fontSize:9,color:C.secondary,marginBottom:3}}>BESCHIKBARE LIQUIDITEIT</div>
-<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,marginBottom:12}}>SRD 4.281.090</div>
-<div style={{fontSize:9,color:C.secondary,marginBottom:8}}>QBO Sync Status: <span style={{color:C.green,fontWeight:700}}>ACTIEF</span></div>
-{[["Burn Rate","-SRD 142k/md"],[" Runway","—"],["Netto Marge","—"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</span>
-</div>
-))}
-<button style={{width:"100%",marginTop:12,padding:"8px",borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,color:C.text,fontSize:10,fontWeight:700,cursor:"pointer"}}>VOLLEDIG GROOTBOEK BEKIJKEN</button>
-</div>
-<div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
-<div style={{fontSize:9,fontWeight:700,color:"rgba(240,235,228,0.6)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INVESTERINGSADVIES</div>
-<blockquote style={{fontFamily:F.display,fontSize:13,fontWeight:600,lineHeight:1.6,margin:"0 0 12px"}}>"De sleutel tot portfolioweerbaarheid is de bewuste afwijzing van het onmiddellijke."</blockquote>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight}}>TACTIGENT INZICHTEN · Wekelijkse Briefing</div>
-</div>
-</div>
-</div>
-</div>
-);
-}
-
-function DocPreviewModal({doc, onClose, onDownload}) {
-const typeIcon={PDF:<FileText size={40} color={C.crimson}/>,Excel:<FileSpreadsheet size={40} color={C.green}/>,Word:<FileType size={40} color={C.blue}/>};
-const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
-// Fake document content lines for visual preview
-const previewLines = doc.type==="PDF" ? [
-{w:"80%",h:10,dark:true},{w:"60%",h:8},{w:"100%",h:6},{w:"95%",h:6},{w:"88%",h:6},{w:"70%",h:6},
-{w:"0%",h:8},{w:"100%",h:6},{w:"92%",h:6},{w:"85%",h:6},{w:"78%",h:6},{w:"40%",h:6},
-] : doc.type==="Excel" ? [
-{grid:true,cols:["Kwartaal","Omzet","Kosten","Marge"],rows:[["Q1 2025","SRD 28.500","SRD 12.200","57%"],["Q2 2025","SRD 34.100","SRD 14.800","57%"],["Q3 2025","SRD 41.200","SRD 17.300","58%"]]},
-] : [
-{w:"70%",h:12,dark:true},{w:"50%",h:8},{w:"100%",h:7},{w:"100%",h:7},{w:"95%",h:7},{w:"80%",h:7},
-{w:"0%",h:10},{w:"100%",h:7},{w:"100%",h:7},{w:"88%",h:7},
-];
-
-useEffect(()=>{
-const handler = e => { if(e.key==="Escape") onClose(); };
-window.addEventListener("keydown", handler);
-return ()=>window.removeEventListener("keydown", handler);
-},[]);
-
-return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-{/* Topbar */}
-<div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-<div style={{width:36,height:36,borderRadius:9,background:typeBg[doc.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-{typeIcon[doc.type]||<FileText size={18} color={C.secondary}/>}
-</div>
-<div style={{flex:1,minWidth:0}}>
-<div style={{fontSize:14,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
-<div style={{fontSize:10,color:C.secondary}}>{doc.size} · {doc.type} · {doc.date}</div>
-</div>
-<div style={{display:"flex",alignItems:"center",gap:8}}>
-<ReviewChip status={doc.status}/>
-<button onClick={()=>onDownload(doc)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-<Download size={13}/> Downloaden
-</button>
-<button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}>
-<X size={16}/>
-</button>
-</div>
-</div>
-
-
-    {/* Body: preview left, metadata right */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1}}>
-      {/* Document preview */}
-      <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:C.bg}}>
-        <div style={{background:C.surface,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
-          {/* Doc header branding */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,paddingBottom:16,borderBottom:`2px solid ${doc.dept==="TC"?C.crimson:C.taupe}`}}>
-            <div>
-              <div style={{fontSize:11,fontWeight:800,color:doc.dept==="TC"?C.crimson:C.taupe,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:2}}>{doc.dept==="TC"?"TACTIGENT CONSULTANCY":"FISCAL FUSE"}</div>
-              <div style={{fontSize:9,color:C.secondary,letterSpacing:"0.08em"}}>VERTROUWELIJK RAPPORT</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:9,color:C.secondary}}>Referentie:</div>
-              <div style={{fontSize:10,fontWeight:700,color:C.text}}>{doc.engagement}</div>
-            </div>
-          </div>
-          {/* Title */}
-          <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:16,lineHeight:1.3}}>
-            {doc.name.replace(/\.[^.]+$/,"").replace(/_/g," ")}
-          </div>
-          {/* Fake content */}
-          {doc.type==="Excel" && previewLines[0]?.grid ? (
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead>
-                  <tr style={{background:doc.dept==="TC"?C.crimsonFaint:"#F0EDE8"}}>
-                    {previewLines[0].cols.map(c=><th key={c} style={{padding:"8px 12px",textAlign:"left",fontWeight:700,color:C.text,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase"}}>{c}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewLines[0].rows.map((row,i)=>(
-                    <tr key={i} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?"transparent":C.warm50}}>
-                      {row.map((cell,j)=><td key={j} style={{padding:"9px 12px",color:C.text,fontWeight:j===0?600:400}}>{cell}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{marginTop:16,padding:"10px 12px",borderRadius:8,background:C.warm50,fontSize:11,color:C.secondary}}>+ Meerdere tabbladen — download het bestand voor volledige inhoud</div>
-            </div>
-          ) : (
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {previewLines.map((l,i)=>l.w==="0%" ? (
-                <div key={i} style={{height:16}}/>
-              ) : (
-                <div key={i} style={{height:l.h,width:l.w,background:l.dark?"#C8BBB2":"#E4DDD5",borderRadius:3,opacity:0.7+(i%3)*0.1}}/>
-              ))}
-              <div style={{marginTop:12,padding:"10px 12px",borderRadius:8,background:C.crimsonFaint,border:`1px solid ${C.crimsonMid}30`,fontSize:11,color:C.crimson,display:"flex",alignItems:"center",gap:6}}>
-                <Lock size={11}/> Download het bestand voor de volledige inhoud
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Metadata sidebar */}
-      <div style={{padding:"24px 20px",overflowY:"auto",display:"flex",flexDirection:"column",gap:20}}>
-        <div>
-          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>BESTANDSINFO</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[
-              ["Grootte", doc.size],
-              ["Type", doc.type+" Document"],
-              ["Geüpload", doc.date],
-              ["Door", doc.uploadedBy],
-              ["Engagement", doc.engagement],
-            ].map(([l,v])=>(
-              <div key={l}>
-                <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>{l}</div>
-                <div style={{fontSize:12,fontWeight:600,color:C.text}}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{height:1,background:C.border}}/>
-        <div>
-          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>STATUS</div>
-          <ReviewChip status={doc.status}/>
-          {doc.status==="verified"&&<div style={{marginTop:8,fontSize:10,color:C.green,lineHeight:1.5}}>Dit document is geverifieerd door uw adviseur.</div>}
-          {doc.status==="in_review"&&<div style={{marginTop:8,fontSize:10,color:C.amber,lineHeight:1.5}}>Uw adviseur bekijkt dit document momenteel.</div>}
-          {doc.status==="pending"&&<div style={{marginTop:8,fontSize:10,color:C.secondary,lineHeight:1.5}}>Wacht op beoordeling door uw adviseur.</div>}
-        </div>
-        <div style={{height:1,background:C.border}}/>
-        <div>
-          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>ACTIES</div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>onDownload(doc)} style={{width:"100%",padding:"9px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              <Download size={13}/> Downloaden
-            </button>
-            <button style={{width:"100%",padding:"9px",borderRadius:9,background:"transparent",color:C.text,border:`1.5px solid ${C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              <Send size={13}/> Delen
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-);
-}
-
-function InvoicePreviewModal({inv, onClose, onDownload}) {
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
-
-useEffect(()=>{
-const handler = e => { if(e.key==="Escape") onClose(); };
-window.addEventListener("keydown", handler);
-return ()=>window.removeEventListener("keydown", handler);
-},[]);
-
-const lineItems = [
-{desc:"Adviseursdiensten — Q1 2025", qty:1, unit:"SRD "+Math.round(inv.amount*0.65).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.65).toLocaleString()},
-{desc:"Documentatiebeheer & archivering", qty:1, unit:"SRD "+Math.round(inv.amount*0.20).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.20).toLocaleString()},
-{desc:"Reiskosten & representatie", qty:1, unit:"SRD "+Math.round(inv.amount*0.15).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.15).toLocaleString()},
-];
-
-return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",margin:"16px auto",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-{/* Topbar */}
-<div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-<div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:C.greenBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-<Receipt size={18} color={inv.status==="overdue"?C.red:C.green}/>
-</div>
-<div style={{flex:1}}>
-<div style={{fontSize:14,fontWeight:700,color:C.text}}>{inv.ref}</div>
-<div style={{fontSize:10,color:C.secondary}}>{inv.client} · Vervaldatum: {inv.due}</div>
-</div>
-<Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
-<button onClick={()=>onDownload(inv)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-<Download size={13}/> PDF
-</button>
-<button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}>
-<X size={16}/>
-</button>
-</div>
-
-
-    {/* Invoice document */}
-    <div style={{overflowY:"auto",padding:"28px 32px",background:C.bg}}>
-      <div style={{background:C.surface,borderRadius:14,padding:"36px 40px",boxShadow:"0 2px 16px rgba(58,46,40,.08)"}}>
-        {/* Invoice header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:800,color:C.crimson,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>
-              {inv.dept==="TC"?"TACTIGENT CONSULTANCY":"FISCAL FUSE"}
-            </div>
-            <div style={{fontSize:11,color:C.secondary}}>Waterkant 45, Paramaribo, Suriname</div>
-            <div style={{fontSize:11,color:C.secondary}}>+597 820-0000 · info@glasexec.sr</div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,marginBottom:4}}>FACTUUR</div>
-            <div style={{fontSize:12,fontWeight:700,color:C.secondary}}>{inv.ref}</div>
-            <div style={{marginTop:8,padding:"6px 14px",borderRadius:8,background:sBg[inv.status]||C.warm50,display:"inline-block"}}>
-              <span style={{fontSize:11,fontWeight:700,color:sColor[inv.status]||C.secondary}}>{sLabel[inv.status]||inv.status}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bill to / details */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:28,padding:"16px 20px",borderRadius:10,background:C.warm50}}>
-          <div>
-            <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>FACTUUR AAN</div>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{inv.client}</div>
-            <div style={{fontSize:11,color:C.secondary}}>Suriname</div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            {[["Factuurdatum","12 Apr 2025"],["Vervaldatum",inv.due],["Referentie",inv.ref],["QBO ID",inv.qbo||"—"]].map(([l,v])=>(
-              <div key={l}>
-                <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>{l}</div>
-                <div style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Line items */}
-        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:20}}>
-          <thead>
-            <tr style={{background:C.darkAccent}}>
-              {["OMSCHRIJVING","AANTAL","BEDRAG","TOTAAL"].map(h=>(
-                <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:700,color:C.onDark,letterSpacing:"0.1em",textTransform:"uppercase"}}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {lineItems.map((item,i)=>(
-              <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?CREAM:C.warm50}}>
-                <td style={{padding:"12px 14px",fontSize:12,color:C.text}}>{item.desc}</td>
-                <td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{item.qty}</td>
-                <td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{item.unit}</td>
-                <td style={{padding:"12px 14px",fontSize:12,fontWeight:600,color:C.text}}>{item.total}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Totals */}
-        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:28}}>
-          <div style={{width:260}}>
-            {[["Subtotaal","SRD "+Math.round(inv.amount*0.92).toLocaleString()],["BTW (8%)","SRD "+Math.round(inv.amount*0.08).toLocaleString()]].map(([l,v])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-                <span style={{fontSize:12,color:C.secondary}}>{l}</span>
-                <span style={{fontSize:12,color:C.text}}>{v}</span>
-              </div>
-            ))}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",marginTop:6,borderRadius:10,background:inv.status==="paid"?C.greenBg:inv.status==="overdue"?C.redBg:C.espresso}}>
-              <span style={{fontSize:13,fontWeight:700,color:inv.status==="paid"?C.green:inv.status==="overdue"?C.red:CREAM}}>TOTAAL</span>
-              <span style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:inv.status==="paid"?C.green:inv.status==="overdue"?C.red:CREAM}}>SRD {inv.amount.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment info */}
-        {inv.status!=="paid"&&(
-          <div style={{padding:"16px 20px",borderRadius:10,border:`1.5px solid ${inv.status==="overdue"?C.red:C.border}`,background:inv.status==="overdue"?C.redBg:C.warm50}}>
-            <div style={{fontSize:11,fontWeight:700,color:inv.status==="overdue"?C.red:C.text,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>{inv.status==="overdue"&&<AlertTriangle size={13}/>}{inv.status==="overdue"?"Betaling achterstallig":"Betaalinstructies"}</div>
-            <div style={{fontSize:11,color:C.secondary,lineHeight:1.6}}>Bank: DSB Suriname · IBAN: SR12 3456 7890 1234 · t.n.v. The Client Portal N.V.</div>
-          </div>
-        )}
-        {inv.status==="paid"&&(
-          <div style={{padding:"16px 20px",borderRadius:10,border:`1.5px solid ${C.green}30`,background:C.greenBg,display:"flex",alignItems:"center",gap:10}}>
-            <CheckCircle size={18} color={C.green}/>
-            <div style={{fontSize:12,fontWeight:700,color:C.green}}>Betaling ontvangen op {inv.paid} — Bedankt!</div>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-</div>
-
-
-);
-}
-
-function ClientDocsView({user}){
-const [tab,setTab]=useState("ALL");
-const [preview,setPreview]=useState(null);
-const [toast,setToast]=useState(null);
-const docs=DOCUMENTS.filter(d=>d.visibility!=="internal"&&(tab==="ALL"||d.dept===tab));
-const typeIconCmp3={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
-const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
-const handleDownload=(doc)=>{ setToast(`${doc.name} gedownload`); };
-
-return(
-<div>
-<PageHeader kicker="Mijn Portaal" title="Documenten"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:16}}>Centraal beheer van uw strategische en fiscale dossiers. Alle documenten zijn versleuteld.</p>
-<div style={{display:"grid",gridTemplateColumns:"1fr 240px",gap:16}}>
-<div>
-<div style={{display:"flex",gap:8,marginBottom:12}}>
-{[["ALL","Alle"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
-<button key={v} onClick={()=>setTab(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${tab===v?C.crimson:C.border}`,background:tab===v?C.crimson:"transparent",color:tab===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","STATUS",""].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{docs.map(d=>(
-<tr key={d.id} onClick={()=>setPreview(d)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"13px 16px"}}>
-<div style={{display:"flex",alignItems:"center",gap:10}}>
-<div style={{width:36,height:36,borderRadius:9,background:typeBg[d.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-{typeIconCmp3[d.type]||<FileText size={16} color={C.secondary}/>}
-</div>
-<div>
-<div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div>
-<div style={{fontSize:10,color:C.secondary}}>{d.size} · {d.type}</div>
-</div>
-</div>
-</td>
-<td style={{padding:"13px 16px"}}><DeptTag dept={d.dept}/></td>
-<td style={{padding:"13px 16px",fontSize:11,color:C.secondary}}>{d.date}</td>
-<td style={{padding:"13px 16px"}}><ReviewChip status={d.status}/></td>
-<td style={{padding:"13px 16px"}}><ChevronRight size={15} color={C.secondary}/></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10}}>
-<div style={{background:C.crimson,borderRadius:14,padding:"16px",color:CREAM,cursor:"pointer"}} onClick={()=>setToast("Upload gestarten")}>
-<div style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,color:"rgba(255,255,255,.7)"}}>Snelle Upload</div>
-<div style={{border:"2px dashed rgba(255,255,255,.4)",borderRadius:10,padding:"20px",textAlign:"center"}}>
-<Upload size={20} color="rgba(255,255,255,.8)" style={{marginBottom:8}}/>
-<div style={{fontSize:11,fontWeight:700,marginBottom:4}}>SELECTEER BESTAND</div>
-<div style={{fontSize:9,color:"rgba(255,255,255,.6)"}}>Sleep bestanden hierheen</div>
-</div>
-</div>
-{[{label:"Tactigent Bestanden",count:DOCUMENTS.filter(d=>d.dept==="TC").length},{label:"Fiscal Fuse Archief",count:DOCUMENTS.filter(d=>d.dept==="FF").length},{label:"Gedeelde Documenten",count:DOCUMENTS.filter(d=>d.visibility==="shared").length}].map(cat=>(
-<div key={cat.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<span style={{fontSize:12,color:C.text,fontWeight:600}}>{cat.label}</span>
-<span style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.crimson}}>{cat.count}</span>
-</div>
-))}
-</div>
-</div>
-{preview&&<DocPreviewModal doc={preview} onClose={()=>setPreview(null)} onDownload={(d)=>{handleDownload(d);setPreview(null);}}/>}
-{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
-</div>
-);
-}
-
-function ClientFinanceView({user,invData}){
-const invoices=invData.filter(i=>i.client===user.company_name||i.company_id===user.company_id);
-const [preview,setPreview]=useState(null);
-const [toast,setToast]=useState(null);
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
-const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
-const totalPaid=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+i.amount,0);
-return(
-<>
-<div>
-<PageHeader kicker="Financiën" title="Facturen & Betalingen"/>
-{/* KPI strip */}
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
-{[{l:"OPENSTAAND",v:`SRD ${totalOpen.toLocaleString()}`,c:totalOpen>0?C.amber:C.text},{l:"BETAALD",v:`SRD ${totalPaid.toLocaleString()}`,c:C.green},{l:"TOTAAL FACTUREN",v:invoices.length,c:C.text}].map(s=>(
-<div key={s.l} style={{background:C.surface,borderRadius:12,padding:"14px 18px",border:`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:s.c}}>{s.v}</div>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,fontSize:11,color:C.secondary}}>
-Klik op een factuur om de volledige factuurdetails te bekijken.
-</div>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS",""].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{invoices.length===0?(
-<tr><td colSpan={5} style={{padding:"40px 18px",textAlign:"center",fontSize:13,color:C.secondary}}>Geen facturen gevonden</td></tr>
-):invoices.map(inv=>(
-<tr key={inv.id} onClick={()=>setPreview(inv)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"14px 18px"}}>
-<div style={{display:"flex",alignItems:"center",gap:10}}>
-<div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:inv.status==="paid"?C.greenBg:C.amberBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-<Receipt size={16} color={sColor[inv.status]||C.secondary}/>
-</div>
-<div>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>{inv.ref}</div>
-{inv.qbo&&<div style={{fontSize:9,color:C.green,fontWeight:600,display:"flex",alignItems:"center",gap:3,marginTop:2}}><CheckCircle size={9}/> QBO gesynchroniseerd</div>}
-</div>
-</div>
-</td>
-<td style={{padding:"14px 18px",fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
-<td style={{padding:"14px 18px",fontSize:12,color:inv.status==="overdue"?C.red:C.secondary,fontWeight:inv.status==="overdue"?700:400}}>{inv.due}</td>
-<td style={{padding:"14px 18px"}}><Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
-<td style={{padding:"14px 18px"}}><ChevronRight size={15} color={C.secondary}/></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-{preview&&<InvoicePreviewModal inv={preview} onClose={()=>setPreview(null)} onDownload={(inv)=>{setToast(`${inv.ref} gedownload als PDF`);setPreview(null);}}/>}
-{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
-</div>
-</>
-);
-}
-function ClientActionsPortal({user,showToast}){
-const t=useT();
-const [actions,setActions]=useState(Object.values(CLIENT_ACTIONS_BY_ENG).flat());
-const [uploading,setUploading]=useState(null);
-const complete=(id,type)=>{ if(type==="upload"){setUploading(id);return;} setActions(as=>as.map(a=>a.id===id?{...a,status:"completed"}:a)); showToast("Actie voltooid"); };
-const handleUpload=()=>{ setActions(as=>as.map(a=>a.id===uploading?{...a,status:"completed"}:a)); setUploading(null); showToast("Document succesvol geüpload"); };
-const pending=actions.filter(a=>a.status!=="completed");
-const done=actions.filter(a=>a.status==="completed");
-const typeIconMap={upload:<Upload size={18}/>,approve:<CheckSquare size={18}/>,sign:<Pen size={18}/>,review:<ScanSearch size={18}/>};
-const typeCTA={upload:"UPLOADEN",approve:"GOEDKEUREN",sign:"ONDERTEKENEN",review:"BEOORDELEN"};
-return(
-<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20}}>
-<PageHeader kicker="Mijn Portaal" title={t("myActionItems")}/>
-<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20,marginBottom:4}}>{pending.length} {t("priorities")}</span>
-</div>
-{pending.length===0&&<div style={{background:C.greenBg,borderRadius:14,padding:"28px 24px",textAlign:"center",marginBottom:16}}><CheckCircle size={32} color={C.green} style={{marginBottom:10}}/><div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Alle acties voltooid</div></div>}
-<div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
-{pending.map((a,i)=>(
-<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${a.status==="overdue"?C.crimson:i===0?C.walnut:C.border}`,padding:"18px 22px",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:16,alignItems:"center"}}>
-<div style={{width:44,height:44,borderRadius:12,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{typeIconMap[a.type]||<ClipboardList size={18}/>}</div>
-<div>
-<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,marginBottom:3}}>{a.title}</div>
-<div style={{fontSize:12,color:C.secondary,marginBottom:4}}>{a.desc}</div>
-<div style={{fontSize:11,color:a.status==="overdue"?C.red:C.secondary,fontWeight:600}}>Termijn: {a.deadline}</div>
-</div>
-<button onClick={()=>complete(a.id,a.type)} style={{padding:"10px 18px",borderRadius:10,background:a.status==="overdue"?C.crimson:i===0?C.walnut:C.bg,color:a.status==="overdue"||i===0?CREAM:C.text,border:i===0||a.status==="overdue"?"none":`1.5px solid ${C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-{typeCTA[a.type]||"UITVOEREN"} →
-</button>
-</div>
-))}
-</div>
-{done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
-{uploading&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setUploading(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
-<button onClick={()=>setUploading(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
-</div>
-<div style={{border:`2px dashed ${C.crimson}`,borderRadius:14,padding:"32px",textAlign:"center",background:C.crimsonFaint,marginBottom:16,cursor:"pointer"}} onClick={handleUpload}>
-<Upload size={28} color={C.crimson} style={{marginBottom:10}}/>
-<div style={{fontSize:14,fontWeight:700,color:C.crimson,marginBottom:4}}>Sleep bestand hierheen</div>
-<div style={{fontSize:10,color:C.muted}}>PDF, Excel, Word — max 25 MB</div>
-</div>
-<button onClick={handleUpload} style={{width:"100%",padding:"11px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Simuleer Upload</button>
-</div>
-</div>
-)}
-</div>
-);
-}
-
-function ClientMessagesView({user,showToast}){
-const [threads,setThreads]=useState(CLIENT_THREADS);
-const [active,setActive]=useState(threads[0]);
-const [newMsg,setNewMsg]=useState("");
-const sendMsg=()=>{
-if(!newMsg.trim())return;
-setThreads(ts=>ts.map(t=>t.id===active.id?{...t,messages:[...t.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}:t));
-setActive(a=>({...a,messages:[...a.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}));
-setNewMsg(""); showToast("Bericht verzonden");
-};
-return(
-<div style={{display:"flex",height:"calc(100vh - 140px)",gap:0,background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-<div style={{width:260,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column"}}>
-<div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text}}>Berichten</div>
-<div style={{flex:1,overflowY:"auto"}}>
-{threads.map(th=>(
-<div key={th.id} onClick={()=>{setActive(th);setThreads(ts=>ts.map(t=>t.id===th.id?{...t,unread:false}:t));}} style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:active?.id===th.id?C.crimsonFaint:"transparent"}}>
-<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-<Avatar initials={th.avatar} size={28} bg={C.walnut}/>
-<div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:C.text}}>{th.from}</div><div style={{fontSize:9,color:C.secondary}}>{th.time}</div></div>
-{th.unread&&<div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,flexShrink:0}}/>}
-</div>
-<div style={{fontSize:11,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingLeft:36}}>{th.preview}</div>
-</div>
-))}
-</div>
-</div>
-<div style={{flex:1,display:"flex",flexDirection:"column"}}>
-{active&&<>
-<div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>{active.subject}</div>
-</div>
-<div style={{flex:1,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-{active.messages.map(m=>(
-<div key={m.id} style={{display:"flex",alignItems:"flex-start",gap:10,flexDirection:m.fromMe?"row-reverse":"row"}}>
-<Avatar initials={m.avatar} size={30} bg={m.fromMe?C.crimson:C.walnut}/>
-<div style={{maxWidth:"70%"}}>
-<div style={{fontSize:12,color:m.fromMe?CREAM:C.text,background:m.fromMe?C.crimson:C.bg,borderRadius:12,padding:"10px 14px",lineHeight:1.6}}>{m.body}</div>
-<div style={{fontSize:9,color:C.secondary,marginTop:4,textAlign:m.fromMe?"right":"left"}}>{m.time}</div>
-</div>
-</div>
-))}
-</div>
-<div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
-<input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Typ een bericht..." style={{flex:1,padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<button onClick={sendMsg} style={{padding:"9px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",cursor:"pointer"}}><Send size={14}/></button>
-</div>
-</>}
-</div>
-</div>
-);
-}
-
-// ─── COMPANY DETAIL ──────────────────────────────────────────────────────────
-function CompanyDetail({company,user,onBack,setDetailEng,engData,invData,showToast}){
-const [activeTab,setActiveTab]=useState("overview");
-const engagements=(engData||ENGAGEMENTS_INIT).filter(e=>e.client===company.name);
-const invoices=invData.filter(i=>i.client===company.name);
-const docs=DOCUMENTS.filter(d=>engagements.some(e=>e.ref===d.engagement));
-const totalBilled=invoices.reduce((s,i)=>s+i.amount,0);
-const openBilled=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const tabs=[
-{id:"overview",label:"Overzicht",icon:Layers},
-{id:"engagements",label:`Engagements (${engagements.length})`,icon:Target},
-{id:"documents",label:`Documenten (${docs.length})`,icon:FileText},
-{id:"invoices",label:`Facturen (${invoices.length})`,icon:Receipt},
-];
-return(
-<div className="fu">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:16,padding:0}}>
-<ChevronLeft size={15}/> Terug naar overzicht
-</button>
-{/* Header */}
-<div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16,display:"flex",alignItems:"center",gap:20}}>
-<div style={{flexShrink:0}}>
-<CompanyLogo name={company.name} size={52} dept={company.dept} logoUrl={company.logoUrl}/>
-</div>
-<div style={{flex:1}}>
-<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-<h1 style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,margin:0}}>{company.name}</h1>
-<DeptTag dept={company.dept}/>
-<HealthDot status={company.health}/>
-</div>
-<div style={{fontSize:12,color:C.secondary}}>KKF {company.kkf} · {company.lifecycle}</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center"}}>
-{[{l:"ENGAGEMENTS",v:engagements.length},{l:"GEFACTUREERD",v:`SRD ${totalBilled.toLocaleString()}`},{l:"OPENSTAAND",v:`SRD ${openBilled.toLocaleString()}`}].map(s=>(
-<div key={s.l} style={{background:C.bg,borderRadius:10,padding:"10px 14px"}}>
-<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:openBilled>0&&s.l==="OPENSTAAND"?C.amber:C.text}}>{s.v}</div>
-</div>
-))}
-</div>
-</div>
-{/* Tabs */}
-<div style={{display:"flex",gap:4,marginBottom:16,background:C.bg,borderRadius:12,padding:4}}>
-{tabs.map(tb=>(
-<button key={tb.id} onClick={()=>setActiveTab(tb.id)} style={{flex:1,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,fontWeight:activeTab===tb.id?700:400,fontSize:12,transition:"background .15s,color .15s,border-color .15s,opacity .15s",boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none"}}>
-<tb.icon size={13}/>{tb.label}
-</button>
-))}
-</div>
-{/* Overview tab */}
-{activeTab==="overview"&&(
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Primair Contact</div>
-<div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-<div style={{position:"relative"}}>
-<Avatar initials={company.contact.split(" ").map(w=>w[0]).join("").slice(0,2)} size={44} bg={company.dept==="TC"?C.crimson:C.taupe} shape="circle"/>
-<div style={{position:"absolute",bottom:-1,right:-1,width:14,height:14,borderRadius:"50%",background:C.green,border:`2px solid ${C.surface}`}}/>
-</div>
-<div>
-<div style={{fontSize:14,fontWeight:700,color:C.text}}>{company.contact}</div>
-<div style={{fontSize:11,color:C.secondary}}>{company.role}</div>
-</div>
-</div>
-{[["Email",`${company.contact.split(" ")[0].toLowerCase()}@${company.name.toLowerCase().replace(/\s+/g,"").replace(/[^a-z]/g,"")}.sr`],["Telefoon","+597 8xx-xxxx"],["Afdeling",company.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Bedrijfsgegevens</div>
-{[["KKF Nummer",company.kkf],["Lifecycle Status",company.lifecycle],["Gezondheidsstatus",company.health==="red"?"Kritiek":company.health==="amber"?"Amber":"Stabiel"],["Afdeling",company.dept==="TC"?"Tactigent":"Fiscal Fuse"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:600,color:company.health==="red"&&l==="Gezondheidsstatus"?C.red:company.health==="amber"&&l==="Gezondheidsstatus"?C.amber:C.text}}>{v}</span>
-</div>
-))}
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Actieve Engagements</div>
-{engagements.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen actieve engagements</div>):
-engagements.map(e=>(
-<div key={e.id} onClick={()=>setDetailEng(e)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref} · {e.phase}</div></div>
-<div style={{display:"flex",alignItems:"center",gap:8}}><HealthDot status={e.health}/><ChevronRight size={14} color={C.secondary}/></div>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Recente Facturen</div>
-{invoices.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen facturen</div>):
-invoices.slice(0,3).map(inv=>(
-<div key={inv.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderTop:`1px solid ${C.border}`}}>
-<div><div style={{fontSize:12,fontWeight:600,color:C.text}}>{inv.ref}</div><div style={{fontSize:10,color:C.secondary}}>{inv.due}</div></div>
-<div style={{display:"flex",alignItems:"center",gap:8}}>
-<span style={{fontFamily:F.display,fontSize:13,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</span>
-<Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERS.":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
-</div>
-</div>
-))}
-</div>
-</div>
-</div>
-)}
-{/* Engagements tab */}
-{activeTab==="engagements"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-{engagements.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Target size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["NAAM","TYPE","FASE","GEZONDHEID","MANAGER","ACTIE"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{engagements.map(e=>(
-<tr key={e.id} onClick={()=>setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"13px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref}</div></td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:9,padding:"3px 8px",borderRadius:4,background:e.type==="project"?C.crimsonFaint:"#F0EDE8",color:e.type==="project"?C.crimson:C.taupe,fontWeight:700,textTransform:"uppercase"}}>{e.type==="project"?"PROJECT":"DOSSIER"}</span></td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase}</span></td>
-<td style={{padding:"13px 18px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><HealthDot status={e.health}/><span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>{e.health==="red"?"KRITIEK":e.health==="amber"?"AMBER":"STABIEL"}</span></div></td>
-<td style={{padding:"13px 18px"}}><Avatar initials={e.manager} size={26} bg={e.dept==="TC"?C.crimson:C.taupe}/></td>
-<td style={{padding:"13px 18px"}}><button style={{padding:"5px 12px",borderRadius:7,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}>Openen</button></td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
-{/* Documents tab */}
-{activeTab==="documents"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-{docs.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><FileText size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen documenten voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DOCUMENT","TYPE","DATUM","ZICHTBAARHEID","STATUS"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{docs.map(d=>(
-<tr key={`${d.sourceType||"doc"}-${d.id}`} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"14px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div><div style={{fontSize:10,color:C.secondary}}>{d.size}</div></td>
-<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.type}</td>
-<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.date}</td>
-<td style={{padding:"14px 18px"}}><VisChip vis={d.visibility}/></td>
-<td style={{padding:"14px 18px"}}><ReviewChip status={d.status}/></td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
-{/* Invoices tab */}
-{activeTab==="invoices"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-{invoices.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Receipt size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen facturen voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS","QBO"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{invoices.map(inv=>(
-<tr key={inv.id} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"12px 18px",fontSize:12,fontWeight:700,color:C.secondary}}>{inv.ref}</td>
-<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
-<td style={{padding:"12px 18px",fontSize:12,color:C.secondary}}>{inv.due}</td>
-<td style={{padding:"14px 18px"}}><Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERSTALLIG":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
-<td style={{padding:"14px 18px"}}>{inv.qbo?(<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> SYNC</span>):(<span style={{fontSize:9,color:C.muted}}>—</span>)}</td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
 </div>
 );
 }
 
 // ─── LEAD DETAIL ─────────────────────────────────────────────────────────────
 function LeadDetail({lead,onBack,showToast}){
-const stageMap={
-TC:{new:{label:"Nieuw",pct:10},qualified:{label:"Gekwalificeerd",pct:35},proposal:{label:"Voorstel",pct:65},won:{label:"Gewonnen",pct:100}},
-FF:{inquiry:{label:"Aanvraag",pct:15},strategy_review:{label:"Strategie Review",pct:50},engaged:{label:"Betrokken",pct:85}},
-};
-const stages=lead.dept==="TC"?["new","qualified","proposal","won"]:["inquiry","strategy_review","engaged"];
-const stageLabels=stageMap[lead.dept]||stageMap.TC;
-const currentPct=stageLabels[lead.stage]?.pct||0;
-const sColor={new:C.secondary,qualified:C.amber,proposal:C.crimson,won:C.green,inquiry:C.secondary,strategy_review:C.amber,engaged:C.green};
+const stages=lead.dept==="FF"?FF_STAGES:TC_STAGES;
+const allStages=[...stages,LOST_STAGE];
+const currentStage=allStages.find(s=>s.id===lead.stage)||allStages[0];
+const currentPct=currentStage.pct;
+const [activities,setActivities]=useState([]);
 const [note,setNote]=useState("");
-const [notes,setNotes]=useState([
-{id:"1",text:"Eerste contact gelegd via netwerkevenement in Paramaribo.",time:"12 Apr 2025",author:"MR"},
-]);
-const addNote=()=>{if(!note.trim())return;setNotes(ns=>[...ns,{id:`n${Date.now()}`,text:note,time:"Nu",author:"KB"}]);setNote("");showToast("Notitie opgeslagen");};
+const [noteType,setNoteType]=useState("note");
+const [savingNote,setSavingNote]=useState(false);
+const [currentLead,setCurrentLead]=useState(lead);
+
+useEffect(()=>{
+  supabase.from("lead_activities").select("*").eq("lead_id",lead.id).order("created_at",{ascending:false})
+    .then(({data})=>setActivities(data||[])).catch(()=>{});
+},[lead.id]);
+
+const moveStage=async(newStageId)=>{
+  await supabase.from("leads").update({stage:newStageId}).eq("id",lead.id);
+  setCurrentLead(l=>({...l,stage:newStageId}));
+  showToast(`Stadium bijgewerkt naar ${allStages.find(s=>s.id===newStageId)?.label}`);
+};
+
+const addActivity=async()=>{
+  if(!note.trim()||savingNote) return;
+  setSavingNote(true);
+  try{
+    const {data}=await supabase.from("lead_activities").insert({
+      lead_id:lead.id,type:noteType,content:note.trim(),
+    }).select().single();
+    setActivities(as=>[data,...as]);
+    setNote("");
+    showToast("Activiteit opgeslagen ✓");
+  }catch(e){showToast("Fout: "+e.message);}
+  setSavingNote(false);
+};
+
+const typeIcon={note:<FileText size={12}/>,call:<Activity size={12}/>,email:<Send size={12}/>,meeting:<Users size={12}/>,stage_change:<RefreshCw size={12}/>};
+const typeColor={note:C.secondary,call:C.amber,email:C.indigo,meeting:C.crimson,stage_change:C.green};
+
 return(
 <div className="fu">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:16,padding:0}}>
-<ChevronLeft size={15}/> Terug naar leads
-</button>
-<div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+  <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:16,padding:0}}>
+    <ChevronLeft size={15}/> Terug naar leads
+  </button>
+
+  {/* Header card */}
+  <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <DeptTag dept={currentLead.dept}/>
+          <span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,background:currentStage.bg,color:currentStage.color,textTransform:"uppercase"}}>{currentStage.label}</span>
+        </div>
+        <h1 style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:C.text,margin:"0 0 4px"}}>{currentLead.name}</h1>
+        <div style={{fontSize:12,color:C.secondary}}>{currentLead.contact||"Geen contactpersoon"}{currentLead.email&&` · ${currentLead.email}`}</div>
+      </div>
+      <div style={{textAlign:"right"}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>GESCHATTE WAARDE</div>
+        <div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.crimson}}>SRD {currentLead.value?.toLocaleString()}</div>
+      </div>
+    </div>
+
+    {/* Pipeline progress bar */}
+    <div style={{marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase"}}>PIPELINE VOORTGANG</div>
+        <div style={{fontSize:10,fontWeight:700,color:currentStage.color}}>{currentPct}%</div>
+      </div>
+      <div style={{height:6,background:C.border,borderRadius:3,overflow:"hidden",marginBottom:12}}>
+        <div style={{height:"100%",width:`${currentPct}%`,background:`linear-gradient(90deg,${C.crimson},${currentStage.color})`,borderRadius:3,transition:"width .4s"}}/>
+      </div>
+      {/* Stage buttons */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {allStages.map(s=>(
+          <button key={s.id} onClick={()=>moveStage(s.id)}
+            style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${currentLead.stage===s.id?s.color:C.border}`,background:currentLead.stage===s.id?s.bg:"transparent",color:currentLead.stage===s.id?s.color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer",transition:"all .15s"}}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:16}}>
+    {/* Left: Activity log */}
+    <div>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.06)"}}>
+        <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text}}>Activiteiten & Notities</div>
+        {/* Add activity */}
+        <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,background:C.warm50}}>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            {[{v:"note",l:"Notitie"},{v:"call",l:"Gesprek"},{v:"email",l:"E-mail"},{v:"meeting",l:"Meeting"}].map(t=>(
+              <button key={t.v} onClick={()=>setNoteType(t.v)}
+                style={{padding:"4px 10px",borderRadius:16,border:`1.5px solid ${noteType===t.v?typeColor[t.v]:C.border}`,background:noteType===t.v?`${typeColor[t.v]}18`:"transparent",color:noteType===t.v?typeColor[t.v]:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                {typeIcon[t.v]} {t.l}
+              </button>
+            ))}
+          </div>
+          <textarea value={note} onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&e.metaKey)addActivity();}} rows={2}
+            placeholder={noteType==="call"?"Gespreksverslag...":noteType==="meeting"?"Verslag van de meeting...":noteType==="email"?"Samenvatting e-mail...":"Notitie toevoegen..."}
+            style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6,marginBottom:8}}/>
+          <button onClick={addActivity} disabled={!note.trim()||savingNote}
+            style={{padding:"7px 16px",borderRadius:8,background:note.trim()?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:note.trim()?"pointer":"default"}}>
+            {savingNote?"Opslaan...":"Opslaan"}
+          </button>
+        </div>
+        {/* Activity list */}
+        {activities.length===0?(
+          <div style={{padding:"28px 24px",textAlign:"center",color:C.secondary,fontSize:12}}>Nog geen activiteiten. Voeg een notitie toe om te beginnen.</div>
+        ):activities.map((a,i)=>(
+          <div key={a.id} style={{padding:"13px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",gap:12,alignItems:"flex-start"}}>
+            <div style={{width:28,height:28,borderRadius:7,background:`${typeColor[a.type]||C.secondary}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:typeColor[a.type]||C.secondary}}>
+              {typeIcon[a.type]||<FileText size={11}/>}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,color:C.text,lineHeight:1.6,marginBottom:3}}>{a.content}</div>
+              <div style={{fontSize:10,color:C.muted}}>{a.author_name||"Systeem"} · {new Date(a.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Right: Details + Actions */}
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Lead Details</div>
+        {[
+          ["Bedrijf",currentLead.name],
+          ["Contactpersoon",currentLead.contact||"—"],
+          ["E-mail",currentLead.email||"—"],
+          ["Telefoon",currentLead.phone||"—"],
+          ["Bron",currentLead.source||"—"],
+          ["Sluitdatum",currentLead.expectedClose||"—"],
+          ["Afdeling",currentLead.dept==="TC"?"Tactigent":"Fiscal Fuse"],
+        ].map(([l,v])=>(
+          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+            <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+            <span style={{fontSize:11,fontWeight:600,color:C.text,maxWidth:160,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>Acties</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {currentLead.stage!=="won"&&(
+            <button onClick={()=>moveStage("won")}
+              style={{width:"100%",padding:"9px 14px",borderRadius:9,background:C.greenBg,border:`1px solid ${C.green}40`,color:C.green,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+              <CheckCircle size={14}/> Markeer als Gewonnen
+            </button>
+          )}
+          {currentLead.stage==="won"&&(
+            <button onClick={()=>{/* convertToClient */showToast("Conversie — ga naar de lijst");}}
+              style={{width:"100%",padding:"9px 14px",borderRadius:9,background:C.crimson,border:"none",color:CREAM,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+              <Users size={14}/> Converteer naar Cliënt
+            </button>
+          )}
+          {currentLead.stage!=="lost"&&(
+            <button onClick={()=>moveStage("lost")}
+              style={{width:"100%",padding:"9px 14px",borderRadius:9,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+              <X size={14}/> Markeer als Verloren
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Notes */}
+      {currentLead.notes&&(
+        <div style={{background:C.warm50,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>NOTITIES</div>
+          <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{currentLead.notes}</div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+);
+}
+
+
+// ─── INVOICES VIEW ───────────────────────────────────────────────────────────
+function InvoicesView({user,invData,setInvData,showToast}){
+const [invoices,setInvoices]=useState([]);
+const [loading,setLoading]=useState(true);
+const [q,setQ]=useState("");
+const [statusF,setStatusF]=useState("ALL");
+const [deptF,setDeptF]=useState(user.dept==="BOTH"?"ALL":user.dept);
+const [showNew,setShowNew]=useState(false);
+const [selected,setSelected]=useState(null);
+const [companies,setCompanies]=useState([]);
+const [engagements,setEngagements]=useState([]);
+
+useEffect(()=>{
+  Promise.all([
+    supabase.from("invoices")
+      .select("id,reference_code,company_id,engagement_id,department,amount,subtotal,tax_rate,tax_amount,currency,status,due_date,paid_at,created_at,notes,description,line_items,file_url,qbo_id")
+      .order("created_at",{ascending:false}),
+    supabase.from("companies").select("id,name,department"),
+    supabase.from("engagements").select("id,name,department"),
+  ]).then(([{data:inv},{data:cos},{data:engs}])=>{
+    const compMap={};(cos||[]).forEach(c=>compMap[c.id]=c.name);
+    const engMap={};(engs||[]).forEach(e=>engMap[e.id]=e.name);
+    setCompanies(cos||[]);
+    setEngagements(engs||[]);
+    setInvoices((inv||[]).map(i=>({
+      ...i,
+      companyName:compMap[i.company_id]||"—",
+      engagementName:engMap[i.engagement_id]||"—",
+      dept:i.department,
+      dueDate:i.due_date?new Date(i.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+      paidAt:i.paid_at?new Date(i.paid_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+      createdAt:new Date(i.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}),
+      isOverdue:i.due_date&&new Date(i.due_date)<new Date()&&i.status!=="paid"&&i.status!=="cancelled",
+    })));
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[]);
+
+const filtered=invoices.filter(i=>{
+  const dOk=deptF==="ALL"||i.dept===deptF;
+  const sOk=statusF==="ALL"||(statusF==="overdue"?i.isOverdue:i.status===statusF);
+  const qOk=!q||i.companyName.toLowerCase().includes(q.toLowerCase())||i.reference_code?.toLowerCase().includes(q.toLowerCase());
+  return dOk&&sOk&&qOk;
+});
+
+// Aging buckets
+const now=new Date();
+const aging={current:0,d30:0,d60:0,d90:0};
+invoices.filter(i=>i.status!=="paid"&&i.status!=="cancelled"&&i.due_date).forEach(i=>{
+  const days=Math.floor((now-new Date(i.due_date))/(86400000));
+  if(days<=0) aging.current+=Number(i.amount)||0;
+  else if(days<=30) aging.d30+=Number(i.amount)||0;
+  else if(days<=60) aging.d60+=Number(i.amount)||0;
+  else aging.d90+=Number(i.amount)||0;
+});
+
+// KPIs
+const totalOpen=invoices.filter(i=>i.status==="sent"||i.status==="draft").reduce((s,i)=>s+Number(i.amount||0),0);
+const totalPaid=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+Number(i.amount||0),0);
+const overdueCount=invoices.filter(i=>i.isOverdue).length;
+
+const updateStatus=async(id,newStatus)=>{
+  const extra=newStatus==="paid"?{paid_at:new Date().toISOString()}:{};
+  await supabase.from("invoices").update({status:newStatus,...extra}).eq("id",id);
+  setInvoices(is=>is.map(i=>i.id===id?{...i,status:newStatus,...extra}:i));
+  if(selected?.id===id) setSelected(s=>({...s,status:newStatus}));
+  showToast(`Status bijgewerkt naar ${newStatus}`);
+};
+
+const deleteInvoice=async(id,ref)=>{
+  if(!window.confirm(`Factuur ${ref} verwijderen?`)) return;
+  await fetch(`${SB_URL}/rest/v1/invoices?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+  setInvoices(is=>is.filter(i=>i.id!==id));
+  if(selected?.id===id) setSelected(null);
+  showToast(`Factuur ${ref} verwijderd`);
+};
+
+const STATUS_META={
+  draft:{label:"Concept",color:C.secondary,bg:C.warm50},
+  sent:{label:"Verzonden",color:C.indigo,bg:C.indigoBg},
+  paid:{label:"Betaald",color:C.green,bg:C.greenBg},
+  overdue:{label:"Achterstallig",color:C.red,bg:C.redBg},
+  cancelled:{label:"Geannuleerd",color:C.muted,bg:C.warm50},
+};
+const getStatusMeta=(inv)=>inv.isOverdue&&inv.status!=="paid"?STATUS_META.overdue:STATUS_META[inv.status]||STATUS_META.draft;
+
+return(
 <div>
-<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><DeptTag dept={lead.dept}/><Badge label={stageLabels[lead.stage]?.label||lead.stage} color={sColor[lead.stage]||C.secondary} bg={C.warm50}/></div>
-<h1 style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:C.text,margin:"0 0 4px"}}>{lead.name}</h1>
-<div style={{fontSize:12,color:C.secondary}}>Adviseur: <strong style={{color:C.text}}>{lead.rep}</strong></div>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="Financiën" title="Facturen & QBO"/>
+    <button onClick={()=>setShowNew(true)}
+      style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",marginTop:4}}>
+      <Plus size={13}/> Nieuwe factuur
+    </button>
+  </div>
+
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:16}}>
+    {[
+      {l:"OPENSTAAND",v:`SRD ${(totalOpen/1000).toFixed(1)}K`,c:C.amber,bg:C.amberBg},
+      {l:"BETAALD",v:`SRD ${(totalPaid/1000).toFixed(1)}K`,c:C.green,bg:C.greenBg},
+      {l:"ACHTERSTALLIG",v:overdueCount+" facturen",c:C.red,bg:C.redBg},
+      {l:"TOTAAL FACTUREN",v:invoices.length,c:C.text,bg:C.surface},
+    ].map(k=>(
+      <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"12px 16px",border:`1px solid ${k.c}30`}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Aging analysis */}
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 20px",marginBottom:16}}>
+    <div style={{fontSize:11,fontWeight:700,color:C.text,marginBottom:12}}>Ouderdomsanalyse (A/R Aging)</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+      {[
+        {l:"Huidig",v:aging.current,c:C.green},
+        {l:"1–30 dagen",v:aging.d30,c:C.amber},
+        {l:"31–60 dagen",v:aging.d60,c:"#F97316"},
+        {l:"60+ dagen",v:aging.d90,c:C.red},
+      ].map(b=>{
+        const total=aging.current+aging.d30+aging.d60+aging.d90||1;
+        const pct=Math.round((b.v/total)*100);
+        return(
+          <div key={b.l}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+              <span style={{fontSize:10,fontWeight:700,color:b.c}}>{b.l}</span>
+              <span style={{fontSize:10,fontWeight:700,color:b.c}}>{pct}%</span>
+            </div>
+            <div style={{height:6,background:C.border,borderRadius:3,overflow:"hidden",marginBottom:5}}>
+              <div style={{height:"100%",width:`${pct}%`,background:b.c,borderRadius:3,transition:"width .4s"}}/>
+            </div>
+            <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:b.c}}>SRD {(b.v/1000).toFixed(1)}K</div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  {/* Filters */}
+  <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+    <div style={{position:"relative",flex:1,minWidth:200,maxWidth:320}}>
+      <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek op cliënt of referentie..."
+        style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+      {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+    </div>
+    {["ALL","draft","sent","overdue","paid","cancelled"].map(s=>{
+      const meta=s==="ALL"?{label:"Alle",color:C.crimson,bg:C.crimsonFaint}:s==="overdue"?STATUS_META.overdue:STATUS_META[s]||STATUS_META.draft;
+      return(
+        <button key={s} onClick={()=>setStatusF(s)}
+          style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${statusF===s?meta.color:C.border}`,background:statusF===s?meta.bg:"transparent",color:statusF===s?meta.color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+          {meta.label||s}
+        </button>
+      );
+    })}
+    {user.dept==="BOTH"&&["ALL","TC","FF"].map(d=>(
+      <button key={d} onClick={()=>setDeptF(d)}
+        style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${deptF===d?C.crimson:C.border}`,background:deptF===d?C.crimson:"transparent",color:deptF===d?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {d==="ALL"?"Alle":d}
+      </button>
+    ))}
+  </div>
+
+  {/* Table */}
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.07)"}}>
+    {loading?(
+      <div style={{padding:"40px 24px",textAlign:"center",color:C.secondary}}>Laden...</div>
+    ):filtered.length===0?(
+      <div style={{padding:"52px 24px",textAlign:"center"}}>
+        <Receipt size={32} color={C.mushroom} style={{marginBottom:12}}/>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen facturen gevonden</div>
+        <button onClick={()=>setShowNew(true)} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",marginTop:8}}>
+          <Plus size={13}/> Eerste factuur aanmaken
+        </button>
+      </div>
+    ):(
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead>
+          <tr style={{background:C.warm50}}>
+            {["REFERENTIE","CLIËNT","AFDELING","BEDRAG","VERVALDATUM","STATUS","ACTIES"].map((h,i)=>(
+              <th key={i} style={{padding:"10px 16px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map(inv=>{
+            const meta=getStatusMeta(inv);
+            return(
+              <tr key={inv.id} onClick={()=>setSelected(inv)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer",background:inv.isOverdue?"#FFF8F8":"transparent"}}>
+                <td style={{padding:"13px 16px"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.crimson}}>{inv.reference_code||inv.ref||"—"}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{inv.createdAt}</div>
+                </td>
+                <td style={{padding:"13px 16px"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text}}>{inv.companyName}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{inv.engagementName}</div>
+                </td>
+                <td style={{padding:"13px 16px"}}><DeptTag dept={inv.dept}/></td>
+                <td style={{padding:"13px 16px"}}>
+                  <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>SRD {Number(inv.amount||0).toLocaleString()}</div>
+                  <div style={{fontSize:9,color:C.secondary}}>{inv.currency||"SRD"}</div>
+                </td>
+                <td style={{padding:"13px 16px",fontSize:12,color:inv.isOverdue?C.red:C.secondary,fontWeight:inv.isOverdue?700:400}}>
+                  {inv.dueDate}
+                  {inv.isOverdue&&<div style={{fontSize:9,color:C.red,fontWeight:700}}>ACHTERSTALLIG</div>}
+                </td>
+                <td style={{padding:"13px 16px"}}>
+                  <span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,background:meta.bg,color:meta.color,textTransform:"uppercase",whiteSpace:"nowrap"}}>{meta.label}</span>
+                </td>
+                <td style={{padding:"13px 16px"}}>
+                  <div style={{display:"flex",gap:5}} onClick={e=>e.stopPropagation()}>
+                    {inv.status==="draft"&&(
+                      <button onClick={()=>updateStatus(inv.id,"sent")}
+                        style={{padding:"4px 9px",borderRadius:7,background:C.indigoBg,border:`1px solid ${C.indigo}40`,color:C.indigo,fontSize:9,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                        Verzend
+                      </button>
+                    )}
+                    {(inv.status==="sent"||inv.isOverdue)&&(
+                      <button onClick={()=>updateStatus(inv.id,"paid")}
+                        style={{padding:"4px 9px",borderRadius:7,background:C.greenBg,border:`1px solid ${C.green}40`,color:C.green,fontSize:9,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                        Betaald
+                      </button>
+                    )}
+                    <button onClick={()=>deleteInvoice(inv.id,inv.reference_code||inv.ref)}
+                      style={{padding:"4px 8px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                      <X size={10}/>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  {/* Invoice detail modal */}
+  {selected&&(
+    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
+      <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:640,maxWidth:"95vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden"}}>
+        {/* Header */}
+        <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Factuurdetails</div>
+            <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>{selected.reference_code||selected.ref||"Factuur"}</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            {selected.file_url&&(
+              <a href={selected.file_url} target="_blank" rel="noopener"
+                style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:9,background:C.crimson,color:CREAM,fontSize:11,fontWeight:700,textDecoration:"none"}}>
+                <Download size={12}/> PDF
+              </a>
+            )}
+            <button onClick={()=>setSelected(null)} style={{width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={14}/></button>
+          </div>
+        </div>
+        {/* Body */}
+        <div style={{overflowY:"auto",padding:"22px"}}>
+          {/* Meta grid */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+            <div style={{background:C.warm50,borderRadius:12,padding:"14px 16px"}}>
+              {[["Cliënt",selected.companyName],["Engagement",selected.engagementName],["Afdeling",selected.dept]].map(([l,v])=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+                  <span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{background:C.warm50,borderRadius:12,padding:"14px 16px"}}>
+              {[["Aangemaakt",selected.createdAt],["Vervaldatum",selected.dueDate],["Betaald op",selected.paidAt]].map(([l,v])=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+                  <span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Line items */}
+          {(selected.line_items?.length>0)&&(
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>REGELPOSTEN</div>
+              <div style={{background:C.warm50,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr style={{background:C.border+"40"}}>
+                    {["OMSCHRIJVING","UREN/QTY","TARIEF","TOTAAL"].map((h,i)=>(
+                      <th key={i} style={{padding:"8px 12px",textAlign:i>0?"right":"left",fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.06em",textTransform:"uppercase"}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {selected.line_items.map((item,i)=>(
+                      <tr key={i} style={{borderTop:`1px solid ${C.border}`}}>
+                        <td style={{padding:"9px 12px",fontSize:12,color:C.text}}>{item.description||item.desc||"—"}</td>
+                        <td style={{padding:"9px 12px",fontSize:12,color:C.text,textAlign:"right"}}>{item.qty||item.hours||1}</td>
+                        <td style={{padding:"9px 12px",fontSize:12,color:C.text,textAlign:"right"}}>SRD {Number(item.rate||item.price||0).toLocaleString()}</td>
+                        <td style={{padding:"9px 12px",fontSize:12,fontWeight:700,color:C.text,textAlign:"right"}}>SRD {Number((item.qty||item.hours||1)*(item.rate||item.price||0)).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {/* Totals */}
+          <div style={{background:C.darkAccent,borderRadius:12,padding:"16px 20px",color:C.onDark}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontSize:12,opacity:0.7}}>Subtotaal</span>
+              <span style={{fontSize:12,fontWeight:600}}>SRD {Number(selected.subtotal||selected.amount||0).toLocaleString()}</span>
+            </div>
+            {Number(selected.tax_rate||0)>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontSize:12,opacity:0.7}}>BTW ({selected.tax_rate}%)</span>
+                <span style={{fontSize:12,fontWeight:600}}>SRD {Number(selected.tax_amount||0).toLocaleString()}</span>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,.15)",paddingTop:10,marginTop:4}}>
+              <span style={{fontSize:14,fontWeight:700}}>TOTAAL</span>
+              <span style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:C.onDark}}>SRD {Number(selected.amount||0).toLocaleString()}</span>
+            </div>
+          </div>
+          {/* Status actions */}
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            {selected.status==="draft"&&<button onClick={()=>updateStatus(selected.id,"sent")} style={{flex:1,padding:"10px",borderRadius:9,background:C.indigo,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Markeer als Verzonden</button>}
+            {(selected.status==="sent"||selected.isOverdue)&&<button onClick={()=>updateStatus(selected.id,"paid")} style={{flex:1,padding:"10px",borderRadius:9,background:C.green,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><CheckCircle size={14}/> Markeer als Betaald</button>}
+            {selected.status!=="cancelled"&&selected.status!=="paid"&&<button onClick={()=>updateStatus(selected.id,"cancelled")} style={{padding:"10px 14px",borderRadius:9,background:C.redBg,border:`1px solid ${C.red}40`,color:C.red,fontSize:12,fontWeight:700,cursor:"pointer"}}>Annuleer</button>}
+            {selected.qbo_id&&<div style={{padding:"10px 14px",borderRadius:9,background:C.greenBg,border:`1px solid ${C.green}40`,fontSize:11,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:5}}><CheckCircle size={12}/> QBO #{selected.qbo_id}</div>}
+          </div>
+          {selected.notes&&<div style={{marginTop:14,padding:"12px 14px",borderRadius:9,background:C.warm50,border:`1px solid ${C.border}`,fontSize:12,color:C.secondary,lineHeight:1.6}}>{selected.notes}</div>}
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* New invoice modal */}
+  {showNew&&<NewInvoiceModal user={user} companies={companies} engagements={engagements} onClose={()=>setShowNew(false)}
+    onCreated={inv=>{setInvoices(is=>[inv,...is]);showToast(`Factuur ${inv.reference_code} aangemaakt ✓`);}} showToast={showToast}/>}
 </div>
-<div style={{textAlign:"right"}}>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>GESCHATTE WAARDE</div>
-<div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.crimson}}>SRD {lead.value.toLocaleString()}</div>
-</div>
-</div>
-{/* Pipeline progress */}
-<div style={{marginTop:12}}>
-<div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:10}}>PIPELINE VOORTGANG</div>
-<div style={{display:"flex",alignItems:"center",marginBottom:8}}>
-{stages.map((s,i)=>(
-<div key={s} style={{display:"flex",alignItems:"center",flex:1}}>
-<div style={{display:"flex",flexDirection:"column",alignItems:"center",flex:1}}>
-<div style={{width:26,height:26,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:stages.indexOf(lead.stage)>=i?C.crimson:C.bg,border:`2px solid ${stages.indexOf(lead.stage)>=i?C.crimson:C.border}`,marginBottom:4}}>
-{stages.indexOf(lead.stage)>i?<CheckCircle size={13} color={CREAM}/>:<span style={{fontSize:9,fontWeight:700,color:stages.indexOf(lead.stage)===i?CREAM:C.secondary}}>{i+1}</span>}
-</div>
-<span style={{fontSize:8.5,fontWeight:700,color:stages.indexOf(lead.stage)>=i?C.crimson:C.secondary,textAlign:"center"}}>{stageLabels[s]?.label||s}</span>
-</div>
-{i<stages.length-1&&<div style={{height:2,flex:1,background:stages.indexOf(lead.stage)>i?C.crimson:C.border,margin:"0 2px",marginBottom:18}}/>}
-</div>
-))}
-</div>
-<div style={{height:6,background:C.border,borderRadius:3}}>
-<div style={{height:"100%",width:`${currentPct}%`,background:`linear-gradient(90deg,${C.crimson},${C.crimsonMid})`,borderRadius:3,transition:"width .4s"}}/>
-</div>
-</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Lead Details</div>
-{[["Bedrijf",lead.name],["Afdeling",lead.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"],["Huidig Stadium",stageLabels[lead.stage]?.label||lead.stage],["Geschatte Waarde",`SRD ${lead.value.toLocaleString()}`],["Toegewezen aan",lead.rep==="MR"?"Adviseur TC":lead.rep==="PS"?"Adviseur FF":"Beheerder"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Acties</div>
-<div style={{display:"flex",flexDirection:"column",gap:8}}>
-{[{label:"Voorstel Versturen",bg:C.crimson},{label:"Stadium Bijwerken",bg:C.walnut},{label:"Herinnering Plannen",bg:C.bg,color:C.text,border:true}].map(a=>(
-<button key={a.label} onClick={()=>showToast(`${a.label} — gesimuleerd`)} style={{width:"100%",padding:"10px",borderRadius:9,background:a.bg,color:a.color||CREAM,border:a.border?`1.5px solid ${C.border}`:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>{a.label}</button>
-))}
-</div>
-</div>
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px 20px",display:"flex",flexDirection:"column"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Activiteitslog & Notities</div>
-<div style={{flex:1,overflowY:"auto",marginBottom:12,display:"flex",flexDirection:"column",gap:10}}>
-{notes.map(n=>(
-<div key={n.id} style={{padding:"10px 12px",borderRadius:9,background:C.bg,border:`1px solid ${C.border}`}}>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-<span style={{fontSize:11,fontWeight:700,color:C.text}}>{n.author}</span>
-<span style={{fontSize:9,color:C.secondary}}>{n.time}</span>
-</div>
-<div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{n.text}</div>
-</div>
-))}
-</div>
-<div style={{display:"flex",gap:8}}>
-<input value={note} onChange={e=>setNote(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addNote()} placeholder="Voeg notitie toe..." style={{flex:1,padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<button onClick={addNote} style={{padding:"8px 14px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",cursor:"pointer",fontSize:11,fontWeight:700}}>+</button>
-</div>
-</div>
+);
+}
+
+function NewInvoiceModal({user,companies,engagements,onClose,onCreated,showToast}){
+const [companyId,setCompanyId]=useState("");
+const [engId,setEngId]=useState("");
+const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
+const [dueDate,setDueDate]=useState("");
+const [notes,setNotes]=useState("");
+const [taxRate,setTaxRate]=useState(0);
+const [lineItems,setLineItems]=useState([{description:"",qty:1,rate:0}]);
+const [saving,setSaving]=useState(false);
+
+useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
+const subtotal=lineItems.reduce((s,i)=>s+((Number(i.qty)||0)*(Number(i.rate)||0)),0);
+const taxAmount=subtotal*(Number(taxRate)||0)/100;
+const total=subtotal+taxAmount;
+
+const addLine=()=>setLineItems(ls=>[...ls,{description:"",qty:1,rate:0}]);
+const updateLine=(idx,field,val)=>setLineItems(ls=>ls.map((l,i)=>i===idx?{...l,[field]:val}:l));
+const removeLine=(idx)=>setLineItems(ls=>ls.filter((_,i)=>i!==idx));
+
+const submit=async()=>{
+  if(saving||!companyId) return;
+  setSaving(true);
+  try{
+    const ref=`INV-${dept}-${Date.now().toString().slice(-6)}`;
+    const {data,error}=await supabase.from("invoices").insert({
+      reference_code:ref,
+      company_id:companyId||null,
+      engagement_id:engId||null,
+      department:dept,
+      amount:total,
+      subtotal,
+      tax_rate:Number(taxRate)||0,
+      tax_amount:taxAmount,
+      currency:"SRD",
+      status:"draft",
+      due_date:dueDate||null,
+      notes:notes||null,
+      line_items:lineItems,
+    }).select().single();
+    if(error) throw new Error(error.message);
+    const compName=(companies.find(c=>c.id===companyId)||{}).name||"—";
+    const engName=(engagements.find(e=>e.id===engId)||{}).name||"—";
+    onCreated({...data,companyName:compName,engagementName:engName,dept,
+      dueDate:dueDate?new Date(dueDate).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+      paidAt:"—",createdAt:new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}),
+      isOverdue:false,
+    });
+    onClose();
+  }catch(e){showToast("Fout: "+e.message);}
+  setSaving(false);
+};
+
+const filtCos=companies.filter(c=>dept==="BOTH"||c.department===dept);
+const filtEngs=engagements.filter(e=>dept==="BOTH"||e.department===dept);
+
+return(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:620,maxWidth:"95vw",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Factuur</div>
+    <button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+  </div>
+  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    {/* Dept */}
+    {user.dept==="BOTH"&&(
+      <div style={{display:"flex",gap:8}}>
+        {["TC","FF"].map(d=>(
+          <button key={d} onClick={()=>setDept(d)}
+            style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {d==="TC"?"Tactigent":"Fiscal Fuse"}
+          </button>
+        ))}
+      </div>
+    )}
+    {/* Client + Engagement */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
+        <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${companyId?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+          <option value="">— Selecteer cliënt —</option>
+          {filtCos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>ENGAGEMENT</div>
+        <select value={engId} onChange={e=>setEngId(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+          <option value="">— Optioneel —</option>
+          {filtEngs.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+      </div>
+    </div>
+    {/* Due date + BTW */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>VERVALDATUM</div>
+        <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,boxSizing:"border-box"}}/>
+      </div>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>BTW %</div>
+        <input type="number" value={taxRate} onChange={e=>setTaxRate(e.target.value)} min="0" max="100" placeholder="0"
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",background:C.bg,color:C.text,boxSizing:"border-box"}}/>
+      </div>
+    </div>
+    {/* Line items */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>REGELPOSTEN</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {lineItems.map((item,i)=>(
+          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 80px 100px 28px",gap:6,alignItems:"center"}}>
+            <input value={item.description} onChange={e=>updateLine(i,"description",e.target.value)} placeholder="Omschrijving..."
+              style={{padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",background:C.bg,color:C.text}}/>
+            <input type="number" value={item.qty} onChange={e=>updateLine(i,"qty",e.target.value)} min="0" placeholder="1"
+              style={{padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",background:C.bg,color:C.text,textAlign:"right"}}/>
+            <input type="number" value={item.rate} onChange={e=>updateLine(i,"rate",e.target.value)} min="0" placeholder="0"
+              style={{padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",background:C.bg,color:C.text,textAlign:"right"}}/>
+            <button onClick={()=>removeLine(i)} style={{width:26,height:26,borderRadius:6,border:"none",background:C.redBg,color:C.red,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <X size={10}/>
+            </button>
+          </div>
+        ))}
+        <button onClick={addLine}
+          style={{padding:"7px",borderRadius:8,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <Plus size={11}/> Regelpost toevoegen
+        </button>
+      </div>
+    </div>
+    {/* Totals preview */}
+    <div style={{background:C.warm50,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`}}>
+      {[["Subtotaal",`SRD ${subtotal.toLocaleString()}`],Number(taxRate)>0&&[`BTW (${taxRate}%)`,`SRD ${taxAmount.toLocaleString()}`],["Totaal",`SRD ${total.toLocaleString()}`]].filter(Boolean).map(([l,v],i,arr)=>(
+        <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:i<arr.length-1?`1px solid ${C.border}`:"none"}}>
+          <span style={{fontSize:i===arr.length-1?13:11,fontWeight:i===arr.length-1?700:400,color:C.text}}>{l}</span>
+          <span style={{fontSize:i===arr.length-1?15:11,fontWeight:700,color:i===arr.length-1?C.crimson:C.text,fontFamily:i===arr.length-1?F.display:F.body}}>{v}</span>
+        </div>
+      ))}
+    </div>
+    {/* Notes */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>NOTITIES</div>
+      <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} placeholder="Betalingsinstructies, opmerkingen..."
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text}}/>
+    </div>
+  </div>
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+    <button onClick={submit} disabled={!companyId||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:companyId?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:companyId?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <Receipt size={14}/>{saving?"Aanmaken...":"Factuur aanmaken als concept"}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
 </div>
 </div>
 );
 }
 
 
-// ─── MARKETING VIEW ──────────────────────────────────────────────────────────
-function MarketingView({user,showToast}){
-const [tab,setTab]=useState("overview");
-const [campaigns,setCampaigns]=useState(MARKETING_CAMPAIGNS);
-const [channels,setChannels]=useState(SOCIAL_CHANNELS);
-const [composerOpen,setComposerOpen]=useState(false);
-const [postComposerOpen,setPostComposerOpen]=useState(null); // channel id
-const [editCampaign,setEditCampaign]=useState(null);
-const [selectedChannel,setSelectedChannel]=useState(null);
+// ─── NOTIFICATIONS VIEW ──────────────────────────────────────────────────────
+function NotificationsView({notifData,setNotifData}){
+const [filter,setFilter]=useState("ALL");
+const [q,setQ]=useState("");
 
-const sColor={sent:C.green,draft:C.secondary,scheduled:C.amber};
-const sBg={sent:C.greenBg,draft:C.warm50,scheduled:C.amberBg};
-const sLabel={sent:"VERZONDEN",draft:"CONCEPT",scheduled:"GEPLAND"};
-const platformColor={linkedin:"#0A66C2",instagram:"#E1306C",facebook:"#1877F2",x:"#14171A"};
-const platformLabel={linkedin:"LinkedIn",instagram:"Instagram",facebook:"Facebook",x:"X (Twitter)"};
-const platformIcon={
-linkedin:<Globe size={18} color={CREAM}/>,
-instagram:<Globe size={18} color={CREAM}/>,
-facebook:<Globe size={18} color={CREAM}/>,
-x:<Globe size={18} color={CREAM}/>
+const TYPE_META={
+  info:    {label:"Info",     color:C.secondary, bg:C.warm50,     Icon:Activity},
+  success: {label:"Succes",   color:C.green,     bg:C.greenBg,    Icon:CheckCircle},
+  warning: {label:"Aandacht", color:C.amber,     bg:C.amberBg,    Icon:AlertTriangle},
+  error:   {label:"Fout",     color:C.red,       bg:C.redBg,      Icon:X},
+  review:  {label:"Review",   color:C.indigo,    bg:C.indigoBg,   Icon:ClipboardList},
+  invoice: {label:"Factuur",  color:C.crimson,   bg:C.crimsonFaint,Icon:Receipt},
+  lead:    {label:"Lead",     color:C.walnut,    bg:C.warm50,     Icon:TrendingUp},
+  document:{label:"Document", color:C.blue,      bg:C.blueBg,     Icon:FileText},
 };
 
-const vis=user.dept==="BOTH";
-const visC=vis?campaigns:campaigns.filter(c=>c.dept===user.dept||c.dept==="BOTH");
-const visCh=vis?channels:channels.filter(c=>c.dept===user.dept||c.dept==="BOTH");
+const [notifs,setNotifs]=useState([]);
+const [loading,setLoading]=useState(true);
 
-const totalReach=visC.filter(c=>c.status==="sent").reduce((s,c)=>s+c.recipients,0);
-const sentCampaigns=visC.filter(c=>c.status==="sent");
-const avgOpen=sentCampaigns.length?Math.round(sentCampaigns.reduce((s,c)=>s+parseInt(c.openRate||0),0)/sentCampaigns.length):0;
-const connectedChannels=visCh.filter(c=>c.connected);
-const totalFollowers=connectedChannels.reduce((s,c)=>s+parseInt(c.followers.replace(/[^0-9.]/g,""))*1000,0);
+useEffect(()=>{
+  supabase.from("notifications")
+    .select("id,title,body,is_read,created_at,action_type,entity_type,entity_id,company_id,archived")
+    .order("created_at",{ascending:false})
+    .limit(100)
+    .then(({data})=>{
+      setNotifs((data||[]).map(n=>({
+        ...n,
+        read:n.is_read,
+        type:n.action_type||n.entity_type||"info",
+        time:formatNotifTime(new Date(n.created_at)),
+      })));
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+},[]);
 
-// Sparkline data
-const openRateData=[52,61,58,68,65,72,68];
-const reachData=[180,220,310,280,342,400,380];
-const months=["Nov","Dec","Jan","Feb","Mrt","Apr","Mei"];
-
-const advance=async(c)=>{
-const isSchedule=c.status==="draft";
-const newRecip=isSchedule?Math.floor(Math.random()*350)+80:c.recipients;
-const newRate=!isSchedule?Math.floor(Math.random()*30+50)+"%":undefined;
-const newStatus=isSchedule?"scheduled":"sent";
-setCampaigns(cs=>cs.map(x=>x.id===c.id?{...x,status:newStatus,recipients:newRecip,...(newRate?{openRate:newRate}:{})}:x));
-showToast(isSchedule?"Campagne ingepland":"Campagne verzonden!");
-updateCampaign(c.id,{status:newStatus,recipients:newRecip,...(newRate?{open_rate:newRate}:{})}).catch(e=>console.warn("updateCampaign:",e.message));
+const formatNotifTime=(d)=>{
+  const diff=(new Date()-d)/1000;
+  if(diff<60) return "Zojuist";
+  if(diff<3600) return `${Math.floor(diff/60)}m geleden`;
+  if(diff<86400) return `${Math.floor(diff/3600)}u geleden`;
+  return d.toLocaleDateString("nl-SR",{day:"2-digit",month:"short"});
 };
 
-const tabs=[
-{id:"overview",label:"Dashboard",Icon:LayoutDashboard},
-{id:"campaigns",label:"Campagnes",Icon:Mail},
-{id:"social",label:"Social Media",Icon:Globe},
-{id:"analytics",label:"Analytics",Icon:BarChart3},
-];
+const markRead=async(id)=>{
+  setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,is_read:true}:n));
+  await supabase.from("notifications").update({is_read:true}).eq("id",id);
+};
+
+const archiveNotif=async(id)=>{
+  setNotifs(ns=>ns.filter(n=>n.id!==id));
+  await supabase.from("notifications").update({archived:true,is_read:true}).eq("id",id);
+};
+
+const markAllRead=async()=>{
+  setNotifs(ns=>ns.map(n=>({...n,read:true,is_read:true})));
+  await supabase.from("notifications").update({is_read:true}).eq("is_read",false);
+};
+
+const unread=notifs.filter(n=>!n.read&&!n.is_read);
+
+const filtered=notifs.filter(n=>{
+  if(n.archived) return false;
+  const fOk=filter==="ALL"||(filter==="unread"?!n.read:n.type===filter);
+  const qOk=!q||n.title?.toLowerCase().includes(q.toLowerCase())||n.body?.toLowerCase().includes(q.toLowerCase());
+  return fOk&&qOk;
+});
+
+// Group by date
+const groups={};
+filtered.forEach(n=>{
+  const d=new Date(n.created_at);
+  const diff=Math.floor((new Date()-d)/86400000);
+  const key=diff===0?"Vandaag":diff===1?"Gisteren":d.toLocaleDateString("nl-SR",{weekday:"long",day:"2-digit",month:"long"});
+  if(!groups[key]) groups[key]=[];
+  groups[key].push(n);
+});
 
 return(
 <div>
-{/* Header */}
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-<PageHeader kicker="Marketing & Sales" title="Marketing Hub"/>
-<div style={{display:"flex",gap:8,marginTop:4}}>
-<button onClick={()=>setComposerOpen(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.darkAccent,color:C.onDark,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-<Mail size={13}/> Nieuwe Campagne
-</button>
-<button onClick={()=>setPostComposerOpen("new")} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:10,background:C.crimson,color:C.onDark,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-<Plus size={13}/> Social Post
-</button>
-</div>
-</div>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="Systeem" title="Notificaties"/>
+    <div style={{display:"flex",gap:8,marginTop:4}}>
+      {unread.length>0&&(
+        <button onClick={markAllRead}
+          style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+          <CheckCircle size={13}/> Alles gelezen
+        </button>
+      )}
+    </div>
+  </div>
 
-
-  {/* KPI strip — always visible */}
-  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
     {[
-      {l:"TOTAAL BEREIK",v:totalReach.toLocaleString(),s:"Ontvangers dit kwartaal",Icon:Users,c:C.crimson,trend:"+12%"},
-      {l:"GEM. OPEN RATE",v:`${avgOpen}%`,s:"Over alle campagnes",Icon:TrendingUp,c:C.green,trend:"+4pt"},
-      {l:"VOLGERS (TOTAAL)",v:`${(totalFollowers/1000).toFixed(1)}K`,s:`${connectedChannels.length} kanalen actief`,Icon:Globe,c:C.blue,trend:"+8%"},
-      {l:"ACTIEVE CAMPAGNES",v:visC.filter(c=>c.status!=="sent").length,s:`${visC.filter(c=>c.status==="sent").length} verzonden`,Icon:Activity,c:C.amber,trend:""},
+      {l:"ONGELEZEN",v:notifs.filter(n=>!n.read&&!n.is_read).length,c:C.crimson,cursor:true,f:"unread"},
+      {l:"REVIEWS",v:notifs.filter(n=>n.type==="review").length,c:C.indigo,cursor:true,f:"review"},
+      {l:"FACTUREN",v:notifs.filter(n=>n.type==="invoice").length,c:C.amber,cursor:true,f:"invoice"},
+      {l:"TOTAAL",v:notifs.filter(n=>!n.archived).length,c:C.text,cursor:false,f:"ALL"},
     ].map(k=>(
-      <div key={k.l} style={{background:C.surface,borderRadius:14,padding:"16px 18px",border:`1px solid ${C.border}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-          <div style={{fontSize:8.5,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase"}}>{k.l}</div>
-          <div style={{width:28,height:28,borderRadius:8,background:`${k.c}18`,display:"flex",alignItems:"center",justifyContent:"center"}}><k.Icon size={13} color={k.c}/></div>
-        </div>
-        <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:C.text,lineHeight:1}}>{k.v}</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
-          <div style={{fontSize:10,color:C.secondary}}>{k.s}</div>
-          {k.trend&&<div style={{fontSize:10,fontWeight:700,color:C.green}}>{k.trend}</div>}
-        </div>
+      <div key={k.l} onClick={k.cursor?()=>setFilter(filter===k.f?"ALL":k.f):undefined}
+        style={{background:C.surface,borderRadius:12,padding:"12px 16px",border:`1px solid ${filter===k.f?k.c:C.border}`,cursor:k.cursor?"pointer":"default",transition:"border-color .15s"}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:k.c}}>{k.v}</div>
       </div>
     ))}
   </div>
 
-  {/* Tab nav */}
-  <div style={{display:"flex",gap:2,marginBottom:16,background:C.bg,borderRadius:12,padding:4,width:"fit-content"}}>
-    {tabs.map(tb=>(
-      <button key={tb.id} onClick={()=>setTab(tb.id)} style={{padding:"8px 16px",borderRadius:9,border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:7,background:tab===tb.id?C.surface:"transparent",color:tab===tb.id?C.text:C.secondary,fontWeight:tab===tb.id?700:400,fontSize:12,boxShadow:tab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
-        <tb.Icon size={13}/>{tb.label}
+  {/* Filter bar */}
+  <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+    <div style={{position:"relative",flex:1,minWidth:200,maxWidth:320}}>
+      <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek notificaties..."
+        style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+      {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+    </div>
+    {[["ALL","Alle"],["unread","Ongelezen"],["success","Succes"],["warning","Aandacht"],["review","Review"],["invoice","Factuur"]].map(([v,l])=>(
+      <button key={v} onClick={()=>setFilter(v)}
+        style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${filter===v?C.crimson:C.border}`,background:filter===v?C.crimson:"transparent",color:filter===v?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {l}
+      </button>
+    ))}
+  </div>
+
+  {/* Notification list grouped by date */}
+  {loading?(
+    <div style={{background:C.surface,borderRadius:14,padding:"40px 24px",textAlign:"center",color:C.secondary,border:`1px solid ${C.border}`}}>Laden...</div>
+  ):filtered.length===0?(
+    <div style={{background:C.surface,borderRadius:14,padding:"52px 24px",textAlign:"center",border:`1px solid ${C.border}`}}>
+      <CheckCircle size={32} color={C.green} style={{marginBottom:12}}/>
+      <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Alles bijgewerkt</div>
+      <div style={{fontSize:12,color:C.secondary}}>Geen notificaties om te tonen.</div>
+    </div>
+  ):(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {Object.entries(groups).map(([dateLabel,groupNotifs])=>(
+        <div key={dateLabel}>
+          {/* Date divider */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase",whiteSpace:"nowrap"}}>{dateLabel}</div>
+            <div style={{flex:1,height:1,background:C.border}}/>
+            <div style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{groupNotifs.length} notificaties</div>
+          </div>
+          <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.06)"}}>
+            {groupNotifs.map((n,i)=>{
+              const meta=TYPE_META[n.type]||TYPE_META.info;
+              const IconComp=meta.Icon;
+              return(
+                <div key={n.id}
+                  onClick={()=>markRead(n.id)}
+                  style={{
+                    padding:"14px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",
+                    display:"flex",alignItems:"flex-start",gap:14,cursor:"pointer",
+                    background:!n.read&&!n.is_read?`${meta.color}06`:"transparent",
+                    transition:"background .15s",
+                  }}>
+                  {/* Unread indicator */}
+                  <div style={{position:"relative",flexShrink:0}}>
+                    <div style={{width:36,height:36,borderRadius:9,background:meta.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <IconComp size={14} color={meta.color}/>
+                    </div>
+                    {!n.read&&!n.is_read&&(
+                      <div style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:C.crimson,border:`2px solid ${C.surface}`}}/>
+                    )}
+                  </div>
+                  {/* Content */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                      <span style={{fontSize:13,fontWeight:!n.read&&!n.is_read?700:600,color:C.text}}>{n.title}</span>
+                      <span style={{fontSize:9,fontWeight:700,background:meta.bg,color:meta.color,padding:"2px 7px",borderRadius:4,textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{meta.label}</span>
+                    </div>
+                    {n.body&&<div style={{fontSize:12,color:C.secondary,lineHeight:1.5}}>{n.body}</div>}
+                  </div>
+                  {/* Right: time + archive */}
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
+                    <span style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{n.time}</span>
+                    <button
+                      onClick={e=>{e.stopPropagation();archiveNotif(n.id);}}
+                      title="Archiveer"
+                      style={{width:22,height:22,borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.mushroom,opacity:0.6}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity=1}
+                      onMouseLeave={e=>e.currentTarget.style.opacity=0.6}>
+                      <X size={10}/>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+);
+}
+
+
+// ─── MARKETING HUB ───────────────────────────────────────────────────────────
+function MarketingView({user,showToast}){
+const [tab,setTab]=useState("overview");
+const [campaigns,setCampaigns]=useState([]);
+const [posts,setPosts]=useState([]);
+const [loading,setLoading]=useState(true);
+const [showNewCampaign,setShowNewCampaign]=useState(false);
+const [showNewPost,setShowNewPost]=useState(false);
+const [selectedCampaign,setSelectedCampaign]=useState(null);
+
+// Load from DB
+useEffect(()=>{
+  Promise.all([
+    supabase.from("campaigns").select("*").order("created_at",{ascending:false}),
+    supabase.from("social_posts").select("*").order("created_at",{ascending:false}),
+  ]).then(([{data:camps},{data:socials}])=>{
+    setCampaigns((camps||[]).map(c=>({
+      ...c,dept:c.department,
+      sentDate:c.sent_at?new Date(c.sent_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+      scheduledDate:c.scheduled_at?new Date(c.scheduled_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+    })));
+    setPosts((socials||[]).map(p=>({...p,dept:p.department})));
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[]);
+
+const userCamps=user.dept==="BOTH"?campaigns:campaigns.filter(c=>c.department===user.dept||c.department==="BOTH");
+const userPosts=user.dept==="BOTH"?posts:posts.filter(p=>p.department===user.dept||p.department==="BOTH");
+
+// KPIs
+const sentCamps=userCamps.filter(c=>c.status==="sent");
+const totalReach=sentCamps.reduce((s,c)=>s+Number(c.recipients||0),0);
+const avgOpen=sentCamps.length?Math.round(sentCamps.reduce((s,c)=>s+Number(c.open_rate||0),0)/sentCamps.length):0;
+const totalLikes=userPosts.reduce((s,p)=>s+Number(p.likes||0),0);
+const totalReachSocial=userPosts.reduce((s,p)=>s+Number(p.reach||0),0);
+
+const STATUS_META={
+  draft:    {label:"Concept",   color:C.secondary,bg:C.warm50},
+  scheduled:{label:"Gepland",   color:C.amber,    bg:C.amberBg},
+  sent:     {label:"Verzonden", color:C.green,     bg:C.greenBg},
+  archived: {label:"Archief",   color:C.muted,     bg:C.warm50},
+  published:{label:"Gepubliceerd",color:C.green,   bg:C.greenBg},
+};
+const PLATFORM_COLOR={linkedin:"#0A66C2",instagram:"#E1306C",facebook:"#1877F2",x:"#14171A"};
+const PLATFORM_LABEL={linkedin:"LinkedIn",instagram:"Instagram",facebook:"Facebook",x:"X (Twitter)"};
+const TYPE_LABEL={email:"E-mail",social:"Social",event:"Evenement",webinar:"Webinar"};
+const TYPE_ICON={email:<Mail size={13}/>,social:<Globe size={13}/>,event:<Users size={13}/>,webinar:<Activity size={13}/>};
+const SEG_LABEL={all:"Alle contacten",TC_clients:"TC Cliënten",FF_clients:"FF Cliënten",leads:"Leads",custom:"Aangepast"};
+
+const advanceCampaign=async(camp)=>{
+  const next=camp.status==="draft"?"scheduled":camp.status==="scheduled"?"sent":null;
+  if(!next) return;
+  const extra=next==="sent"?{sent_at:new Date().toISOString(),recipients:Math.floor(Math.random()*150)+20,open_rate:Math.floor(Math.random()*30)+45}:{scheduled_at:new Date(Date.now()+86400000*3).toISOString()};
+  await supabase.from("campaigns").update({status:next,...extra}).eq("id",camp.id);
+  setCampaigns(cs=>cs.map(c=>c.id===camp.id?{...c,status:next,...extra,sentDate:next==="sent"?new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):c.sentDate}:c));
+  if(selectedCampaign?.id===camp.id) setSelectedCampaign(s=>({...s,status:next,...extra}));
+  showToast(next==="scheduled"?"Campagne ingepland ✓":"Campagne verzonden ✓");
+};
+
+const deleteCampaign=async(id,title)=>{
+  if(!window.confirm(`Campagne "${title}" verwijderen?`)) return;
+  await fetch(`${SB_URL}/rest/v1/campaigns?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+  setCampaigns(cs=>cs.filter(c=>c.id!==id));
+  if(selectedCampaign?.id===id) setSelectedCampaign(null);
+  showToast("Campagne verwijderd");
+};
+
+const deletePost=async(id)=>{
+  await fetch(`${SB_URL}/rest/v1/social_posts?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+  setPosts(ps=>ps.filter(p=>p.id!==id));
+  showToast("Post verwijderd");
+};
+
+const TABS=[
+  {id:"overview", label:"Dashboard", Icon:LayoutDashboard},
+  {id:"campaigns",label:"Campagnes", Icon:Mail},
+  {id:"social",   label:"Social Media",Icon:Globe},
+  {id:"analytics",label:"Analytics",  Icon:BarChart3},
+];
+
+return(
+<div>
+  {/* Header */}
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="Marketing & Sales" title="Marketing Hub"/>
+    <div style={{display:"flex",gap:8,marginTop:4}}>
+      <button onClick={()=>setShowNewPost(true)}
+        style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+        <Globe size={13}/> Social Post
+      </button>
+      <button onClick={()=>setShowNewCampaign(true)}
+        style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+        <Mail size={13}/> Nieuwe Campagne
+      </button>
+    </div>
+  </div>
+
+  {/* Tab bar */}
+  <div style={{display:"flex",gap:4,marginBottom:18,background:C.bg,borderRadius:12,padding:4,border:`1px solid ${C.border}`,width:"fit-content"}}>
+    {TABS.map(({id,label,Icon})=>(
+      <button key={id} onClick={()=>setTab(id)}
+        style={{display:"flex",alignItems:"center",gap:7,padding:"7px 16px",borderRadius:9,border:"none",cursor:"pointer",background:tab===id?C.surface:"transparent",color:tab===id?C.text:C.secondary,fontWeight:tab===id?700:400,fontSize:12,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,.07)":"none",transition:"all .15s"}}>
+        <Icon size={13}/>{label}
       </button>
     ))}
   </div>
 
   {/* ── OVERVIEW TAB ── */}
   {tab==="overview"&&(
-    <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:14}}>
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        {/* Open rate chart */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>Open Rate Trend</div>
-              <div style={{fontSize:10,color:C.secondary}}>Afgelopen 7 maanden</div>
-            </div>
-            <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:C.green}}>{avgOpen}%</div>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* KPI strip */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {[
+          {l:"TOTAAL BEREIK",v:totalReach.toLocaleString(),sub:"E-mail ontvangers",c:C.crimson,bg:C.crimsonFaint},
+          {l:"GEM. OPEN RATE",v:`${avgOpen}%`,sub:"Alle campagnes",c:C.green,bg:C.greenBg},
+          {l:"SOCIAL BEREIK",v:`${(totalReachSocial/1000).toFixed(1)}K`,sub:"Totale impressies",c:C.indigo,bg:C.indigoBg},
+          {l:"ACTIEVE CAMPS",v:userCamps.filter(c=>c.status!=="archived").length,sub:`${sentCamps.length} verzonden`,c:C.amber,bg:C.amberBg},
+        ].map(k=>(
+          <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${k.c}30`}}>
+            <div style={{fontSize:9,fontWeight:700,color:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+            <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:k.c,marginBottom:3}}>{k.v}</div>
+            <div style={{fontSize:10,color:k.c,opacity:0.7}}>{k.sub}</div>
           </div>
-          {/* Bar chart */}
-          <div style={{display:"flex",alignItems:"flex-end",gap:8,height:80,marginBottom:8}}>
-            {openRateData.map((v,i)=>(
-              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                <div style={{fontSize:9,fontWeight:600,color:i===openRateData.length-1?C.crimson:C.muted}}>{v}%</div>
-                <div style={{width:"100%",background:i===openRateData.length-1?C.crimson:`${C.crimson}35`,borderRadius:"4px 4px 0 0",height:`${(v/100)*70}px`,transition:"height .3s"}}/>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            {months.map((m,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:C.secondary,fontWeight:600}}>{m}</div>)}
-          </div>
-        </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:16}}>
         {/* Recent campaigns */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
           <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Campagnes</div>
-            <button onClick={()=>setTab("campaigns")} style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Alle bekijken →</button>
+            <button onClick={()=>setTab("campaigns")} style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Alles bekijken →</button>
           </div>
-          {visC.slice(0,3).map((c,i)=>(
-            <div key={c.id} style={{padding:"13px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",alignItems:"center",gap:14}}>
-              <div style={{width:36,height:36,borderRadius:9,background:c.dept==="TC"?C.crimsonFaint:"#F0EDE8",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Mail size={15} color={c.dept==="TC"?C.crimson:C.taupe}/>
+          {userCamps.slice(0,4).map((c,i)=>{
+            const meta=STATUS_META[c.status]||STATUS_META.draft;
+            return(
+              <div key={c.id} onClick={()=>setSelectedCampaign(c)}
+                style={{padding:"13px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+                <div style={{width:34,height:34,borderRadius:8,background:c.dept==="TC"?C.crimsonFaint:c.dept==="FF"?"#F0EDE8":C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {TYPE_ICON[c.type]||<Mail size={13}/>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{c.sentDate!=="—"?c.sentDate:c.scheduledDate!=="—"?"Gepland: "+c.scheduledDate:"Concept"}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                  {c.status==="sent"&&<span style={{fontSize:11,fontWeight:700,color:C.green}}>{c.open_rate}% open</span>}
+                  <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:20,background:meta.bg,color:meta.color}}>{meta.label}</span>
+                </div>
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
-                <div style={{fontSize:10,color:C.secondary}}>{c.date} · {c.recipients||0} ontvangers</div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                {c.openRate!=="—"&&<span style={{fontSize:11,fontWeight:700,color:C.green}}>{c.openRate}</span>}
-                <Badge label={sLabel[c.status]} color={sColor[c.status]} bg={sBg[c.status]}/>
-              </div>
-            </div>
-          ))}
+            );
+          })}
+          {userCamps.length===0&&<div style={{padding:"32px 24px",textAlign:"center",color:C.secondary,fontSize:12}}>Nog geen campagnes. Maak je eerste campagne aan.</div>}
         </div>
-      </div>
-      {/* Right sidebar */}
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        {/* Reach chart */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>Maandelijks Bereik</div>
-          <div style={{fontSize:10,color:C.secondary,marginBottom:14}}>Unieke ontvangers per maand</div>
-          <div style={{display:"flex",alignItems:"flex-end",gap:5,height:60,marginBottom:8}}>
-            {reachData.map((v,i)=>(
-              <div key={i} style={{flex:1,borderRadius:"3px 3px 0 0",background:i===reachData.length-1?C.walnut:`${C.walnut}40`,height:`${(v/450)*60}px`}}/>
-            ))}
+
+        {/* Social performance */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px"}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>Social Media</div>
+            {["linkedin","instagram","facebook","x"].map(platform=>{
+              const platformPosts=userPosts.filter(p=>p.platform===platform&&p.status==="published");
+              const reach=platformPosts.reduce((s,p)=>s+Number(p.reach||0),0);
+              const likes=platformPosts.reduce((s,p)=>s+Number(p.likes||0),0);
+              return(
+                <div key={platform} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <div style={{width:28,height:28,borderRadius:7,background:PLATFORM_COLOR[platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Globe size={12} color={CREAM}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                      <span style={{fontSize:11,fontWeight:600,color:C.text}}>{PLATFORM_LABEL[platform]}</span>
+                      <span style={{fontSize:10,color:C.secondary}}>{reach>0?`${reach.toLocaleString()} bereik`:"—"}</span>
+                    </div>
+                    <div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:reach>0?`${Math.min((reach/5000)*100,100)}%`:"0%",background:PLATFORM_COLOR[platform],borderRadius:2}}/>
+                    </div>
+                  </div>
+                  <span style={{fontSize:10,color:C.muted,flexShrink:0}}>{likes>0?`${likes}♥`:""}</span>
+                </div>
+              );
+            })}
           </div>
-          <div style={{display:"flex",gap:5}}>
-            {months.map((m,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:C.muted}}>{m}</div>)}
+          {/* Next scheduled */}
+          <div style={{background:C.darkAccent,borderRadius:14,padding:"16px",color:C.onDark}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:"rgba(240,235,228,.6)",marginBottom:8}}>VOLGENDE ACTIE</div>
+            {userCamps.find(c=>c.status==="scheduled")?(
+              <div>
+                <div style={{fontFamily:F.display,fontSize:14,fontWeight:600,marginBottom:4}}>{userCamps.find(c=>c.status==="scheduled").title}</div>
+                <div style={{fontSize:11,color:"rgba(240,235,228,.7)"}}>{userCamps.find(c=>c.status==="scheduled").scheduledDate}</div>
+              </div>
+            ):(
+              <div style={{fontSize:11,color:"rgba(240,235,228,.5)"}}>Geen geplande campagnes</div>
+            )}
           </div>
-        </div>
-        {/* Channel health */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"18px"}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Kanaal Overzicht</div>
-          {visCh.map(ch=>(
-            <div key={ch.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <div style={{width:32,height:32,borderRadius:8,background:platformColor[ch.platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Globe size={14} color={CREAM}/>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:11,fontWeight:600,color:C.text}}>{platformLabel[ch.platform]}</div>
-                <div style={{fontSize:9,color:C.secondary}}>{ch.followers} volgers</div>
-              </div>
-              <div style={{width:7,height:7,borderRadius:"50%",background:ch.connected?C.green:C.mushroom,flexShrink:0}}/>
-            </div>
-          ))}
-        </div>
-        {/* Quick actions */}
-        <div style={{background:C.darkAccent,borderRadius:14,padding:"18px",color:C.onDark}}>
-          <div style={{fontSize:12,fontWeight:700,marginBottom:12}}>Snelle Acties</div>
-          {[
-            {label:"Nieuwsbrief aanmaken",Icon:Mail,action:()=>setComposerOpen(true)},
-            {label:"Social post plannen",Icon:Send,action:()=>setPostComposerOpen("new")},
-            {label:"Analytics bekijken",Icon:BarChart3,action:()=>setTab("analytics")},
-          ].map(a=>(
-            <button key={a.label} onClick={a.action} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,background:"rgba(255,255,255,.08)",border:"none",cursor:"pointer",color:C.onDark,fontSize:11,fontWeight:600,marginBottom:6,textAlign:"left"}}>
-              <a.Icon size={13}/>{a.label}
-            </button>
-          ))}
         </div>
       </div>
     </div>
@@ -5323,42 +4878,150 @@ return(
 
   {/* ── CAMPAIGNS TAB ── */}
   {tab==="campaigns"&&(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.07)"}}>
+        {loading?<div style={{padding:"40px 24px",textAlign:"center",color:C.secondary}}>Laden...</div>:
+        userCamps.length===0?
+          <div style={{padding:"52px 24px",textAlign:"center"}}>
+            <Mail size={32} color={C.mushroom} style={{marginBottom:12}}/>
+            <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:8}}>Nog geen campagnes</div>
+            <button onClick={()=>setShowNewCampaign(true)} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              <Plus size={13}/> Campagne aanmaken
+            </button>
+          </div>
+        :(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr style={{background:C.warm50}}>
+                {["CAMPAGNE","TYPE","DOELGROEP","VERZONDEN","OPEN RATE","STATUS",""].map((h,i)=>(
+                  <th key={i} style={{padding:"10px 16px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {userCamps.map((c,i)=>{
+                const meta=STATUS_META[c.status]||STATUS_META.draft;
+                return(
+                  <tr key={c.id} onClick={()=>setSelectedCampaign(c)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+                    <td style={{padding:"13px 16px"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text}}>{c.title}</div>
+                      {c.subject&&<div style={{fontSize:10,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:240}}>{c.subject}</div>}
+                    </td>
+                    <td style={{padding:"13px 16px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:10,fontWeight:600,color:C.secondary}}>
+                        {TYPE_ICON[c.type]}{TYPE_LABEL[c.type]||c.type}
+                      </div>
+                    </td>
+                    <td style={{padding:"13px 16px",fontSize:11,color:C.secondary}}>{SEG_LABEL[c.target_segment]||c.target_segment||"—"}</td>
+                    <td style={{padding:"13px 16px",fontSize:12,color:C.text,fontWeight:600}}>{c.recipients>0?c.recipients.toLocaleString():"—"}</td>
+                    <td style={{padding:"13px 16px"}}>
+                      {c.open_rate>0?(
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{width:60,height:5,background:C.border,borderRadius:3,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${Math.min(c.open_rate,100)}%`,background:Number(c.open_rate)>=60?C.green:Number(c.open_rate)>=40?C.amber:C.red,borderRadius:3}}/>
+                          </div>
+                          <span style={{fontSize:11,fontWeight:700,color:Number(c.open_rate)>=60?C.green:Number(c.open_rate)>=40?C.amber:C.red}}>{c.open_rate}%</span>
+                        </div>
+                      ):<span style={{color:C.muted,fontSize:11}}>—</span>}
+                    </td>
+                    <td style={{padding:"13px 16px"}}>
+                      <span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,background:meta.bg,color:meta.color}}>{meta.label}</span>
+                    </td>
+                    <td style={{padding:"13px 16px"}}>
+                      <div style={{display:"flex",gap:6}} onClick={e=>e.stopPropagation()}>
+                        {c.status==="draft"&&(
+                          <button onClick={()=>advanceCampaign(c)}
+                            style={{padding:"4px 9px",borderRadius:7,background:C.amberBg,border:`1px solid ${C.amber}40`,color:C.amber,fontSize:9,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                            Inplannen
+                          </button>
+                        )}
+                        {c.status==="scheduled"&&(
+                          <button onClick={()=>advanceCampaign(c)}
+                            style={{padding:"4px 9px",borderRadius:7,background:C.greenBg,border:`1px solid ${C.green}40`,color:C.green,fontSize:9,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                            Verstuur
+                          </button>
+                        )}
+                        <button onClick={()=>deleteCampaign(c.id,c.title)}
+                          style={{padding:"4px 8px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                          <X size={10}/>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )}
+
+  {/* ── SOCIAL TAB ── */}
+  {tab==="social"&&(
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {/* Pipeline kanban */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
-        {[
-          {status:"draft",label:"Concepten",color:C.secondary,bg:C.warm50},
-          {status:"scheduled",label:"Ingepland",color:C.amber,bg:C.amberBg},
-          {status:"sent",label:"Verzonden",color:C.green,bg:C.greenBg},
-        ].map(col=>{
-          const items=visC.filter(c=>c.status===col.status);
+      {/* Platform KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {["linkedin","instagram","facebook","x"].map(platform=>{
+          const platformPosts=userPosts.filter(p=>p.platform===platform);
+          const pubPosts=platformPosts.filter(p=>p.status==="published");
+          const reach=pubPosts.reduce((s,p)=>s+Number(p.reach||0),0);
           return(
-            <div key={col.status} style={{background:col.bg,borderRadius:14,padding:"14px",border:`1px solid ${col.color}30`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:col.color}}/>
-                  <span style={{fontSize:11,fontWeight:700,color:col.color,textTransform:"uppercase",letterSpacing:"0.08em"}}>{col.label}</span>
+            <div key={platform} style={{background:C.surface,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:10}}>
+                <div style={{width:32,height:32,borderRadius:8,background:PLATFORM_COLOR[platform],display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Globe size={14} color={CREAM}/>
                 </div>
-                <span style={{fontSize:11,fontWeight:700,color:col.color,background:`${col.color}20`,padding:"2px 8px",borderRadius:10}}>{items.length}</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text}}>{PLATFORM_LABEL[platform]}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{platformPosts.length} posts</div>
+                </div>
               </div>
-              {items.map(c=>(
-                <div key={c.id} style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:8,boxShadow:"0 1px 4px rgba(58,46,40,.08)"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                    <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,flex:1,paddingRight:8}}>{c.name}</div>
-                    <DeptTag dept={c.dept}/>
-                  </div>
-                  <div style={{fontSize:10,color:C.secondary,marginBottom:8}}>{c.date}{c.recipients>0&&` · ${c.recipients} ontvangers`}{c.openRate!=="—"&&` · Open: ${c.openRate}`}</div>
-                  <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>setEditCampaign(c)} style={{flex:1,padding:"5px 8px",borderRadius:6,background:C.bg,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>BEWERKEN</button>
-                    {c.status!=="sent"&&<button onClick={()=>advance(c)} style={{flex:1,padding:"5px 8px",borderRadius:6,background:col.status==="draft"?C.amberBg:C.greenBg,border:`1px solid ${col.status==="draft"?C.amber:C.green}30`,color:col.status==="draft"?C.amber:C.green,fontSize:9,fontWeight:700,cursor:"pointer"}}>{col.status==="draft"?"INPLANNEN":"VERZENDEN"}</button>}
-                  </div>
+              <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>{reach>0?`${reach.toLocaleString()}`:"-"}</div>
+              <div style={{fontSize:9,color:C.secondary,marginTop:2}}>Totaal bereik</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Posts list */}
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+        <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>Social Posts</div>
+          <button onClick={()=>setShowNewPost(true)}
+            style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+            <Plus size={11}/> Nieuwe post
+          </button>
+        </div>
+        {userPosts.length===0?(
+          <div style={{padding:"40px 24px",textAlign:"center",color:C.secondary,fontSize:12}}>Nog geen posts. Maak je eerste social post aan.</div>
+        ):userPosts.map((p,i)=>{
+          const meta=STATUS_META[p.status]||STATUS_META.draft;
+          return(
+            <div key={p.id} style={{padding:"14px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",gap:14,alignItems:"flex-start"}}>
+              <div style={{width:36,height:36,borderRadius:9,background:PLATFORM_COLOR[p.platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Globe size={15} color={CREAM}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                  <span style={{fontSize:11,fontWeight:700,color:C.text}}>{PLATFORM_LABEL[p.platform]}</span>
+                  <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:4,background:meta.bg,color:meta.color}}>{meta.label}</span>
+                  {p.department!=="BOTH"&&<DeptTag dept={p.department}/>}
                 </div>
-              ))}
-              {col.status==="draft"&&(
-                <button onClick={()=>setComposerOpen(true)} style={{width:"100%",padding:"8px",borderRadius:9,background:"transparent",border:`1.5px dashed ${C.border}`,color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  <Plus size={11}/> Nieuwe campagne
-                </button>
-              )}
+                <div style={{fontSize:12,color:C.text,lineHeight:1.6,marginBottom:6}}>{p.content}</div>
+                {p.status==="published"&&(
+                  <div style={{display:"flex",gap:12,fontSize:10,color:C.secondary}}>
+                    <span>♥ {p.likes||0} likes</span>
+                    <span>👁 {(p.reach||0).toLocaleString()} bereik</span>
+                    <span>{p.published_at?new Date(p.published_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—"}</span>
+                  </div>
+                )}
+              </div>
+              <button onClick={()=>deletePost(p.id)}
+                style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",cursor:"pointer",color:C.mushroom,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:0.5}}
+                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>
+                <X size={11}/>
+              </button>
             </div>
           );
         })}
@@ -5366,359 +5029,325 @@ return(
     </div>
   )}
 
-  {/* ── SOCIAL TAB ── */}
-  {tab==="social"&&(
-    <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
-      <div>
-        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>Gekoppelde Kanalen</div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {visCh.map(ch=>(
-            <div key={ch.id} style={{background:C.surface,borderRadius:14,border:`1px solid ${selectedChannel===ch.id?C.crimson:C.border}`,padding:"18px 20px",cursor:"pointer",transition:"border-color .15s"}} onClick={()=>setSelectedChannel(selectedChannel===ch.id?null:ch.id)}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{width:48,height:48,borderRadius:12,background:platformColor[ch.platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <Globe size={22} color={CREAM}/>
+  {/* ── ANALYTICS TAB ── */}
+  {tab==="analytics"&&(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Open rate per campaign bar chart */}
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Open Rate per Campagne</div>
+        {sentCamps.length===0?
+          <div style={{textAlign:"center",color:C.secondary,fontSize:12,padding:"24px 0"}}>Nog geen verzonden campagnes.</div>
+        :(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {sentCamps.map(c=>(
+              <div key={c.id}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:11,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"70%"}}>{c.title}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:Number(c.open_rate)>=60?C.green:Number(c.open_rate)>=40?C.amber:C.red}}>{c.open_rate}%</span>
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <div style={{fontSize:14,fontWeight:700,color:C.text}}>{ch.name}</div>
-                    <DeptTag dept={ch.dept}/>
-                    {ch.connected&&<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:3}}><div style={{width:6,height:6,borderRadius:"50%",background:C.green}}/> Actief</span>}
-                  </div>
-                  <div style={{fontSize:11,color:C.secondary}}>{ch.handle} · <strong style={{color:C.text}}>{ch.followers}</strong> volgers · Laatste post: {ch.lastPost}</div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  {ch.connected?(
-                    <button onClick={e=>{e.stopPropagation();setPostComposerOpen(ch.id);}} style={{padding:"8px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                      <Send size={11}/> Post Plannen
-                    </button>
-                  ):(
-                    <button onClick={e=>{e.stopPropagation();setChannels(cs=>cs.map(x=>x.id===ch.id?{...x,connected:true,lastPost:"Zojuist"}:x));showToast(`${platformLabel[ch.platform]} gekoppeld`);toggleSocialChannel(ch.id,true).catch(()=>{});}} style={{padding:"8px 14px",borderRadius:9,background:C.walnut,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                      <Plus size={11}/> Koppelen
-                    </button>
-                  )}
+                <div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${Math.min(Number(c.open_rate),100)}%`,background:Number(c.open_rate)>=60?C.green:Number(c.open_rate)>=40?C.amber:C.red,borderRadius:4,transition:"width .5s"}}/>
                 </div>
               </div>
-              {/* Expanded stats */}
-              {selectedChannel===ch.id&&ch.connected&&(
-                <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-                  {[["Impressies","12.4K"],[" Klikken","842"],["Engagements","6.2%"]].map(([l,v])=>(
-                    <div key={l} style={{textAlign:"center",padding:"10px",borderRadius:9,background:C.bg}}>
-                      <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>{v}</div>
-                      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.07em",textTransform:"uppercase",marginTop:2}}>{l}</div>
-                    </div>
-                  ))}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Segment breakdown + social summary */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>Doelgroep Verdeling</div>
+          {Object.entries(
+            userCamps.reduce((acc,c)=>{const seg=c.target_segment||"all";acc[seg]=(acc[seg]||0)+1;return acc;},{})
+          ).map(([seg,count])=>(
+            <div key={seg} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:11,color:C.text}}>{SEG_LABEL[seg]||seg}</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:60,height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${(count/Math.max(userCamps.length,1))*100}%`,background:C.crimson,borderRadius:2}}/>
                 </div>
-              )}
+                <span style={{fontSize:11,fontWeight:700,color:C.text,minWidth:16}}>{count}</span>
+              </div>
+            </div>
+          ))}
+          {userCamps.length===0&&<div style={{color:C.secondary,fontSize:12,textAlign:"center",padding:"16px 0"}}>Geen data</div>}
+        </div>
+
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>Social Samenvatting</div>
+          {[["Totale posts",userPosts.length],["Gepubliceerd",userPosts.filter(p=>p.status==="published").length],["Totaal bereik",userPosts.reduce((s,p)=>s+Number(p.reach||0),0).toLocaleString()],["Totaal likes",totalLikes]].map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+              <span style={{fontSize:12,fontWeight:700,color:C.text}}>{v}</span>
             </div>
           ))}
         </div>
       </div>
-      {/* Scheduled posts */}
-      <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
-          <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12,fontWeight:700,color:C.text}}>Geplande Posts</div>
-          {[
-            {platform:"linkedin",text:"Tactigent kondigt haar Q2 resultaten aan. Strategische groei van 18% t.o.v. vorig kwartaal.",time:"Morgen 09:00",dept:"TC"},
-            {},
-            {platform:"facebook",text:"Nieuwe fiscale richtlijnen voor 2025: wat betekent dit voor uw onderneming? Lees ons analyse-rapport.",time:"Ma 10:30",dept:"FF"},
-          ].map((p,i)=>(
-            <div key={i} style={{padding:"12px 16px",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                <div style={{width:22,height:22,borderRadius:6,background:platformColor[p.platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <Globe size={11} color={CREAM}/>
-                </div>
-                <div style={{fontSize:10,fontWeight:700,color:C.secondary}}>{platformLabel[p.platform]} · {p.time}</div>
-                <DeptTag dept={p.dept}/>
+    </div>
+  )}
+
+  {/* ── CAMPAIGN DETAIL MODAL ── */}
+  {selectedCampaign&&(
+    <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelectedCampaign(null)}>
+      <div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",maxHeight:"88vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden"}}>
+        <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{TYPE_LABEL[selectedCampaign.type]||"Campagne"}</div>
+            <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>{selectedCampaign.title}</div>
+          </div>
+          <button onClick={()=>setSelectedCampaign(null)} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+        </div>
+        <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+            {[{l:"Ontvangers",v:selectedCampaign.recipients||"—"},{l:"Open Rate",v:selectedCampaign.open_rate>0?selectedCampaign.open_rate+"%":"—"},{l:"Click Rate",v:selectedCampaign.click_rate>0?selectedCampaign.click_rate+"%":"—"}].map(k=>(
+              <div key={k.l} style={{background:C.warm50,borderRadius:10,padding:"12px 14px",textAlign:"center"}}>
+                <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+                <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>{k.v}</div>
               </div>
-              <div style={{fontSize:11,color:C.text,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{p.text}</div>
+            ))}
+          </div>
+          {/* Details */}
+          {[["Onderwerp",selectedCampaign.subject],["Doelgroep",SEG_LABEL[selectedCampaign.target_segment]||selectedCampaign.target_segment],["Verzonden op",selectedCampaign.sentDate],["Gepland op",selectedCampaign.scheduledDate]].filter(([,v])=>v&&v!=="—").map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+              <span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
             </div>
           ))}
-          <div style={{padding:"10px 16px",borderTop:`1px solid ${C.border}`,background:C.warm50}}>
-            <button onClick={()=>setPostComposerOpen("new")} style={{width:"100%",padding:"8px",borderRadius:8,background:"transparent",border:`1.5px dashed ${C.border}`,color:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-              <Plus size={11}/> Post toevoegen
-            </button>
+          {selectedCampaign.body&&(
+            <div>
+              <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INHOUD PREVIEW</div>
+              <div style={{background:C.warm50,borderRadius:10,padding:"14px 16px",fontSize:12,color:C.text,lineHeight:1.7,maxHeight:160,overflow:"hidden"}}>{selectedCampaign.body}</div>
+            </div>
+          )}
+          {/* Actions */}
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            {selectedCampaign.status==="draft"&&(
+              <button onClick={()=>{advanceCampaign(selectedCampaign);setSelectedCampaign(null);}}
+                style={{flex:1,padding:"10px",borderRadius:9,background:C.amber,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Inplannen</button>
+            )}
+            {selectedCampaign.status==="scheduled"&&(
+              <button onClick={()=>{advanceCampaign(selectedCampaign);setSelectedCampaign(null);}}
+                style={{flex:1,padding:"10px",borderRadius:9,background:C.green,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <Mail size={13}/> Nu versturen
+              </button>
+            )}
+            <button onClick={()=>{deleteCampaign(selectedCampaign.id,selectedCampaign.title);setSelectedCampaign(null);}}
+              style={{padding:"10px 14px",borderRadius:9,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:12,fontWeight:700,cursor:"pointer"}}>Verwijder</button>
           </div>
         </div>
       </div>
     </div>
   )}
 
-  {/* ── ANALYTICS TAB ── */}
-  {tab==="analytics"&&(
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        {/* Open rate by campaign */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"20px"}}>
-          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Open Rate per Campagne</div>
-          <div style={{fontSize:10,color:C.secondary,marginBottom:16}}>Alleen verzonden campagnes</div>
-          {visC.filter(c=>c.openRate!=="—").map(c=>(
-            <div key={c.id} style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:11,color:C.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"65%"}}>{c.name}</span>
-                <span style={{fontSize:11,fontWeight:700,color:parseInt(c.openRate)>=60?C.green:C.amber}}>{c.openRate}</span>
-              </div>
-              <div style={{height:5,background:C.border,borderRadius:3}}>
-                <div style={{height:"100%",width:c.openRate,background:parseInt(c.openRate)>=60?C.green:C.amber,borderRadius:3,transition:"width .4s"}}/>
-              </div>
-            </div>
-          ))}
-        </div>
-        {/* Followers growth */}
-        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"20px"}}>
-          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Volgersgroei</div>
-          <div style={{fontSize:10,color:C.secondary,marginBottom:16}}>Per platform — huidige stand</div>
-          {visCh.filter(c=>c.connected).map(ch=>(
-            <div key={ch.id} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-              <div style={{width:28,height:28,borderRadius:7,background:platformColor[ch.platform],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Globe size={12} color={CREAM}/>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                  <span style={{fontSize:11,color:C.text}}>{platformLabel[ch.platform]}</span>
-                  <span style={{fontSize:11,fontWeight:700,color:C.text}}>{ch.followers}</span>
-                </div>
-                <div style={{height:4,background:C.border,borderRadius:2}}>
-                  <div style={{height:"100%",width:`${Math.min(100,parseInt(ch.followers)*15)}%`,background:platformColor[ch.platform],borderRadius:2,opacity:0.8}}/>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Department performance */}
-      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"20px"}}>
-        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Prestaties per Afdeling</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
-          {[
-            {dept:"TC",color:C.crimson,campaigns:visC.filter(c=>c.dept==="TC"),label:"Tactigent"},
-            {dept:"FF",color:C.taupe,campaigns:visC.filter(c=>c.dept==="FF"),label:"Fiscal Fuse"},
-            {dept:"BOTH",color:C.walnut,campaigns:visC.filter(c=>c.dept==="BOTH"),label:"Gecombineerd"},
-          ].map(d=>{
-            const sent=d.campaigns.filter(c=>c.status==="sent");
-            const reach=sent.reduce((s,c)=>s+c.recipients,0);
-            const open=sent.length?Math.round(sent.reduce((s,c)=>s+parseInt(c.openRate||0),0)/sent.length):0;
-            return(
-              <div key={d.dept} style={{padding:"16px",borderRadius:12,background:C.bg,border:`1px solid ${C.border}`}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:d.color}}/>
-                  <span style={{fontSize:12,fontWeight:700,color:C.text}}>{d.label}</span>
-                </div>
-                {[["Campagnes",d.campaigns.length],["Verzonden",sent.length],["Bereik",reach.toLocaleString()],["Open Rate",sent.length?`${open}%`:"—"]].map(([l,v])=>(
-                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderTop:`1px solid ${C.border}`}}>
-                    <span style={{fontSize:10,color:C.secondary}}>{l}</span>
-                    <span style={{fontSize:10,fontWeight:700,color:d.color}}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+  {/* ── NEW CAMPAIGN MODAL ── */}
+  {showNewCampaign&&<NewCampaignModal user={user} onClose={()=>setShowNewCampaign(false)}
+    onCreated={camp=>{setCampaigns(cs=>[camp,...cs]);showToast(`Campagne "${camp.title}" aangemaakt ✓`);}} showToast={showToast}/>}
+
+  {/* ── NEW POST MODAL ── */}
+  {showNewPost&&<NewSocialPostModal user={user} onClose={()=>setShowNewPost(false)}
+    onCreated={post=>{setPosts(ps=>[post,...ps]);showToast("Post aangemaakt ✓");}} showToast={showToast}/>}
+</div>
+);
+}
+
+function NewCampaignModal({user,onClose,onCreated,showToast}){
+const [title,setTitle]=useState("");
+const [subject,setSubject]=useState("");
+const [body,setBody]=useState("");
+const [type,setType]=useState("email");
+const [dept,setDept]=useState(user.dept==="BOTH"?"BOTH":user.dept);
+const [segment,setSegment]=useState("all");
+const [saving,setSaving]=useState(false);
+
+useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
+const submit=async()=>{
+  if(!title.trim()||saving) return;
+  setSaving(true);
+  try{
+    const {data,error}=await supabase.from("campaigns").insert({
+      title:title.trim(),subject:subject.trim()||null,body:body.trim()||null,
+      type,department:dept,target_segment:segment,status:"draft",created_by:user.id,
+    }).select().single();
+    if(error) throw new Error(error.message);
+    onCreated({...data,dept:data.department,sentDate:"—",scheduledDate:"—"});
+    onClose();
+  }catch(e){showToast("Fout: "+e.message);}
+  setSaving(false);
+};
+
+return(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:560,maxWidth:"95vw",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Campagne</div>
+    <button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+  </div>
+  <div style={{overflowY:"auto",padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    {/* Type */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>TYPE</div>
+      <div style={{display:"flex",gap:8}}>
+        {[["email","E-mail",<Mail size={12}/>],["social","Social",<Globe size={12}/>],["event","Evenement",<Users size={12}/>],["webinar","Webinar",<Activity size={12}/>]].map(([v,l,Icon])=>(
+          <button key={v} onClick={()=>setType(v)}
+            style={{flex:1,padding:"8px 6px",borderRadius:9,border:`2px solid ${type===v?C.crimson:C.border}`,background:type===v?C.crimsonFaint:"transparent",color:type===v?C.crimson:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            {Icon}{l}
+          </button>
+        ))}
       </div>
     </div>
-  )}
-
-  {/* ── CAMPAIGN COMPOSER MODAL ── */}
-  {composerOpen&&<CampaignComposer campaigns={visC} setCampaigns={setCampaigns} user={user} onClose={()=>setComposerOpen(false)} showToast={showToast}/>}
-  {editCampaign&&<CampaignComposer campaigns={visC} setCampaigns={setCampaigns} user={user} onClose={()=>setEditCampaign(null)} showToast={showToast} edit={editCampaign}/>}
-  {postComposerOpen&&<PostComposer channels={visCh} onClose={()=>setPostComposerOpen(null)} showToast={showToast} preselect={postComposerOpen!=="new"?postComposerOpen:null}/>}
+    {/* Dept */}
+    {user.dept==="BOTH"&&(
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>AFDELING</div>
+        <div style={{display:"flex",gap:8}}>
+          {[["BOTH","Beide"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setDept(v)}
+              style={{flex:1,padding:"7px",borderRadius:9,border:`2px solid ${dept===v?C.crimson:C.border}`,background:dept===v?C.crimsonFaint:"transparent",color:dept===v?C.crimson:C.secondary,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+    {/* Title */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CAMPAGNETITEL <span style={{color:C.crimson}}>*</span></div>
+      <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Bijv. Fiscale Deadline Herinnering Q2"
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${title.length>2?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+    </div>
+    {/* Subject */}
+    {type==="email"&&(
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>ONDERWERPREGEL</div>
+        <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="E-mail onderwerpregel..."
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+      </div>
+    )}
+    {/* Segment */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>DOELGROEP</div>
+      <select value={segment} onChange={e=>setSegment(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+        {[["all","Alle contacten"],["TC_clients","TC Cliënten"],["FF_clients","FF Cliënten"],["leads","Leads pipeline"],["custom","Aangepaste selectie"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+      </select>
+    </div>
+    {/* Body */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>INHOUD / BERICHT</div>
+      <textarea value={body} onChange={e=>setBody(e.target.value)} rows={4}
+        placeholder="Schrijf de inhoud van je campagne..."
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6}}/>
+    </div>
+  </div>
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+    <button onClick={submit} disabled={!title.trim()||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:title.trim()?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:title.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <Mail size={14}/>{saving?"Aanmaken...":"Concept opslaan"}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
 </div>
-
-
+</div>
 );
 }
 
-function CampaignComposer({campaigns,setCampaigns,user,onClose,showToast,edit}){
-const [subject,setSubject]=useState(edit?.name||"");
-const [body,setBody]=useState(edit?"Geachte {{first_name}},\n\nBedankt voor uw vertrouwen in Tactigent Consultancy.\n\nWij willen u graag informeren over de laatste ontwikkelingen...\n\nMet vriendelijke groet,\nHet Tactigent Team":"");
-const [dept,setDept]=useState(edit?.dept||(user.dept==="BOTH"?"TC":user.dept));
-const [audience,setAudience]=useState("all");
-const wordCount=body.trim().split(/\s+/).filter(Boolean).length;
-const preview=body.replace("{{first_name}}","Raj").replace("{{action_title}}","Q2 Update").replace("{{deadline}}","30 apr 2025");
-const save=()=>{
-if(!subject.trim()) return;
-if(edit){
-setCampaigns(cs=>cs.map(c=>c.id===edit.id?{...c,name:subject,dept}:c));
-showToast("Campagne bijgewerkt");
-} else {
-setCampaigns(cs=>[...cs,{id:`c${Date.now()}`,name:subject,type:"newsletter",status:"draft",recipients:0,openRate:"—",date:new Date().toLocaleDateString("nl-NL",{day:"2-digit",month:"short",year:"numeric"}),dept}]);
-showToast("Campagne aangemaakt als concept");
-}
-onClose();
-};
+function NewSocialPostModal({user,onClose,onCreated,showToast}){
+const [platform,setPlatform]=useState("linkedin");
+const [content,setContent]=useState("");
+const [dept,setDept]=useState(user.dept==="BOTH"?"BOTH":user.dept);
+const [scheduleDate,setScheduleDate]=useState("");
+const [saving,setSaving]=useState(false);
+
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
-return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:820,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-{/* Header */}
-<div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
-<div style={{display:"flex",alignItems:"center",gap:12}}>
-<div style={{width:38,height:38,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Mail size={17} color={CREAM}/></div>
-<div>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>{edit?"Campagne bewerken":"Nieuwe Campagne"}</div>
-<div style={{fontSize:10,color:C.secondary}}>E-mailcampagne samenstellen en inplannen</div>
-</div>
-</div>
-<button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
-</div>
-{/* Body */}
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",flex:1}}>
-{/* Editor */}
-<div style={{padding:"22px",overflowY:"auto",borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:14}}>
-{/* Dept */}
-{user.dept==="BOTH"&&(
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>AFDELING</div>
-<div style={{display:"flex",gap:8}}>
-{["TC","FF","BOTH"].map(d=>(
-<button key={d} onClick={()=>setDept(d)} style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:11,fontWeight:700,cursor:"pointer"}}>
-{d==="TC"?"Tactigent":d==="FF"?"Fiscal Fuse":"Beide"}
-</button>
-))}
-</div>
-</div>
-)}
-{/* Subject */}
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>ONDERWERP *</div>
-<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Bijv. Kwartaalupdate — Tactigent Q2 2025" style={{width:"100%",padding:"10px 14px",borderRadius:9,border:`1.5px solid ${subject?C.crimson:C.border}`,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
-</div>
-{/* Audience */}
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>DOELGROEP</div>
-<select value={audience} onChange={e=>setAudience(e.target.value)} style={{width:"100%",padding:"9px 14px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.surface}}>
-<option value="all">Alle cliënten (1.482)</option>
-<option value="tc">Tactigent cliënten (892)</option>
-<option value="ff">Fiscal Fuse cliënten (590)</option>
-<option value="active">Actieve engagements (42)</option>
-</select>
-</div>
-{/* Body */}
-<div style={{flex:1}}>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase"}}>BERICHTTEKST</div>
-<span style={{fontSize:9,color:C.muted}}>{wordCount} woorden</span>
-</div>
-<textarea value={body} onChange={e=>setBody(e.target.value)} rows={10} style={{width:"100%",padding:"12px 14px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body,lineHeight:1.7}}/>
-<div style={{marginTop:6,fontSize:10,color:C.muted}}>Gebruik <code style={{background:C.warm50,padding:"1px 5px",borderRadius:4,fontSize:10}}>{"{{first_name}}"}</code> <code style={{background:C.warm50,padding:"1px 5px",borderRadius:4,fontSize:10}}>{"{{action_title}}"}</code> voor personalisatie</div>
-</div>
-</div>
-{/* Preview */}
-<div style={{display:"flex",flexDirection:"column",overflowY:"auto"}}>
-<div style={{padding:"16px",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.text}}>Voorbeeld e-mail</div>
-<div style={{padding:"16px",flex:1,overflowY:"auto"}}>
-<div style={{background:C.surface,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 12px rgba(58,46,40,.1)"}}>
-<div style={{background:dept==="TC"?C.crimson:dept==="FF"?C.taupe:C.walnut,padding:"14px 16px"}}>
-<div style={{fontSize:12,fontWeight:700,color:CREAM}}>{dept==="TC"?"TACTIGENT CONSULTANCY":dept==="FF"?"FISCAL FUSE":"THE GLASS EXECUTIVE"}</div>
-</div>
-<div style={{padding:"16px",fontSize:11,lineHeight:1.7,color:C.text,borderBottom:`2px solid ${dept==="TC"?C.crimson:dept==="FF"?C.taupe:C.walnut}`}}>
-<div style={{fontWeight:700,marginBottom:4,fontSize:13}}>{subject||"(geen onderwerp)"}</div>
-</div>
-<div style={{padding:"14px 16px",fontSize:11,color:C.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{preview||"(geen inhoud)"}</div>
-<div style={{padding:"12px 16px",background:C.warm50,fontSize:9,color:C.secondary}}>The Client Portal · Waterkant 45, Paramaribo · Uitschrijven</div>
-</div>
-</div>
-<div style={{padding:"14px 16px",borderTop:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
-<button onClick={save} disabled={!subject.trim()} style={{width:"100%",padding:"10px",borderRadius:9,background:subject?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:subject?"pointer":"default"}}>
-{edit?"Wijzigingen opslaan":"Opslaan als concept"}
-</button>
-</div>
-</div>
-</div>
-</div>
-</div>
-);
-}
 
-function PostComposer({channels,onClose,showToast,preselect}){
-const connected=channels.filter(c=>c.connected);
-const [selChannels,setSelChannels]=useState(preselect?[preselect]:connected.slice(0,1).map(c=>c.id));
-const [text,setText]=useState("");
-const [schedDate,setSchedDate]=useState("");
-const [schedTime,setSchedTime]=useState("09:00");
-const platformColor={linkedin:"#0A66C2",instagram:"#E1306C",facebook:"#1877F2",x:"#14171A"};
-const platformLabel={linkedin:"LinkedIn",instagram:"Instagram",facebook:"Facebook",x:"X"};
-const maxChars={linkedin:3000,instagram:2200,facebook:63206,x:280};
-const activeMax=selChannels.includes("x")||connected.find(c=>c.id===selChannels[0])?.platform==="x"?280:3000;
-const toggle=(id)=>setSelChannels(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
-const submit=()=>{
-if(!text.trim()||!selChannels.length) return;
-showToast(`Post ingepland op ${selChannels.length} kanaal${selChannels.length>1?"en":""}`);
-onClose();
+const charLimit={linkedin:3000,instagram:2200,facebook:63206,x:280};
+const limit=charLimit[platform]||280;
+const PLATFORM_COLOR={linkedin:"#0A66C2",instagram:"#E1306C",facebook:"#1877F2",x:"#14171A"};
+const PLATFORM_LABEL={linkedin:"LinkedIn",instagram:"Instagram",facebook:"Facebook",x:"X (Twitter)"};
+
+const submit=async()=>{
+  if(!content.trim()||saving) return;
+  setSaving(true);
+  try{
+    const isScheduled=!!scheduleDate;
+    const {data,error}=await supabase.from("social_posts").insert({
+      platform,content:content.trim(),department:dept,
+      status:isScheduled?"scheduled":"draft",
+      scheduled_at:scheduleDate||null,
+      created_by:user.id,
+    }).select().single();
+    if(error) throw new Error(error.message);
+    onCreated({...data,dept:data.department});
+    onClose();
+  }catch(e){showToast("Fout: "+e.message);}
+  setSaving(false);
 };
-useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
 return(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:680,maxWidth:"95vw",display:"flex",flexDirection:"column",maxHeight:"min(90vh, 800px)",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-<div style={{padding:"18px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.crimsonFaint,flexShrink:0}}>
-<div style={{display:"flex",alignItems:"center",gap:12}}>
-<div style={{width:38,height:38,borderRadius:9,background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center"}}><Send size={17} color={CREAM}/></div>
-<div>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Social Post Plannen</div>
-<div style={{fontSize:10,color:C.secondary}}>Publiceer op meerdere kanalen tegelijk</div>
-</div>
-</div>
-<button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
-</div>
-<div style={{padding:"22px",overflowY:"auto",display:"flex",flexDirection:"column",gap:16}}>
-{/* Channel selector */}
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:10}}>KANALEN *</div>
-<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-{connected.map(ch=>{
-const isSel=selChannels.includes(ch.id);
-return(
-<button key={ch.id} onClick={()=>toggle(ch.id)} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 14px",borderRadius:9,border:`2px solid ${isSel?platformColor[ch.platform]:C.border}`,background:isSel?`${platformColor[ch.platform]}15`:"transparent",color:isSel?platformColor[ch.platform]:C.secondary,fontSize:11,fontWeight:700,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>
-<div style={{width:16,height:16,borderRadius:4,background:platformColor[ch.platform],display:"flex",alignItems:"center",justifyContent:"center"}}><Globe size={9} color={CREAM}/></div>
-{platformLabel[ch.platform]}
-<span style={{fontSize:9,color:isSel?platformColor[ch.platform]:C.muted}}>{ch.followers}</span>
-</button>
-);
-})}
-</div>
-</div>
-{/* Text composer */}
-<div>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase"}}>BERICHTTEKST *</div>
-<span style={{fontSize:9,fontWeight:700,color:text.length>activeMax*0.9?C.red:C.muted}}>{text.length}/{activeMax}</span>
-</div>
-<textarea value={text} onChange={e=>setText(e.target.value)} rows={5} placeholder="Schrijf uw bericht hier... Gebruik #hashtags en @mentions voor meer bereik." style={{width:"100%",padding:"12px 14px",borderRadius:9,border:`1.5px solid ${text.length>activeMax?C.red:C.border}`,fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body,lineHeight:1.7}}/>
-</div>
-{/* Schedule */}
-<div>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>PUBLICATIETIJDSTIP</div>
-<div style={{display:"flex",gap:10}}>
-<input type="date" value={schedDate} onChange={e=>setSchedDate(e.target.value)} style={{flex:2,padding:"9px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<input type="time" value={schedTime} onChange={e=>setSchedTime(e.target.value)} style={{flex:1,padding:"9px 13px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-</div>
-{!schedDate&&<div style={{marginTop:6,fontSize:10,color:C.amber}}>Geen datum = direct publiceren</div>}
-</div>
-{/* Preview */}
-{text&&(
-<div style={{background:C.bg,borderRadius:10,padding:"14px",border:`1px solid ${C.border}`}}>
-<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>VOORBEELD</div>
-<div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-<div style={{width:36,height:36,borderRadius:"50%",background:C.crimson,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:700,color:CREAM}}>GE</div>
-<div>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:2}}>The Client Portal <span style={{color:C.secondary,fontWeight:400}}>· Zojuist</span></div>
-<div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{text}</div>
-</div>
-</div>
-</div>
-)}
-</div>
-<div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
-<button onClick={submit} disabled={!text.trim()||!selChannels.length} style={{flex:1,padding:"11px",borderRadius:9,background:text&&selChannels.length?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:text&&selChannels.length?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
-<Send size={14}/> {schedDate?"Inplannen":"Nu Publiceren"}
-</button>
-<button onClick={onClose} style={{padding:"11px 20px",borderRadius:9,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
-</div>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:500,maxWidth:"95vw",display:"flex",flexDirection:"column",boxShadow:"0 4px 32px rgba(0,0,0,.18)",overflow:"hidden",fontFamily:F.body}}>
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Nieuwe Social Post</div>
+    <button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+  </div>
+  <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    {/* Platform */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>PLATFORM</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+        {["linkedin","instagram","facebook","x"].map(p=>(
+          <button key={p} onClick={()=>setPlatform(p)}
+            style={{padding:"9px 4px",borderRadius:9,border:`2px solid ${platform===p?PLATFORM_COLOR[p]:C.border}`,background:platform===p?PLATFORM_COLOR[p]:"transparent",color:platform===p?CREAM:C.secondary,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all .15s"}}>
+            <Globe size={14} color={platform===p?CREAM:C.secondary}/>
+            {PLATFORM_LABEL[p].split(" ")[0]}
+          </button>
+        ))}
+      </div>
+    </div>
+    {/* Content */}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>INHOUD</div>
+        <span style={{fontSize:10,color:content.length>limit*0.9?C.red:C.muted}}>{content.length}/{limit}</span>
+      </div>
+      <textarea value={content} onChange={e=>setContent(e.target.value.slice(0,limit))} rows={5}
+        placeholder={`Schrijf je ${PLATFORM_LABEL[platform]} post...`}
+        style={{width:"100%",padding:"10px 12px",borderRadius:9,border:`1.5px solid ${content.length>limit*0.9?C.amber:C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.7}}/>
+    </div>
+    {/* Dept + Schedule */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      {user.dept==="BOTH"&&(
+        <div>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>AFDELING</div>
+          <select value={dept} onChange={e=>setDept(e.target.value)}
+            style={{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+            {[["BOTH","Beide"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+      )}
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>INPLANNEN (optioneel)</div>
+        <input type="datetime-local" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)}
+          style={{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",background:C.bg,color:C.text,boxSizing:"border-box"}}/>
+      </div>
+    </div>
+  </div>
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10}}>
+    <button onClick={submit} disabled={!content.trim()||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:content.trim()?PLATFORM_COLOR[platform]:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:content.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <Globe size={14}/>{saving?"Opslaan...":scheduleDate?"Post inplannen":"Concept opslaan"}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
 </div>
 </div>
 );
 }
 
-// ─── SETTINGS VIEW ───────────────────────────────────────────────────────────
+
 function SettingsView({user,language,setLanguage,showToast}){
 const [activeTab,setActiveTab]=useState("profile");
 const [name,setName]=useState(user.name);
