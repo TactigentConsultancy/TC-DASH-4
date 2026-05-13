@@ -2738,13 +2738,15 @@ const [reviewing,setReviewing]=useState(null); const [decision,setDecision]=useS
 // Load all pending review items from DB (3 sources)
 useEffect(()=>{
   const loadAll=async()=>{
+    const items=[];
+    const compMap={};
     try{
-      const items=[];
-      // Pre-load company names for lookup
       const {data:compList}=await supabase.from("companies").select("id,name");
-      const compMap={};
       (compList||[]).forEach(c=>{ compMap[c.id]=c.name; });
-      // 1. Documents with review_status = 'pending'
+    }catch(e){}
+
+    // 1. Documents with review_status = 'pending'
+    try{
       const {data:pendingDocs}=await supabase.from("documents")
         .select("id,name,department,review_status,uploaded_at,company_id")
         .eq("review_status","pending")
@@ -2755,7 +2757,10 @@ useEffect(()=>{
         client:compMap[d.company_id]||"Intern", priority:"normaal",
         sourceType:"document", reviewType:"document", typeLabel:"Document",
       }));
-      // 2. Engagements with status = 'In Review'
+    }catch(e){ console.warn("ReviewQueue docs:",e.message||e); }
+
+    // 2. Engagements with status = 'In Review'
+    try{
       const {data:reviewEngs}=await supabase.from("engagements")
         .select("id,name,department,status,updated_at,company_id")
         .eq("status","In Review")
@@ -2766,7 +2771,10 @@ useEffect(()=>{
         client:compMap[e.company_id]||"—", priority:"hoog",
         sourceType:"engagement", reviewType:"engagement", typeLabel:"Engagement Review",
       }));
-      // 3. Client actions with action_type = 'review'
+    }catch(e){ console.warn("ReviewQueue engs:",e.message||e); }
+
+    // 3. Client actions with action_type = 'review'
+    try{
       const {data:reviewActions}=await supabase.from("client_actions")
         .select("id,title,action_type,status,created_at,department,company_id")
         .eq("action_type","review")
@@ -2778,14 +2786,18 @@ useEffect(()=>{
         client:compMap[a.company_id]||"—", priority:"normaal",
         sourceType:"client_action", reviewType:"client_action", typeLabel:"Cliëntactie Review",
       }));
-      // Count today's processed items
+    }catch(e){ console.warn("ReviewQueue actions:",e.message||e); }
+
+    // Count today's processed
+    try{
       const today=new Date(); today.setHours(0,0,0,0);
       const {data:processedDocs}=await supabase.from("documents")
         .select("id").in("review_status",["verified","rejected"])
         .gte("updated_at",today.toISOString());
       setProcessedCount((processedDocs||[]).length);
-      setDocs(items);
-    }catch(e){ console.warn("ReviewQueue load:",e.message); }
+    }catch(e){}
+
+    setDocs(items);
     setLoading(false);
   };
   loadAll();
