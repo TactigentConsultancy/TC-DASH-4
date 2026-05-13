@@ -26,7 +26,7 @@ Building, LayoutDashboard
 // Once you add your images, change BRANDING_USE_IMAGES to true.
 // The app will automatically swap from initials to your logos everywhere.
 // ─────────────────────────────────────────────────────────────────────────────
-const BRANDING_USE_IMAGES = true; // ← set to true after adding images
+const BRANDING_USE_IMAGES = true; // <- set to true after adding images
 
 const BRANDING = {
   // Image paths (relative to /public)
@@ -1338,7 +1338,7 @@ return(
     <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
       <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <h3 style={{margin:0,fontSize:13,fontWeight:700,color:C.text}}>{t("activeDossiers")}</h3>
-        <button onClick={()=>setView("analyses")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,color:C.crimson}}>{t("viewAll")} →</button>
+        <button onClick={()=>setView("analyses")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,color:C.crimson}}>{t("viewAll")} -></button>
       </div>
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead><tr style={{background:C.warm50}}>{["NAAM",t("dept"),t("phase"),t("health")].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
@@ -1358,7 +1358,7 @@ return(
       <div style={{display:"flex",justifyContent:"space-between"}}>
         {[{l:"TACTIGENT",v:`${eng.filter(e=>e.dept==="TC").length} actief`,up:true},{l:"FISCAL FUSE",v:`${eng.filter(e=>e.dept==="FF").length} actief`,up:false}].map(s=>(
           <div key={s.l}><div style={{fontSize:8,color:"rgba(240,235,228,0.65)",fontWeight:700,marginBottom:3}}>{s.l}</div>
-          <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:s.up?"#E87B7B":CREAM_DIM}}>{s.v}{s.up?"↑":"↓"}</div></div>
+          <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:s.up?"#E87B7B":CREAM_DIM}}>{s.v}{s.up?"^":"v"}</div></div>
         ))}
       </div>
       <div style={{borderTop:"1px solid rgba(255,255,255,.1)",paddingTop:10}}>
@@ -1401,7 +1401,7 @@ return(
     {newsLoading&&(
       <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
         {[1,2,3].map(i=>(<div key={i} className="skeleton" style={{height:16,borderRadius:6,width:i===1?"90%":i===2?"70%":"80%"}}/>))}
-        <div style={{fontSize:10,color:C.muted,textAlign:"center",paddingTop:4}}>Actueel nieuws ophalen…</div>
+        <div style={{fontSize:10,color:C.muted,textAlign:"center",paddingTop:4}}>Actueel nieuws ophalen...</div>
       </div>
     )}
 
@@ -1798,7 +1798,7 @@ return(
   <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0,background:C.surface}}>
     <button onClick={submit} disabled={!name.trim()||saving}
       style={{flex:1,padding:"11px",borderRadius:10,background:name.trim()?C.crimson:"#D6D3CE",color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:name.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:name.trim()?"0 4px 12px rgba(139,26,43,.24)":"none",transition:"background .15s"}}>
-      <Plus size={14}/>{saving?"Aanmaken…":`${dept==="TC"?"Project":"Dossier"} aanmaken`}
+      <Plus size={14}/>{saving?"Aanmaken...":`${dept==="TC"?"Project":"Dossier"} aanmaken`}
     </button>
     <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
   </div>
@@ -2052,7 +2052,7 @@ onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.sty
 ))}
 {(tpl.items||[]).length>4&&<div style={{fontSize:10,color:C.muted,paddingLeft:10}}>+{(tpl.items||[]).length-4} meer subtaken</div>}
 </div>
-<div style={{marginTop:10,fontSize:9,fontWeight:700,color:tpl.color,letterSpacing:"0.07em"}}>{(tpl.items||[]).length} SUBTAKEN INBEGREPEN →</div>
+<div style={{marginTop:10,fontSize:9,fontWeight:700,color:tpl.color,letterSpacing:"0.07em"}}>{(tpl.items||[]).length} SUBTAKEN INBEGREPEN -></div>
 </div>
 ))}
 </div>
@@ -3087,9 +3087,9 @@ return(
     <FileText size={32} color={C.mushroom} style={{marginBottom:12}}/>
     <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text,marginBottom:6}}>Wachtrij leeg</div>
     <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Items verschijnen hier automatisch wanneer:<br/>
-    • Een engagement op <strong>"In Review"</strong> wordt gezet<br/>
-    • Een cliëntactie op <strong>"In Review"</strong> wordt gezet<br/>
-    • Een document wordt geüpload via Documentbeheer</div>
+    * Een engagement op <strong>"In Review"</strong> wordt gezet<br/>
+    * Een cliëntactie op <strong>"In Review"</strong> wordt gezet<br/>
+    * Een document wordt geüpload via Documentbeheer</div>
   </div>
 ):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
@@ -3628,8 +3628,309 @@ return(
 }
 
 // ─── LEADS VIEW ──────────────────────────────────────────────────────────────
+const TC_STAGES=[
+  {id:"new",      label:"Nieuw",           pct:0,   color:C.secondary, bg:C.warm50},
+  {id:"qualified",label:"Gekwalificeerd",  pct:33,  color:C.amber,     bg:C.amberBg},
+  {id:"proposal", label:"Voorstel",        pct:66,  color:C.crimson,   bg:C.crimsonFaint},
+  {id:"won",      label:"Gewonnen",        pct:100, color:C.green,     bg:C.greenBg},
+];
+const FF_STAGES=[
+  {id:"inquiry",        label:"Aanvraag",        pct:0,   color:C.secondary, bg:C.warm50},
+  {id:"strategy_review",label:"Strategie Review", pct:50,  color:C.amber,     bg:C.amberBg},
+  {id:"engaged",        label:"Betrokken",        pct:75,  color:C.crimson,   bg:C.crimsonFaint},
+  {id:"won",            label:"Gewonnen",          pct:100, color:C.green,     bg:C.greenBg},
+];
+const LOST_STAGE={id:"lost",label:"Verloren",pct:0,color:C.red,bg:C.redBg};
 
-// ─── NEW LEAD MODAL ───────────────────────────────────────────────────────────
+function LeadsView({user,setDetailLead,showToast}){
+const {members}=useTeamMembers(user.dept);
+const [leads,setLeads]=useState([]);
+const [loading,setLoading]=useState(true);
+const [view,setView]=useState("kanban"); // kanban | list
+const [deptF,setDeptF]=useState(user.dept==="BOTH"?"ALL":user.dept);
+const [q,setQ]=useState("");
+const [showNew,setShowNew]=useState(false);
+const [newStage,setNewStage]=useState("new"); // pre-select stage when clicking +
+
+// Load from DB
+useEffect(()=>{
+  supabase.from("leads")
+    .select("id,company_name,contact_name,contact_email,phone,estimated_value,stage,department,assigned_to,notes,source,priority,expected_close,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      setLeads((data||[]).map(l=>({
+        id:l.id, name:l.company_name||"—", contact:l.contact_name||"",
+        email:l.contact_email||"", phone:l.phone||"",
+        value:Number(l.estimated_value)||0, stage:l.stage||"new",
+        dept:l.department, assignedTo:l.assigned_to,
+        notes:l.notes||"", source:l.source||"",
+        priority:l.priority||"normal",
+        expectedClose:l.expected_close||null,
+      })));
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+},[]);
+
+const stages=deptF==="FF"?FF_STAGES:TC_STAGES;
+const allStages=[...stages,LOST_STAGE];
+
+const filtered=leads.filter(l=>{
+  const dOk=deptF==="ALL"||(l.dept===deptF);
+  const qOk=!q||l.name.toLowerCase().includes(q.toLowerCase())||l.contact.toLowerCase().includes(q.toLowerCase());
+  return dOk&&qOk;
+});
+
+// KPI totals
+const totalValue=filtered.filter(l=>l.stage!=="lost").reduce((s,l)=>s+l.value,0);
+const wonValue=filtered.filter(l=>l.stage==="won").reduce((s,l)=>s+l.value,0);
+const convRate=filtered.length?Math.round((filtered.filter(l=>l.stage==="won").length/filtered.length)*100):0;
+
+const moveLead=async(leadId,newStage)=>{
+  setLeads(ls=>ls.map(l=>l.id===leadId?{...l,stage:newStage}:l));
+  await supabase.from("leads").update({stage:newStage}).eq("id",leadId);
+};
+
+const deleteLead=async(id,name)=>{
+  if(!window.confirm(`Lead "${name}" verwijderen?`)) return;
+  setLeads(ls=>ls.filter(l=>l.id!==id));
+  await fetch(`${SB_URL}/rest/v1/leads?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+  if(showToast) showToast(`"${name}" verwijderd`);
+};
+
+const convertToClient=async(lead)=>{
+  if(!window.confirm(`Lead "${lead.name}" converteren naar cliënt? Er wordt een nieuw bedrijfsprofiel aangemaakt.`)) return;
+  try{
+    // Create company
+    const {data:company,error}=await supabase.from("companies").insert({
+      name:lead.name,
+      department:lead.dept||"TC",
+      contact_name:lead.contact||null,
+      contact_email:lead.email||null,
+      lifecycle_status:"Nieuw Prospect",
+      health:"green",
+    }).select("id,name").single();
+    if(error) throw new Error(error.message);
+    // Mark lead as won + converted
+    await supabase.from("leads").update({stage:"won",converted_at:new Date().toISOString(),converted_company_id:company.id}).eq("id",lead.id);
+    setLeads(ls=>ls.map(l=>l.id===lead.id?{...l,stage:"won"}:l));
+    if(showToast) showToast(`"${lead.name}" geconverteerd naar cliënt ✓`);
+  }catch(e){
+    if(showToast) showToast("Fout bij conversie: "+e.message);
+  }
+};
+
+return(
+<div>
+  {/* Header */}
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="CRM" title="Leads Pipeline"/>
+    <div style={{display:"flex",gap:8,marginTop:4}}>
+      {/* View toggle */}
+      <div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:9,overflow:"hidden"}}>
+        {[{v:"kanban",Icon:Layers},{v:"list",Icon:BarChart3}].map(({v,Icon})=>(
+          <button key={v} onClick={()=>setView(v)}
+            style={{padding:"7px 12px",border:"none",cursor:"pointer",background:view===v?C.crimson:"transparent",color:view===v?CREAM:C.secondary,display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:700}}>
+            <Icon size={13}/> {v==="kanban"?"Kanban":"Lijst"}
+          </button>
+        ))}
+      </div>
+      <button onClick={()=>{setNewStage("new");setShowNew(true);}}
+        style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+        <Plus size={13}/> Nieuwe lead
+      </button>
+    </div>
+  </div>
+
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+  {[
+    {l:"TOTALE PIPELINE",v:`SRD ${(totalValue/1000).toFixed(0)}K`,c:C.text},
+    {l:"GEWONNEN",v:`SRD ${(wonValue/1000).toFixed(0)}K`,c:C.green},
+    {l:"CONVERSIE",v:`${convRate}%`,c:convRate>=30?C.green:C.amber},
+    {l:"ACTIEVE LEADS",v:filtered.filter(l=>l.stage!=="won"&&l.stage!=="lost").length,c:C.crimson},
+  ].map(k=>(
+    <div key={k.l} style={{background:C.surface,borderRadius:12,padding:"12px 16px",border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+      <div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.c}}>{k.v}</div>
+    </div>
+  ))}
+  </div>
+
+  {/* Filter bar */}
+  <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+    <div style={{position:"relative",flex:1,minWidth:200,maxWidth:320}}>
+      <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek lead..."
+        style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+      {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+    </div>
+    {user.dept==="BOTH"&&["ALL","TC","FF"].map(d=>(
+      <button key={d} onClick={()=>setDeptF(d)}
+        style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${deptF===d?C.crimson:C.border}`,background:deptF===d?C.crimson:"transparent",color:deptF===d?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {d==="ALL"?"Alle":d}
+      </button>
+    ))}
+  </div>
+
+  {/* ── KANBAN BOARD ── */}
+  {view==="kanban"&&(
+    <div style={{display:"grid",gridTemplateColumns:`repeat(${allStages.length},1fr)`,gap:12,alignItems:"start"}}>
+      {allStages.map(stage=>{
+        const stageLeads=filtered.filter(l=>l.stage===stage.id);
+        const stageVal=stageLeads.reduce((s,l)=>s+l.value,0);
+        return(
+          <div key={stage.id}
+            onDragOver={e=>e.preventDefault()}
+            onDrop={e=>{e.preventDefault();const id=e.dataTransfer.getData("leadId");if(id)moveLead(id,stage.id);}}>
+            {/* Column header */}
+            <div style={{padding:"10px 12px",borderRadius:"10px 10px 0 0",background:stage.bg,border:`1px solid ${stage.color}30`,borderBottom:"none",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:stage.color}}/>
+                <span style={{fontSize:11,fontWeight:700,color:stage.color,textTransform:"uppercase",letterSpacing:"0.07em"}}>{stage.label}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:10,fontWeight:700,color:stage.color,background:`${stage.color}20`,padding:"2px 7px",borderRadius:8}}>{stageLeads.length}</span>
+              </div>
+            </div>
+            {stageVal>0&&(
+              <div style={{padding:"4px 12px",background:stage.bg,borderLeft:`1px solid ${stage.color}30`,borderRight:`1px solid ${stage.color}30`,fontSize:10,color:stage.color,fontWeight:700}}>
+                SRD {(stageVal/1000).toFixed(0)}K
+              </div>
+            )}
+
+            {/* Cards */}
+            <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px",background:C.bg,borderRadius:"0 0 10px 10px",border:`1px solid ${C.border}`,borderTop:"none",minHeight:80}}>
+              {stageLeads.map(lead=>(
+                <div key={lead.id} draggable
+                  onDragStart={e=>{e.dataTransfer.setData("leadId",lead.id);e.currentTarget.style.opacity="0.5";}}
+                  onDragEnd={e=>{e.currentTarget.style.opacity="1";}}
+                  onClick={()=>setDetailLead&&setDetailLead(lead)}
+                  style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`,cursor:"pointer",transition:"box-shadow .15s",boxShadow:"0 1px 3px rgba(58,46,40,.06)"}}>
+                  {/* Card header */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text,lineHeight:1.3,flex:1,paddingRight:8}}>{lead.name}</div>
+                    <button onClick={e=>{e.stopPropagation();deleteLead(lead.id,lead.name);}}
+                      style={{width:20,height:20,borderRadius:5,border:"none",background:"transparent",cursor:"pointer",color:C.mushroom,display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0,opacity:0.6}}>
+                      <X size={11}/>
+                    </button>
+                  </div>
+                  {lead.contact&&<div style={{fontSize:10,color:C.secondary,marginBottom:4}}>{lead.contact}</div>}
+                  {/* Value */}
+                  <div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.crimson,marginBottom:8}}>SRD {lead.value.toLocaleString()}</div>
+                  {/* Footer */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <DeptTag dept={lead.dept}/>
+                    {/* Stage move buttons */}
+                    <div style={{display:"flex",gap:4}}>
+                      {stage.id!=="won"&&stage.id!=="lost"&&(
+                        <button onClick={e=>{e.stopPropagation();const nextIdx=allStages.findIndex(s=>s.id===stage.id)+1;if(nextIdx<allStages.length-1)moveLead(lead.id,allStages[nextIdx].id);}}
+                          title="Volgende fase"
+                          style={{width:22,height:22,borderRadius:6,border:`1px solid ${C.border}`,background:C.bg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.secondary}}>
+                          <ChevronRight size={11}/>
+                        </button>
+                      )}
+                      {stage.id==="won"&&(
+                        <button onClick={e=>{e.stopPropagation();convertToClient(lead);}}
+                          title="Converteer naar cliënt"
+                          style={{fontSize:9,fontWeight:700,padding:"3px 7px",borderRadius:6,border:`1px solid ${C.green}40`,background:C.greenBg,color:C.green,cursor:"pointer",whiteSpace:"nowrap"}}>
+                          + Cliënt
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Quick add */}
+              {stage.id!=="lost"&&(
+                <button onClick={()=>{setNewStage(stage.id);setShowNew(true);}}
+                  style={{width:"100%",padding:"7px",borderRadius:8,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:2}}>
+                  <Plus size={11}/> Toevoegen
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  {/* ── LIST VIEW ── */}
+  {view==="list"&&(
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(58,46,40,.07)"}}>
+      {loading?(
+        <div style={{padding:"40px 24px",textAlign:"center",color:C.secondary}}>Laden...</div>
+      ):filtered.length===0?(
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <TrendingUp size={32} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen leads gevonden</div>
+          <button onClick={()=>setShowNew(true)} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",marginTop:8}}>
+            <Plus size={13}/> Eerste lead aanmaken
+          </button>
+        </div>
+      ):(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr style={{background:C.warm50}}>
+              {["BEDRIJF","CONTACT","AFDELING","STADIUM","WAARDE","SLUITDATUM",""].map((h,i)=>(
+                <th key={i} style={{padding:"10px 16px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(l=>{
+              const stg=allStages.find(s=>s.id===l.stage)||allStages[0];
+              return(
+                <tr key={l.id} onClick={()=>setDetailLead&&setDetailLead(l)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+                  <td style={{padding:"13px 16px"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>{l.name}</div>
+                    {l.source&&<div style={{fontSize:10,color:C.muted}}>{l.source}</div>}
+                  </td>
+                  <td style={{padding:"13px 16px"}}>
+                    <div style={{fontSize:12,color:C.text}}>{l.contact||"—"}</div>
+                    {l.email&&<div style={{fontSize:10,color:C.secondary}}>{l.email}</div>}
+                  </td>
+                  <td style={{padding:"13px 16px"}}><DeptTag dept={l.dept}/></td>
+                  <td style={{padding:"13px 16px"}}>
+                    <span style={{fontSize:9,fontWeight:700,padding:"3px 9px",borderRadius:20,background:stg.bg,color:stg.color,textTransform:"uppercase"}}>{stg.label}</span>
+                  </td>
+                  <td style={{padding:"13px 16px",fontFamily:F.display,fontSize:15,fontWeight:600,color:C.crimson}}>SRD {l.value.toLocaleString()}</td>
+                  <td style={{padding:"13px 16px",fontSize:11,color:C.secondary}}>{l.expectedClose||"—"}</td>
+                  <td style={{padding:"13px 16px"}}>
+                    <div style={{display:"flex",gap:6}}>
+                      {l.stage==="won"&&(
+                        <button onClick={e=>{e.stopPropagation();convertToClient(l);}}
+                          style={{padding:"4px 9px",borderRadius:7,border:`1px solid ${C.green}40`,background:C.greenBg,color:C.green,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                          → Cliënt
+                        </button>
+                      )}
+                      <button onClick={e=>{e.stopPropagation();deleteLead(l.id,l.name);}}
+                        style={{padding:"4px 8px",borderRadius:7,border:`1px solid ${C.red}30`,background:C.redBg,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                        <X size={10}/>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )}
+
+  {/* ── NEW LEAD MODAL ── */}
+  {showNew&&(
+    <NewLeadModal
+      user={user} members={members} initialStage={newStage}
+      onClose={()=>setShowNew(false)}
+      onCreated={lead=>{setLeads(ls=>[lead,...ls]);if(showToast)showToast(`Lead "${lead.name}" aangemaakt ✓`);}}
+      showToast={showToast}
+    />
+  )}
+</div>
+);
+}
+
 
 function NewLeadModal({user,members,initialStage,onClose,onCreated,showToast}){
 const [name,setName]=useState("");
@@ -3797,7 +4098,7 @@ return(
 );
 }
 
-// ─── LEAD DETAIL ─────────────────────────────────────────────────────────────
+
 function LeadDetail({lead,onBack,showToast}){
 const stages=lead.dept==="FF"?FF_STAGES:TC_STAGES;
 const allStages=[...stages,LOST_STAGE];
@@ -3981,6 +4282,382 @@ return(
 
 
 // ─── INVOICES VIEW ───────────────────────────────────────────────────────────
+
+function DMSView({user,showToast}){
+const t=useT();
+const [docs,setDocs]=useState([]);
+const [loading,setLoading]=useState(true);
+const [q,setQ]=useState("");
+const [deptF,setDeptF]=useState(user.dept==="BOTH"?"ALL":user.dept);
+const [statusF,setStatusF]=useState("ALL");
+const [typeF,setTypeF]=useState("ALL");
+const [activeFolder,setActiveFolder]=useState("ALL");
+const [selected,setSelected]=useState(null);
+const [uploading,setUploading]=useState(false);
+const [showNewFolder,setShowNewFolder]=useState(false);
+const [folderName,setFolderName]=useState("");
+const [folders,setFolders]=useState(["Contracten","Jaarrekeningen","Fiscale Documenten","KYC","Rapporten"]);
+const uploadRef=React.useRef();
+
+// Load from DB
+useEffect(()=>{
+  supabase.from("documents")
+    .select("id,name,file_url,file_type,file_size,visibility,review_status,department,uploaded_at,uploaded_by,folder_name,tags,version")
+    .order("uploaded_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setDocs(data.map(d=>({
+        ...d,
+        dept:d.department,
+        type:(d.file_type||"PDF").toUpperCase(),
+        status:d.review_status,
+        date:d.uploaded_at?new Date(d.uploaded_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+        size:d.file_size?formatBytes(d.file_size):"—",
+        folder:d.folder_name||"Geen map",
+      })));
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+},[]);
+
+const formatBytes=(b)=>{
+  if(!b) return "—";
+  if(b<1024) return b+"B";
+  if(b<1024*1024) return (b/1024).toFixed(1)+"KB";
+  return (b/(1024*1024)).toFixed(1)+"MB";
+};
+
+const handleUpload=async(file,targetFolder=activeFolder==="ALL"?null:activeFolder)=>{
+  if(!file) return;
+  if(file.size>50*1024*1024){showToast("Max 50MB per bestand");return;}
+  setUploading(true);
+  try{
+    const ext=file.name.split(".").pop().toLowerCase();
+    const path=`${user.dept||"TC"}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+    const uploadRes=await fetch(`${SB_URL}/storage/v1/object/documents/${path}`,{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${_authToken}`,"apikey":SB_ANON,"Content-Type":file.type||"application/octet-stream"},
+      body:file,
+    });
+    if(!uploadRes.ok) throw new Error("Upload naar storage mislukt");
+    const fileUrl=`${SB_URL}/storage/v1/object/documents/${path}`;
+    const {data:doc,error}=await supabase.from("documents").insert({
+      name:file.name, file_url:fileUrl, file_type:ext,
+      file_size:file.size,
+      department:user.dept==="BOTH"?"TC":user.dept,
+      visibility:"internal", review_status:"pending",
+      uploaded_by:user.id,
+      folder_name:targetFolder||null,
+    }).select().single();
+    if(error) throw new Error(error.message);
+    setDocs(ds=>[{...doc,dept:doc.department,type:ext.toUpperCase(),status:"pending",date:"Zojuist",size:formatBytes(file.size),folder:targetFolder||"Geen map"},...ds]);
+    showToast(`"${file.name}" geüpload ✓`);
+  }catch(e){showToast("Upload mislukt: "+e.message);}
+  setUploading(false);
+};
+
+const deleteDoc=async(doc,e)=>{
+  e.stopPropagation();
+  if(!window.confirm(`"${doc.name}" permanent verwijderen?`)) return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/documents?id=eq.${doc.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+    setDocs(ds=>ds.filter(d=>d.id!==doc.id));
+    if(selected?.id===doc.id) setSelected(null);
+    showToast(`"${doc.name}" verwijderd`);
+  }catch(e){showToast("Fout: "+e.message);}
+};
+
+const changeVisibility=async(doc,newVis)=>{
+  await supabase.from("documents").update({visibility:newVis}).eq("id",doc.id);
+  setDocs(ds=>ds.map(d=>d.id===doc.id?{...d,visibility:newVis}:d));
+  if(selected?.id===doc.id) setSelected(s=>({...s,visibility:newVis}));
+  showToast("Zichtbaarheid bijgewerkt");
+};
+
+const addFolder=()=>{
+  if(!folderName.trim()) return;
+  if(!folders.includes(folderName.trim())) setFolders(fs=>[...fs,folderName.trim()]);
+  setFolderName(""); setShowNewFolder(false);
+  showToast(`Map "${folderName}" aangemaakt`);
+};
+
+// All unique folders from DB docs
+const allFolders=["Geen map",...new Set(docs.filter(d=>d.folder&&d.folder!=="Geen map").map(d=>d.folder)),...folders.filter(f=>!docs.find(d=>d.folder===f))];
+
+const filtered=docs.filter(d=>{
+  const dOk=deptF==="ALL"||d.dept===deptF;
+  const sOk=statusF==="ALL"||d.status===statusF;
+  const tOk=typeF==="ALL"||d.type===typeF;
+  const fOk=activeFolder==="ALL"||(d.folder||"Geen map")===activeFolder;
+  const qOk=!q||d.name.toLowerCase().includes(q.toLowerCase());
+  return dOk&&sOk&&tOk&&fOk&&qOk;
+});
+
+const typeIcon={PDF:<FileText size={14} color={C.crimson}/>,EXCEL:<FileSpreadsheet size={14} color={C.green}/>,XLSX:<FileSpreadsheet size={14} color={C.green}/>,DOCX:<FileType size={14} color={C.blue}/>,DOC:<FileType size={14} color={C.blue}/>,JPG:<FileText size={14} color={C.amber}/>,PNG:<FileText size={14} color={C.amber}/>};
+const typeBg={PDF:C.crimsonFaint,EXCEL:C.greenBg,XLSX:C.greenBg,DOCX:C.blueBg,DOC:C.blueBg};
+const statusCount={pending:docs.filter(d=>d.status==="pending").length,in_review:docs.filter(d=>d.status==="in_review").length,verified:docs.filter(d=>d.status==="verified").length,rejected:docs.filter(d=>d.status==="rejected").length};
+
+return(
+<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+  <PageHeader kicker="Documenten" title={t("docLib")}/>
+  <div style={{display:"flex",gap:8,marginTop:4}}>
+    <button onClick={()=>setShowNewFolder(true)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+      <FolderOpen size={13}/> Nieuwe map
+    </button>
+    <input type="file" ref={uploadRef} style={{display:"none"}} multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv"
+      onChange={e=>{Array.from(e.target.files||[]).forEach(f=>handleUpload(f));e.target.value="";}}/>
+    <button onClick={()=>uploadRef.current?.click()} disabled={uploading}
+      style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:uploading?C.mushroom:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:uploading?"default":"pointer"}}>
+      {uploading?<><div style={{width:10,height:10,border:"2px solid rgba(255,255,255,.4)",borderTopColor:CREAM,borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Uploaden...</>:<><Upload size={13}/> Uploaden</>}
+    </button>
+  </div>
+</div>
+
+{/* KPI strip */}
+<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+{[
+  {l:"TOTAAL",v:docs.length,c:C.text,bg:C.surface},
+  {l:"IN AFWACHTING",v:statusCount.pending,c:C.amber,bg:C.amberBg,cursor:true,f:"pending"},
+  {l:"GEVERIFIEERD",v:statusCount.verified,c:C.green,bg:C.greenBg,cursor:true,f:"verified"},
+  {l:"AFGEWEZEN",v:statusCount.rejected,c:C.red,bg:C.redBg,cursor:true,f:"rejected"},
+].map(k=>(
+  <div key={k.l} onClick={k.cursor?()=>setStatusF(statusF===k.f?"ALL":k.f):undefined}
+    style={{background:k.bg,borderRadius:12,padding:"12px 16px",border:`1px solid ${k.c==="ALL"?C.border:k.c+"30"}`,cursor:k.cursor?"pointer":"default",transition:"opacity .15s",opacity:k.cursor&&statusF!=="ALL"&&statusF!==k.f?0.5:1}}>
+    <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+    <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:k.c}}>{k.v}</div>
+  </div>
+))}
+</div>
+
+<div style={{display:"grid",gridTemplateColumns:"200px 1fr",gap:16}}>
+
+  {/* Left: folder tree */}
+  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+    <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4,paddingLeft:4}}>MAPPEN</div>
+    {[{id:"ALL",label:"Alle documenten",count:docs.length},...allFolders.map(f=>({id:f,label:f,count:docs.filter(d=>(d.folder||"Geen map")===f).length}))].map(f=>(
+      <div key={f.id} onClick={()=>setActiveFolder(f.id)}
+        style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:9,cursor:"pointer",background:activeFolder===f.id?C.crimsonFaint:"transparent",border:`1.5px solid ${activeFolder===f.id?C.crimson:C.border}`,transition:"all .15s"}}>
+        {f.id==="ALL"?<Layers size={13} color={activeFolder===f.id?C.crimson:C.secondary}/>:<FolderOpen size={13} color={activeFolder===f.id?C.crimson:C.secondary}/>}
+        <span style={{fontSize:12,fontWeight:activeFolder===f.id?700:400,color:activeFolder===f.id?C.crimson:C.text,flex:1}}>{f.label}</span>
+        <span style={{fontSize:10,fontWeight:700,color:activeFolder===f.id?C.crimson:C.muted}}>{f.count}</span>
+      </div>
+    ))}
+    {/* Drag-drop upload area */}
+    <div style={{marginTop:8,border:`2px dashed ${C.border}`,borderRadius:12,padding:"20px 12px",textAlign:"center",cursor:"pointer",background:C.warm50}}
+      onClick={()=>uploadRef.current?.click()}
+      onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.crimson;e.currentTarget.style.background=C.crimsonFaint;}}
+      onDragLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.warm50;}}
+      onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background=C.warm50;Array.from(e.dataTransfer.files).forEach(f=>handleUpload(f));}}>
+      <Upload size={16} color={C.secondary} style={{marginBottom:6}}/>
+      <div style={{fontSize:10,fontWeight:700,color:C.secondary}}>Sleep hier</div>
+      <div style={{fontSize:9,color:C.muted}}>of klik om te kiezen</div>
+    </div>
+  </div>
+
+  {/* Right: document table */}
+  <div>
+    {/* Filter bar */}
+    <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+      <div style={{position:"relative",flex:1,minWidth:180}}>
+        <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek op naam..."
+          style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+        {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+      </div>
+      {user.dept==="BOTH"&&["ALL","TC","FF"].map(d=>(
+        <button key={d} onClick={()=>setDeptF(d)} style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${deptF===d?C.crimson:C.border}`,background:deptF===d?C.crimson:"transparent",color:deptF===d?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+          {d==="ALL"?"Alle":d}
+        </button>
+      ))}
+      <select value={typeF} onChange={e=>setTypeF(e.target.value)}
+        style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.surface,color:C.text}}>
+        <option value="ALL">Alle typen</option>
+        {["PDF","DOCX","XLSX","JPG","PNG"].map(t=><option key={t} value={t}>{t}</option>)}
+      </select>
+    </div>
+
+    {/* Table */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07)",overflow:"hidden"}}>
+      {loading?(
+        <div style={{padding:"40px 24px",textAlign:"center",color:C.secondary,fontSize:12}}>Laden...</div>
+      ):filtered.length===0?(
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <FileText size={32} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen documenten gevonden</div>
+          <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Upload je eerste document of pas de filters aan.</div>
+          <button onClick={()=>uploadRef.current?.click()} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            <Upload size={13}/> Document uploaden
+          </button>
+        </div>
+      ):(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr style={{background:C.warm50}}>
+              {["NAAM","TYPE","MAP","DATUM","ZICHTBAARHEID","STATUS",""].map((h,i)=>(
+                <th key={i} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(d=>(
+              <tr key={d.id} onClick={()=>setSelected(d)}
+                style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+                <td style={{padding:"12px 14px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:32,height:32,borderRadius:8,background:typeBg[d.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {typeIcon[d.type]||<FileText size={14} color={C.secondary}/>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                      <div style={{fontSize:10,color:C.secondary}}>{d.size}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{padding:"12px 14px"}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4}}>{d.type}</span></td>
+                <td style={{padding:"12px 14px",fontSize:11,color:C.secondary}}>{d.folder||"—"}</td>
+                <td style={{padding:"12px 14px",fontSize:11,color:C.secondary,whiteSpace:"nowrap"}}>{d.date}</td>
+                <td style={{padding:"12px 14px"}}><VisChip vis={d.visibility}/></td>
+                <td style={{padding:"12px 14px"}}><ReviewChip status={d.status}/></td>
+                <td style={{padding:"12px 14px"}}>
+                  <div style={{display:"flex",gap:6}}>
+                    {d.file_url&&(
+                      <a href={d.file_url} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()}
+                        style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",borderRadius:7,background:C.bg,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,textDecoration:"none"}}>
+                        <Download size={10}/> DL
+                      </a>
+                    )}
+                    {(user.role==="super_admin"||user.role==="staff")&&(
+                      <button onClick={e=>deleteDoc(d,e)}
+                        style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                        <X size={10}/>
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </div>
+</div>
+
+{/* New folder modal */}
+{showNewFolder&&(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setShowNewFolder(false)}>
+<div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:16,width:380,maxWidth:"95vw",padding:"24px",boxShadow:"0 24px 60px rgba(0,0,0,.2)"}}>
+  <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,marginBottom:14}}>Nieuwe map aanmaken</div>
+  <input value={folderName} onChange={e=>setFolderName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addFolder()}
+    placeholder="Bijv. Contracten 2026" autoFocus
+    style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${C.crimson}`,fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:14,background:C.bg,color:C.text}}/>
+  <div style={{display:"flex",gap:8}}>
+    <button onClick={addFolder} style={{flex:1,padding:"10px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Aanmaken</button>
+    <button onClick={()=>setShowNewFolder(false)} style={{padding:"10px 16px",borderRadius:9,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,cursor:"pointer"}}>Annuleren</button>
+  </div>
+</div>
+</div>
+)}
+
+{/* Document detail panel */}
+{selected&&(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={()=>setSelected(null)}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:620,maxWidth:"95vw",maxHeight:"88vh",boxShadow:"0 4px 32px rgba(0,0,0,.18)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+  {/* Header */}
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+    <div style={{width:38,height:38,borderRadius:9,background:typeBg[selected.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+      {typeIcon[selected.type]||<FileText size={16} color={C.secondary}/>}
+    </div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</div>
+      <div style={{fontSize:10,color:C.secondary}}>{selected.size} · {selected.type} · {selected.date}</div>
+    </div>
+    <div style={{display:"flex",gap:8,flexShrink:0}}>
+      {selected.file_url&&(
+        <a href={selected.file_url} target="_blank" rel="noopener"
+          style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,textDecoration:"none"}}>
+          <Download size={13}/> Downloaden
+        </a>
+      )}
+      <button onClick={()=>setSelected(null)} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={15}/></button>
+    </div>
+  </div>
+  {/* Body */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 200px",flex:1,overflow:"hidden"}}>
+    {/* Preview area */}
+    <div style={{padding:"24px",overflowY:"auto",background:"#F8F7F5",borderRight:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:CREAM,borderRadius:12,padding:"32px",boxShadow:"0 2px 12px rgba(0,0,0,.08)",width:"100%",minHeight:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}>
+        <div style={{width:64,height:64,borderRadius:14,background:typeBg[selected.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {typeIcon[selected.type]||<FileText size={32} color={C.secondary}/>}
+        </div>
+        <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,textAlign:"center"}}>{selected.name}</div>
+        <ReviewChip status={selected.status}/>
+        {selected.file_url?(
+          <a href={selected.file_url} target="_blank" rel="noopener"
+            style={{fontSize:11,color:C.crimson,fontWeight:700,textDecoration:"none",display:"flex",alignItems:"center",gap:5}}>
+            <Download size={12}/> Open bestand
+          </a>
+        ):(
+          <div style={{fontSize:11,color:C.muted,textAlign:"center"}}>Geen bestandspreview beschikbaar</div>
+        )}
+      </div>
+    </div>
+    {/* Metadata */}
+    <div style={{padding:"20px 18px",overflowY:"auto",display:"flex",flexDirection:"column",gap:18}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>BESTANDSINFO</div>
+        {[["Type",selected.type],["Grootte",selected.size],["Geüpload",selected.date],["Map",selected.folder||"Geen map"],["Versie",`v${selected.version||1}`]].map(([l,v])=>(
+          <div key={l} style={{marginBottom:8}}>
+            <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.07em",marginBottom:2}}>{l}</div>
+            <div style={{fontSize:12,fontWeight:600,color:C.text}}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{height:1,background:C.border}}/>
+      {/* Visibility control */}
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>ZICHTBAARHEID</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {[{v:"internal",l:"Intern",sub:"Alleen medewerkers"},{v:"shared",l:"Gedeeld",sub:"TC + FF teams"},{v:"client",l:"Cliënt",sub:"Zichtbaar in portaal"}].map(opt=>(
+            <div key={opt.v} onClick={()=>changeVisibility(selected,opt.v)}
+              style={{padding:"8px 10px",borderRadius:8,border:`1.5px solid ${selected.visibility===opt.v?C.crimson:C.border}`,background:selected.visibility===opt.v?C.crimsonFaint:C.bg,cursor:"pointer",transition:"all .15s"}}>
+              <div style={{fontSize:11,fontWeight:700,color:selected.visibility===opt.v?C.crimson:C.text}}>{opt.l}</div>
+              <div style={{fontSize:9,color:C.secondary}}>{opt.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{height:1,background:C.border}}/>
+      {/* Move to folder */}
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>VERPLAATS NAAR MAP</div>
+        <select value={selected.folder||""} onChange={async e=>{
+          const newFolder=e.target.value||null;
+          await supabase.from("documents").update({folder_name:newFolder}).eq("id",selected.id);
+          setDocs(ds=>ds.map(d=>d.id===selected.id?{...d,folder:newFolder||"Geen map"}:d));
+          setSelected(s=>({...s,folder:newFolder||"Geen map"}));
+          showToast("Map bijgewerkt");
+        }} style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:11,outline:"none",cursor:"pointer",background:C.bg,color:C.text}}>
+          <option value="">Geen map</option>
+          {allFolders.filter(f=>f!=="Geen map").map(f=><option key={f} value={f}>{f}</option>)}
+        </select>
+      </div>
+      {(user.role==="super_admin"||user.role==="staff")&&(
+        <button onClick={e=>deleteDoc(selected,e)}
+          style={{width:"100%",padding:"9px",borderRadius:9,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <X size={13}/> Verwijderen
+        </button>
+      )}
+    </div>
+  </div>
+</div>
+</div>
+)}
+</div>
+);
+}
+
+
+
 function InvoicesView({user,invData,setInvData,showToast}){
 const [invoices,setInvoices]=useState([]);
 const [loading,setLoading]=useState(true);
@@ -4097,8 +4774,8 @@ return(
     <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
       {[
         {l:"Huidig",v:aging.current,c:C.green},
-        {l:"1–30 dagen",v:aging.d30,c:C.amber},
-        {l:"31–60 dagen",v:aging.d60,c:"#F97316"},
+        {l:"1-30 dagen",v:aging.d30,c:C.amber},
+        {l:"31-60 dagen",v:aging.d60,c:"#F97316"},
         {l:"60+ dagen",v:aging.d90,c:C.red},
       ].map(b=>{
         const total=aging.current+aging.d30+aging.d60+aging.d90||1;
@@ -4808,7 +5485,7 @@ return(
         <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
           <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Campagnes</div>
-            <button onClick={()=>setTab("campaigns")} style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Alles bekijken →</button>
+            <button onClick={()=>setTab("campaigns")} style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Alles bekijken -></button>
           </div>
           {userCamps.slice(0,4).map((c,i)=>{
             const meta=STATUS_META[c.status]||STATUS_META.draft;
@@ -4854,7 +5531,7 @@ return(
                       <div style={{height:"100%",width:reach>0?`${Math.min((reach/5000)*100,100)}%`:"0%",background:PLATFORM_COLOR[platform],borderRadius:2}}/>
                     </div>
                   </div>
-                  <span style={{fontSize:10,color:C.muted,flexShrink:0}}>{likes>0?`${likes}♥`:""}</span>
+                  <span style={{fontSize:10,color:C.muted,flexShrink:0}}>{likes>0?`${likes}<3`:""}</span>
                 </div>
               );
             })}
@@ -5011,8 +5688,8 @@ return(
                 <div style={{fontSize:12,color:C.text,lineHeight:1.6,marginBottom:6}}>{p.content}</div>
                 {p.status==="published"&&(
                   <div style={{display:"flex",gap:12,fontSize:10,color:C.secondary}}>
-                    <span>♥ {p.likes||0} likes</span>
-                    <span>👁 {(p.reach||0).toLocaleString()} bereik</span>
+                    <span>{"♥"} {p.likes||0} likes</span>
+                    <span> {(p.reach||0).toLocaleString()} bereik</span>
                     <span>{p.published_at?new Date(p.published_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—"}</span>
                   </div>
                 )}
@@ -5348,6 +6025,945 @@ return(
 }
 
 
+
+// ─── RiskMatrixView ─────────────────────────────────────────
+function RiskMatrixView(){
+const GRID=5;
+const cells=[];
+for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
+const heat=(r+c)/(GRID*2-2);
+cells.push({r,c,heat});
+}
+const sectors=[{l:"Cybersecurity",v:94,red:true},{l:"Financieel Recht",v:82,red:true},{l:"Publieke Sector",v:45},{l:"Infrastructuur",v:31}];
+return(
+<div>
+<PageHeader kicker="Intelligence" title="Strategische Risicomatrix"/>
+<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time dreigingsanalyse en sectorale kwetsbaarheden binnen de Tactigent en Fiscal Fuse ecosystemen.</p>
+<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+<div>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>Dreigingsniveau Matrix</div>
+<div style={{fontSize:10,color:C.secondary}}>Visualisatie van Impact vs. Waarschijnlijkheid</div>
+</div>
+<div style={{display:"flex",gap:12}}>
+{[{c:C.crimson,l:"TACTIGENT"},{c:C.espresso,l:"FISCAL FUSE"}].map(b=>(
+<div key={b.l} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c}}/><span style={{fontSize:9,fontWeight:600,color:C.secondary}}>{b.l}</span></div>
+))}
+</div>
+</div>
+<div style={{position:"relative",aspectRatio:"1",maxHeight:340}}>
+<div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gridTemplateRows:`repeat(${GRID},1fr)`,gap:4,height:"100%"}}>
+{cells.map(({r,c,heat})=>(
+<div key={`${r}-${c}`} style={{borderRadius:6,background:`rgba(139,26,43,${heat*0.35+0.05})`}}/>
+))}
+</div>
+{/* TC bubble row0=top,col4=right (low prob, high impact = row 4, col 4) */}
+<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
+<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
+<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
+<div style={{position:"absolute",bottom:0,left:0,fontSize:9,color:C.secondary,fontWeight:600}}>LAGE WAARSCHIJNLIJKHEID</div>
+<div style={{position:"absolute",bottom:0,right:0,fontSize:9,color:C.secondary,fontWeight:600}}>HOGE WAARSCHIJNLIJKHEID</div>
+</div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:12}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Sectorale Analyse</div>
+{sectors.map(s=>(
+<div key={s.l} style={{marginBottom:12}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+<span style={{fontSize:11,color:C.text}}>{s.l}</span>
+<span style={{fontSize:11,fontWeight:700,color:s.red?C.crimson:C.text}}>{s.v}% Risico</span>
+</div>
+<div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+<div style={{height:"100%",width:`${s.v}%`,background:s.red?C.crimson:C.walnut,borderRadius:2}}/>
+</div>
+</div>
+))}
+<div style={{marginTop:14,padding:"12px",borderRadius:9,background:C.warm50,border:`1px solid ${C.border}`}}>
+<div style={{fontSize:9,fontWeight:700,color:C.crimson,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>SYSTEEM ALERT</div>
+<div style={{fontSize:11,color:C.text,lineHeight:1.5}}>Kritieke stijging gedetecteerd in Tactigent Core blootstelling.</div>
+</div>
+</div>
+<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
+<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>MAANDELIJKSE TREND</div>
+<div style={{fontFamily:F.display,fontSize:32,fontWeight:600,marginBottom:6}}>+12.4%</div>
+<div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:6,background:"rgba(255,255,255,.1)",fontSize:9,fontWeight:700}}>/ INCREASED VIGILANCE</div>
+</div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+{[{Icon:Shield,label:"VEILIGHEIDS INDEX",value:"88.4"},{Icon:Scale,label:"JURIDISCHE DRUK",value:"Medium"}].map(k=>(
+<div key={k.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`}}>
+<k.Icon size={18} color={C.secondary} style={{marginBottom:4}}/>
+<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{k.label}</div>
+<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>{k.value}</div>
+</div>
+))}
+</div>
+</div>
+</div>
+</div>
+);
+}
+
+// ─── ASSET FLOW VIEW ─────────────────────────────────────────────────────────
+
+// ─── AssetFlowView ─────────────────────────────────────────
+function AssetFlowView(){
+const months=["JAN","FEB","MRT","APR","MEI","JUN"];
+const tcBars=[22,28,35,30,42,48];
+const ffBars=[12,16,18,22,20,26];
+const maxBar=Math.max(...tcBars.map((t,i)=>t+ffBars[i]));
+const movements=[
+{date:"14 Jun 2024",desc:"Project Alfa Dividend",dept:"TC",amount:"+SRD 42.500",status:"Afgerond"},
+{date:"12 Jun 2024",desc:"Fiscale Optimalisatie Q2",dept:"FF",amount:"-SRD 12.800",status:"Verwerkt"},
+{date:"08 Jun 2024",desc:"Directie Bonus Pool",dept:"TC",amount:"+SRD 115.000",status:"Geverifieerd"},
+];
+return(
+<div>
+<PageHeader kicker="Intelligence" title="Vermogensstroom"/>
+<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time visualisatie van uw kapitaalallocatie en liquide middelen binnen het Tactigent en Fiscal Fuse ecosysteem.</p>
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+{[{l:"TOTAAL VERMOGEN",v:"SRD 4.281.090",s:"USD"},{l:"LIQUIDE MIDDELEN",v:"SRD 1.12M",s:"Gedekt door FF Reserves"},{l:"INVESTERINGSRENDEMENT",v:"+12.4% YTD",s:"Gedreven door Tactigent Projects",accent:true}].map(k=>(
+<div key={k.l} style={{background:k.accent?C.crimsonFaint:C.surface,borderRadius:14,padding:"16px 18px",border:`1.5px solid ${k.accent?C.crimson:C.border}`}}>
+<div style={{fontSize:8.5,fontWeight:700,color:k.accent?C.crimson:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>{k.l}</div>
+<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.accent?C.crimson:C.text,marginBottom:3}}>{k.v}</div>
+<div style={{fontSize:10,color:C.secondary}}>{k.s}</div>
+</div>
+))}
+</div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Kapitaalallocatie</div>
+<div style={{display:"flex",alignItems:"center",gap:20}}>
+<div style={{position:"relative",width:120,height:120,flexShrink:0}}>
+<svg viewBox="0 0 120 120" style={{transform:"rotate(-90deg)"}}>
+<circle cx="60" cy="60" r="50" fill="none" stroke={C.border} strokeWidth="18"/>
+<circle cx="60" cy="60" r="50" fill="none" stroke={C.espresso} strokeWidth="18" strokeDasharray={`${35*3.14} ${65*3.14}`} strokeDashoffset="0"/>
+<circle cx="60" cy="60" r="50" fill="none" stroke={C.crimson} strokeWidth="18" strokeDasharray={`${65*3.14} ${35*3.14}`} strokeDashoffset={`${-35*3.14}`}/>
+</svg>
+<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>65%</div>
+<div style={{fontSize:9,color:C.secondary}}>TACTIGENT</div>
+</div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:10}}>
+{[{c:C.crimson,l:"TC PROJECTS",v:"SRD 2.78M"},{c:C.espresso,l:"FF MATTERS",v:"SRD 1.50M"}].map(b=>(
+<div key={b.l} style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c,flexShrink:0}}/><div><div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.07em"}}>{b.l}</div><div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{b.v}</div></div></div>
+))}
+</div>
+</div>
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>Cashflow Trend</div>
+<div style={{display:"flex",gap:6}}>
+{["6 MAANDEN","1 JAAR"].map((l,i)=><button key={l} style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${i===0?C.crimson:C.border}`,background:i===0?C.crimsonFaint:"transparent",color:i===0?C.crimson:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>{l}</button>)}
+</div>
+</div>
+<div style={{display:"flex",gap:6,alignItems:"flex-end",height:80,marginBottom:8}}>
+{months.map((m,i)=>(
+<div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"stretch",gap:2}}>
+<div style={{flex:tcBars[i],background:C.crimson,borderRadius:"3px 3px 0 0",opacity:0.8}}/>
+<div style={{flex:ffBars[i],background:C.espresso,opacity:0.6}}/>
+</div>
+))}
+</div>
+<div style={{display:"flex",gap:6}}>
+{months.map(m=>(<div key={m} style={{flex:1,textAlign:"center",fontSize:8.5,color:C.secondary,fontWeight:600}}>{m}</div>))}
+</div>
+</div>
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Vermogensbewegingen</div>
+<button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Exporteren v</button>
+</div>
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["DATUM","OMSCHRIJVING","AFDELING","BEDRAG","STATUS"].map(h=><th key={h} style={{padding:"8px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{movements.map((m,i)=>(
+<tr key={i} style={{borderTop:`1px solid ${C.border}`}}>
+<td style={{padding:"13px 18px",fontSize:11,color:C.secondary}}>{m.date}</td>
+<td style={{padding:"13px 18px",fontSize:13,fontWeight:600,color:C.text}}>{m.desc}</td>
+<td style={{padding:"13px 18px"}}><DeptTag dept={m.dept}/></td>
+<td style={{padding:"13px 18px",fontFamily:F.display,fontSize:14,fontWeight:600,color:m.amount.startsWith("+")?C.green:C.red}}>{m.amount}</td>
+<td style={{padding:"13px 18px"}}><span style={{fontSize:9,fontWeight:700,color:C.secondary,background:C.warm50,padding:"3px 8px",borderRadius:4}}>{m.status}</span></td>
+</tr>
+))}</tbody>
+</table>
+</div>
+</div>
+);
+}
+
+// ─── CLIENT PORTAL VIEWS ─────────────────────────────────────────────────────
+
+// ─── CompanyDetail ─────────────────────────────────────────
+function CompanyDetail({company,user,onBack,setDetailEng,engData,invData,showToast}){
+const [activeTab,setActiveTab]=useState("overview");
+const engagements=(engData||ENGAGEMENTS_INIT).filter(e=>e.client===company.name);
+const invoices=invData.filter(i=>i.client===company.name);
+const docs=DOCUMENTS.filter(d=>engagements.some(e=>e.ref===d.engagement));
+const totalBilled=invoices.reduce((s,i)=>s+i.amount,0);
+const openBilled=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
+const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
+const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
+const tabs=[
+{id:"overview",label:"Overzicht",icon:Layers},
+{id:"engagements",label:`Engagements (${engagements.length})`,icon:Target},
+{id:"documents",label:`Documenten (${docs.length})`,icon:FileText},
+{id:"invoices",label:`Facturen (${invoices.length})`,icon:Receipt},
+];
+return(
+<div className="fu">
+<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:16,padding:0}}>
+<ChevronLeft size={15}/> Terug naar overzicht
+</button>
+{/* Header */}
+<div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16,display:"flex",alignItems:"center",gap:20}}>
+<div style={{flexShrink:0}}>
+<CompanyLogo name={company.name} size={52} dept={company.dept} logoUrl={company.logoUrl}/>
+</div>
+<div style={{flex:1}}>
+<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+<h1 style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,margin:0}}>{company.name}</h1>
+<DeptTag dept={company.dept}/>
+<HealthDot status={company.health}/>
+</div>
+<div style={{fontSize:12,color:C.secondary}}>KKF {company.kkf} · {company.lifecycle}</div>
+</div>
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center"}}>
+{[{l:"ENGAGEMENTS",v:engagements.length},{l:"GEFACTUREERD",v:`SRD ${totalBilled.toLocaleString()}`},{l:"OPENSTAAND",v:`SRD ${openBilled.toLocaleString()}`}].map(s=>(
+<div key={s.l} style={{background:C.bg,borderRadius:10,padding:"10px 14px"}}>
+<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
+<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:openBilled>0&&s.l==="OPENSTAAND"?C.amber:C.text}}>{s.v}</div>
+</div>
+))}
+</div>
+</div>
+{/* Tabs */}
+<div style={{display:"flex",gap:4,marginBottom:16,background:C.bg,borderRadius:12,padding:4}}>
+{tabs.map(tb=>(
+<button key={tb.id} onClick={()=>setActiveTab(tb.id)} style={{flex:1,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,fontWeight:activeTab===tb.id?700:400,fontSize:12,transition:"all .15s",boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none"}}>
+<tb.icon size={13}/>{tb.label}
+</button>
+))}
+</div>
+{/* Overview tab */}
+{activeTab==="overview"&&(
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+<div style={{display:"flex",flexDirection:"column",gap:12}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Primair Contact</div>
+<div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+<div style={{position:"relative"}}>
+<Avatar initials={company.contact.split(" ").map(w=>w[0]).join("").slice(0,2)} size={44} bg={company.dept==="TC"?C.crimson:C.taupe} shape="circle"/>
+<div style={{position:"absolute",bottom:-1,right:-1,width:14,height:14,borderRadius:"50%",background:C.green,border:`2px solid ${C.surface}`}}/>
+</div>
+<div>
+<div style={{fontSize:14,fontWeight:700,color:C.text}}>{company.contact}</div>
+<div style={{fontSize:11,color:C.secondary}}>{company.role}</div>
+</div>
+</div>
+{[["Email",`${company.contact.split(" ")[0].toLowerCase()}@${company.name.toLowerCase().replace(/\s+/g,"").replace(/[^a-z]/g,"")}.sr`],["Telefoon","+597 8xx-xxxx"],["Afdeling",company.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"]].map(([l,v])=>(
+<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+<span style={{fontSize:11,color:C.secondary}}>{l}</span>
+<span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
+</div>
+))}
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Bedrijfsgegevens</div>
+{[["KKF Nummer",company.kkf],["Lifecycle Status",company.lifecycle],["Gezondheidsstatus",company.health==="red"?"Kritiek":company.health==="amber"?"Amber":"Stabiel"],["Afdeling",company.dept==="TC"?"Tactigent":"Fiscal Fuse"]].map(([l,v])=>(
+<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+<span style={{fontSize:11,color:C.secondary}}>{l}</span>
+<span style={{fontSize:11,fontWeight:600,color:company.health==="red"&&l==="Gezondheidsstatus"?C.red:company.health==="amber"&&l==="Gezondheidsstatus"?C.amber:C.text}}>{v}</span>
+</div>
+))}
+</div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:12}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Actieve Engagements</div>
+{engagements.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen actieve engagements</div>):
+engagements.map(e=>(
+<div key={e.id} onClick={()=>setDetailEng(e)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+<div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref} · {e.phase}</div></div>
+<div style={{display:"flex",alignItems:"center",gap:8}}><HealthDot status={e.health}/><ChevronRight size={14} color={C.secondary}/></div>
+</div>
+))}
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Recente Facturen</div>
+{invoices.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen facturen</div>):
+invoices.slice(0,3).map(inv=>(
+<div key={inv.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderTop:`1px solid ${C.border}`}}>
+<div><div style={{fontSize:12,fontWeight:600,color:C.text}}>{inv.ref}</div><div style={{fontSize:10,color:C.secondary}}>{inv.due}</div></div>
+<div style={{display:"flex",alignItems:"center",gap:8}}>
+<span style={{fontFamily:F.display,fontSize:13,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</span>
+<Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERS.":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
+</div>
+</div>
+))}
+</div>
+</div>
+</div>
+)}
+{/* Engagements tab */}
+{activeTab==="engagements"&&(
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+{engagements.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Target size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements voor dit bedrijf</div></div>):(
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["NAAM","TYPE","FASE","GEZONDHEID","MANAGER","ACTIE"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{engagements.map(e=>(
+<tr key={e.id} onClick={()=>setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+<td style={{padding:"13px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref}</div></td>
+<td style={{padding:"13px 18px"}}><span style={{fontSize:9,padding:"3px 8px",borderRadius:4,background:e.type==="project"?C.crimsonFaint:"#F0EDE8",color:e.type==="project"?C.crimson:C.taupe,fontWeight:700,textTransform:"uppercase"}}>{e.type==="project"?"PROJECT":"DOSSIER"}</span></td>
+<td style={{padding:"13px 18px"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase}</span></td>
+<td style={{padding:"13px 18px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><HealthDot status={e.health}/><span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>{e.health==="red"?"KRITIEK":e.health==="amber"?"AMBER":"STABIEL"}</span></div></td>
+<td style={{padding:"13px 18px"}}><Avatar initials={e.manager} size={26} bg={e.dept==="TC"?C.crimson:C.taupe}/></td>
+<td style={{padding:"13px 18px"}}><button style={{padding:"5px 12px",borderRadius:7,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}>Openen</button></td>
+</tr>
+))}</tbody>
+</table>
+)}
+</div>
+)}
+{/* Documents tab */}
+{activeTab==="documents"&&(
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+{docs.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><FileText size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen documenten voor dit bedrijf</div></div>):(
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["DOCUMENT","TYPE","DATUM","ZICHTBAARHEID","STATUS"].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{docs.map(d=>(
+<tr key={d.id} style={{borderTop:`1px solid ${C.border}`}}>
+<td style={{padding:"12px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div><div style={{fontSize:10,color:C.secondary}}>{d.size}</div></td>
+<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.type}</td>
+<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.date}</td>
+<td style={{padding:"12px 18px"}}><VisChip vis={d.visibility}/></td>
+<td style={{padding:"12px 18px"}}><ReviewChip status={d.status}/></td>
+</tr>
+))}</tbody>
+</table>
+)}
+</div>
+)}
+{/* Invoices tab */}
+{activeTab==="invoices"&&(
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+{invoices.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Receipt size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen facturen voor dit bedrijf</div></div>):(
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS","QBO"].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{invoices.map(inv=>(
+<tr key={inv.id} style={{borderTop:`1px solid ${C.border}`}}>
+<td style={{padding:"12px 18px",fontSize:12,fontWeight:700,color:C.secondary}}>{inv.ref}</td>
+<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
+<td style={{padding:"12px 18px",fontSize:12,color:C.secondary}}>{inv.due}</td>
+<td style={{padding:"12px 18px"}}><Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERSTALLIG":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
+<td style={{padding:"12px 18px"}}>{inv.qbo?(<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> SYNC</span>):(<span style={{fontSize:9,color:C.muted}}>—</span>)}</td>
+</tr>
+))}</tbody>
+</table>
+)}
+</div>
+)}
+</div>
+);
+}
+
+// ─── LEAD DETAIL ─────────────────────────────────────────────────────────────
+
+// ─── ClientDashboard ─────────────────────────────────────────
+function ClientDashboard({user}){
+const t=useT();
+const [actions,setActions]=useState(CLIENT_PORTAL_ACTIONS);
+const pending=actions.filter(a=>a.status!=="done");
+return(
+<div>
+<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>STAATSOLIE N.V.</span></div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+<div>
+<h1 style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,margin:"0 0 4px"}}>Het Ethereal Commando</h1>
+<div style={{fontSize:12,color:C.secondary}}>Huidige Betrokkenheidsfase: <strong style={{color:C.crimson}}>Uitvoeringsfase Alpha</strong></div>
+</div>
+</div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
+<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+<div style={{fontSize:14,fontWeight:700,color:C.text}}>Belangrijkste Actiepunten</div>
+<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20}}>{pending.length} PRIORITEITEN</span>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+{pending.map((a,i)=>(
+<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${i===0?C.crimson:C.border}`,padding:"16px 20px",display:"flex",alignItems:"center",gap:16}}>
+<div style={{width:40,height:40,borderRadius:10,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+{a.type==="upload"?<Upload size={16}/>:a.type==="approve"?<CheckSquare size={16}/>:<ClipboardList size={16}/>}
+</div>
+<div style={{flex:1}}>
+<div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text,marginBottom:4}}>{a.title}</div>
+<div style={{fontSize:12,color:C.secondary}}>{a.desc}</div>
+</div>
+<button onClick={()=>setActions(as=>as.map(x=>x.id===a.id?{...x,status:"done"}:x))} style={{padding:"9px 16px",borderRadius:10,background:i===0?C.crimson:C.walnut,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+{i===0?"NU UITVOEREN":"BEKIJKEN"} ->
+</button>
+</div>
+))}
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 20px"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>Voortgang Dossier</div>
+<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.crimson}}>68%</div>
+</div>
+<div style={{fontSize:11,color:C.secondary,marginBottom:10}}>Mijlpaal: Strategie Implementatie</div>
+<div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
+<div style={{height:"100%",width:"68%",background:C.crimson,borderRadius:4}}/>
+</div>
+</div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:12}}>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>Financieel Overzicht</div>
+<div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:7,height:7,borderRadius:"50%",background:C.green,animation:"pulse 2s infinite"}}/><span style={{fontSize:9,fontWeight:700,color:C.secondary}}>LIVE SYNC</span></div>
+</div>
+<div style={{fontSize:9,color:C.secondary,marginBottom:3}}>BESCHIKBARE LIQUIDITEIT</div>
+<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,marginBottom:12}}>SRD 4.281.090</div>
+<div style={{fontSize:9,color:C.secondary,marginBottom:8}}>QBO Sync Status: <span style={{color:C.green,fontWeight:700}}>ACTIEF</span></div>
+{[["Burn Rate","-SRD 142k/md"],[" Runway","30.2 Maanden"],["Netto Marge","18.4%"]].map(([l,v])=>(
+<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+<span style={{fontSize:11,color:C.secondary}}>{l}</span>
+<span style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</span>
+</div>
+))}
+<button style={{width:"100%",marginTop:12,padding:"8px",borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,color:C.text,fontSize:10,fontWeight:700,cursor:"pointer"}}>VOLLEDIG GROOTBOEK BEKIJKEN</button>
+</div>
+<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
+<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INVESTERINGSADVIES</div>
+<blockquote style={{fontFamily:F.display,fontSize:13,fontWeight:600,lineHeight:1.6,margin:"0 0 12px"}}>"De sleutel tot portfolioweerbaarheid is de bewuste afwijzing van het onmiddellijke."</blockquote>
+<div style={{fontSize:9,fontWeight:700,color:C.taupeLight}}>TACTIGENT INZICHTEN · Wekelijkse Briefing</div>
+</div>
+</div>
+</div>
+</div>
+);
+}
+
+// ─── ClientDocsView ─────────────────────────────────────────
+function ClientDocsView({user}){
+const [tab,setTab]=useState("ALL");
+const [preview,setPreview]=useState(null);
+const [toast,setToast]=useState(null);
+const docs=DOCUMENTS.filter(d=>d.visibility!=="internal"&&(tab==="ALL"||d.dept===tab));
+const typeIconCmp3={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
+const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
+const handleDownload=(doc)=>{ setToast(`${doc.name} gedownload`); };
+
+return(
+<div>
+<PageHeader kicker="Mijn Portaal" title="Documenten"/>
+<p style={{fontSize:12,color:C.secondary,marginBottom:16}}>Centraal beheer van uw strategische en fiscale dossiers. Alle documenten zijn versleuteld.</p>
+<div style={{display:"grid",gridTemplateColumns:"1fr 240px",gap:16}}>
+<div>
+<div style={{display:"flex",gap:8,marginBottom:12}}>
+{[["ALL","Alle"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
+<button key={v} onClick={()=>setTab(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${tab===v?C.crimson:C.border}`,background:tab===v?C.crimson:"transparent",color:tab===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
+))}
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","STATUS",""].map(h=><th key={h} style={{padding:"9px 16px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{docs.map(d=>(
+<tr key={d.id} onClick={()=>setPreview(d)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+<td style={{padding:"13px 16px"}}>
+<div style={{display:"flex",alignItems:"center",gap:10}}>
+<div style={{width:36,height:36,borderRadius:9,background:typeBg[d.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+{typeIconCmp3[d.type]||<FileText size={16} color={C.secondary}/>}
+</div>
+<div>
+<div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div>
+<div style={{fontSize:10,color:C.secondary}}>{d.size} · {d.type}</div>
+</div>
+</div>
+</td>
+<td style={{padding:"13px 16px"}}><DeptTag dept={d.dept}/></td>
+<td style={{padding:"13px 16px",fontSize:11,color:C.secondary}}>{d.date}</td>
+<td style={{padding:"13px 16px"}}><ReviewChip status={d.status}/></td>
+<td style={{padding:"13px 16px"}}><ChevronRight size={15} color={C.secondary}/></td>
+</tr>
+))}</tbody>
+</table>
+</div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:10}}>
+<div style={{background:C.crimson,borderRadius:14,padding:"16px",color:CREAM,cursor:"pointer"}} onClick={()=>setToast("Upload gestarten")}>
+<div style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,color:"rgba(255,255,255,.7)"}}>Snelle Upload</div>
+<div style={{border:"2px dashed rgba(255,255,255,.4)",borderRadius:10,padding:"20px",textAlign:"center"}}>
+<Upload size={20} color="rgba(255,255,255,.8)" style={{marginBottom:8}}/>
+<div style={{fontSize:11,fontWeight:700,marginBottom:4}}>SELECTEER BESTAND</div>
+<div style={{fontSize:9,color:"rgba(255,255,255,.6)"}}>Sleep bestanden hierheen</div>
+</div>
+</div>
+{[{label:"Tactigent Bestanden",count:DOCUMENTS.filter(d=>d.dept==="TC").length},{label:"Fiscal Fuse Archief",count:DOCUMENTS.filter(d=>d.dept==="FF").length},{label:"Gedeelde Documenten",count:DOCUMENTS.filter(d=>d.visibility==="shared").length}].map(cat=>(
+<div key={cat.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+<span style={{fontSize:12,color:C.text,fontWeight:600}}>{cat.label}</span>
+<span style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.crimson}}>{cat.count}</span>
+</div>
+))}
+</div>
+</div>
+{preview&&<DocPreviewModal doc={preview} onClose={()=>setPreview(null)} onDownload={(d)=>{handleDownload(d);setPreview(null);}}/>}
+{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
+</div>
+);
+}
+
+// ─── ClientFinanceView ─────────────────────────────────────────
+function ClientFinanceView({user,invData}){
+const invoices=invData.filter(i=>i.client==="Staatsolie N.V.");
+const [preview,setPreview]=useState(null);
+const [toast,setToast]=useState(null);
+const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
+const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
+const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
+const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
+const totalPaid=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+i.amount,0);
+return(
+<div>
+<PageHeader kicker="Financiën" title="Facturen & Betalingen"/>
+{/* KPI strip */}
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+{[{l:"OPENSTAAND",v:`SRD ${totalOpen.toLocaleString()}`,c:totalOpen>0?C.amber:C.text},{l:"BETAALD",v:`SRD ${totalPaid.toLocaleString()}`,c:C.green},{l:"TOTAAL FACTUREN",v:invoices.length,c:C.text}].map(s=>(
+<div key={s.l} style={{background:C.surface,borderRadius:12,padding:"14px 18px",border:`1px solid ${C.border}`}}>
+<div style={{fontSize:8.5,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
+<div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:s.c}}>{s.v}</div>
+</div>
+))}
+</div>
+<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,fontSize:11,color:C.secondary}}>
+Klik op een factuur om de volledige factuurdetails te bekijken.
+</div>
+<table style={{width:"100%",borderCollapse:"collapse"}}>
+<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS",""].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+<tbody>{invoices.length===0?(
+<tr><td colSpan={5} style={{padding:"40px 18px",textAlign:"center",fontSize:13,color:C.secondary}}>Geen facturen gevonden</td></tr>
+):invoices.map(inv=>(
+<tr key={inv.id} onClick={()=>setPreview(inv)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+<td style={{padding:"14px 18px"}}>
+<div style={{display:"flex",alignItems:"center",gap:10}}>
+<div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:inv.status==="paid"?C.greenBg:C.amberBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+<Receipt size={16} color={sColor[inv.status]||C.secondary}/>
+</div>
+<div>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>{inv.ref}</div>
+{inv.qbo&&<div style={{fontSize:9,color:C.green,fontWeight:600,display:"flex",alignItems:"center",gap:3,marginTop:2}}><CheckCircle size={9}/> QBO gesynchroniseerd</div>}
+</div>
+</div>
+</td>
+<td style={{padding:"14px 18px",fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
+<td style={{padding:"14px 18px",fontSize:12,color:inv.status==="overdue"?C.red:C.secondary,fontWeight:inv.status==="overdue"?700:400}}>{inv.due}</td>
+<td style={{padding:"14px 18px"}}><Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
+<td style={{padding:"14px 18px"}}><ChevronRight size={15} color={C.secondary}/></td>
+</tr>
+))}</tbody>
+</table>
+</div>
+{preview&&<InvoicePreviewModal inv={preview} onClose={()=>setPreview(null)} onDownload={(inv)=>{setToast(`${inv.ref} gedownload als PDF`);setPreview(null);}}/>}
+{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
+</div>
+);
+}
+
+// ─── ClientActionsPortal ─────────────────────────────────────────
+function ClientActionsPortal({user,showToast}){
+const t=useT();
+const [actions,setActions]=useState(Object.values(CLIENT_ACTIONS_BY_ENG).flat());
+const [uploading,setUploading]=useState(null);
+const complete=(id,type)=>{ if(type==="upload"){setUploading(id);return;} setActions(as=>as.map(a=>a.id===id?{...a,status:"completed"}:a)); showToast("Actie voltooid"); };
+const handleUpload=()=>{ setActions(as=>as.map(a=>a.id===uploading?{...a,status:"completed"}:a)); setUploading(null); showToast("Document succesvol geüpload"); };
+const pending=actions.filter(a=>a.status!=="completed");
+const done=actions.filter(a=>a.status==="completed");
+const typeIconMap={upload:<Upload size={18}/>,approve:<CheckSquare size={18}/>,sign:<Pen size={18}/>,review:<ScanSearch size={18}/>};
+const typeCTA={upload:"UPLOADEN",approve:"GOEDKEUREN",sign:"ONDERTEKENEN",review:"BEOORDELEN"};
+return(
+<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20}}>
+<PageHeader kicker="Mijn Portaal" title={t("myActionItems")}/>
+<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20,marginBottom:4}}>{pending.length} {t("priorities")}</span>
+</div>
+{pending.length===0&&<div style={{background:C.greenBg,borderRadius:14,padding:"28px 24px",textAlign:"center",marginBottom:16}}><CheckCircle size={32} color={C.green} style={{marginBottom:10}}/><div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Alle acties voltooid</div></div>}
+<div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
+{pending.map((a,i)=>(
+<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${a.status==="overdue"?C.crimson:i===0?C.walnut:C.border}`,padding:"18px 22px",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:16,alignItems:"center"}}>
+<div style={{width:44,height:44,borderRadius:12,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{typeIconMap[a.type]||<ClipboardList size={18}/>}</div>
+<div>
+<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,marginBottom:3}}>{a.title}</div>
+<div style={{fontSize:12,color:C.secondary,marginBottom:4}}>{a.desc}</div>
+<div style={{fontSize:11,color:a.status==="overdue"?C.red:C.secondary,fontWeight:600}}>Termijn: {a.deadline}</div>
+</div>
+<button onClick={()=>complete(a.id,a.type)} style={{padding:"10px 18px",borderRadius:10,background:a.status==="overdue"?C.crimson:i===0?C.walnut:C.bg,color:a.status==="overdue"||i===0?CREAM:C.text,border:i===0||a.status==="overdue"?"none":`1.5px solid ${C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+{typeCTA[a.type]||"UITVOEREN"} ->
+</button>
+</div>
+))}
+</div>
+{done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
+{uploading&&(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setUploading(null)}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
+<button onClick={()=>setUploading(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
+</div>
+<div style={{border:`2px dashed ${C.crimson}`,borderRadius:14,padding:"32px",textAlign:"center",background:C.crimsonFaint,marginBottom:16,cursor:"pointer"}} onClick={handleUpload}>
+<Upload size={28} color={C.crimson} style={{marginBottom:10}}/>
+<div style={{fontSize:14,fontWeight:700,color:C.crimson,marginBottom:4}}>Sleep bestand hierheen</div>
+<div style={{fontSize:10,color:C.muted}}>PDF, Excel, Word — max 25 MB</div>
+</div>
+<button onClick={handleUpload} style={{width:"100%",padding:"11px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Simuleer Upload</button>
+</div>
+</div>
+)}
+</div>
+);
+}
+
+// ─── ClientMessagesView ─────────────────────────────────────────
+function ClientMessagesView({user,showToast}){
+const [threads,setThreads]=useState(CLIENT_THREADS);
+const [active,setActive]=useState(threads[0]);
+const [newMsg,setNewMsg]=useState("");
+const sendMsg=()=>{
+if(!newMsg.trim())return;
+setThreads(ts=>ts.map(t=>t.id===active.id?{...t,messages:[...t.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}:t));
+setActive(a=>({...a,messages:[...a.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}));
+setNewMsg(""); showToast("Bericht verzonden");
+};
+return(
+<div style={{display:"flex",height:"calc(100vh - 140px)",gap:0,background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+<div style={{width:260,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column"}}>
+<div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text}}>Berichten</div>
+<div style={{flex:1,overflowY:"auto"}}>
+{threads.map(th=>(
+<div key={th.id} onClick={()=>{setActive(th);setThreads(ts=>ts.map(t=>t.id===th.id?{...t,unread:false}:t));}} style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:active?.id===th.id?C.crimsonFaint:"transparent"}}>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+<Avatar initials={th.avatar} size={28} bg={C.walnut}/>
+<div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:C.text}}>{th.from}</div><div style={{fontSize:9,color:C.secondary}}>{th.time}</div></div>
+{th.unread&&<div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,flexShrink:0}}/>}
+</div>
+<div style={{fontSize:11,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingLeft:36}}>{th.preview}</div>
+</div>
+))}
+</div>
+</div>
+<div style={{flex:1,display:"flex",flexDirection:"column"}}>
+{active&&<>
+<div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`}}>
+<div style={{fontSize:13,fontWeight:700,color:C.text}}>{active.subject}</div>
+</div>
+<div style={{flex:1,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+{active.messages.map(m=>(
+<div key={m.id} style={{display:"flex",alignItems:"flex-start",gap:10,flexDirection:m.fromMe?"row-reverse":"row"}}>
+<Avatar initials={m.avatar} size={30} bg={m.fromMe?C.crimson:C.walnut}/>
+<div style={{maxWidth:"70%"}}>
+<div style={{fontSize:12,color:m.fromMe?CREAM:C.text,background:m.fromMe?C.crimson:C.bg,borderRadius:12,padding:"10px 14px",lineHeight:1.6}}>{m.body}</div>
+<div style={{fontSize:9,color:C.secondary,marginTop:4,textAlign:m.fromMe?"right":"left"}}>{m.time}</div>
+</div>
+</div>
+))}
+</div>
+<div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
+<input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Typ een bericht..." style={{flex:1,padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none"}}/>
+<button onClick={sendMsg} style={{padding:"9px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",cursor:"pointer"}}><Send size={14}/></button>
+</div>
+</>}
+</div>
+</div>
+);
+}
+
+// ─── COMPANY DETAIL ──────────────────────────────────────────────────────────
+
+// ─── DocPreviewModal ─────────────────────────────────────────
+function DocPreviewModal({doc, onClose, onDownload}) {
+const typeIcon={PDF:<FileText size={40} color={C.crimson}/>,Excel:<FileSpreadsheet size={40} color={C.green}/>,Word:<FileType size={40} color={C.blue}/>};
+const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
+// Fake document content lines for visual preview
+const previewLines = doc.type==="PDF" ? [
+{w:"80%",h:10,dark:true},{w:"60%",h:8},{w:"100%",h:6},{w:"95%",h:6},{w:"88%",h:6},{w:"70%",h:6},
+{w:"0%",h:8},{w:"100%",h:6},{w:"92%",h:6},{w:"85%",h:6},{w:"78%",h:6},{w:"40%",h:6},
+] : doc.type==="Excel" ? [
+{grid:true,cols:["Kwartaal","Omzet","Kosten","Marge"],rows:[["Q1 2025","SRD 28.500","SRD 12.200","57%"],["Q2 2025","SRD 34.100","SRD 14.800","57%"],["Q3 2025","SRD 41.200","SRD 17.300","58%"]]},
+] : [
+{w:"70%",h:12,dark:true},{w:"50%",h:8},{w:"100%",h:7},{w:"100%",h:7},{w:"95%",h:7},{w:"80%",h:7},
+{w:"0%",h:10},{w:"100%",h:7},{w:"100%",h:7},{w:"88%",h:7},
+];
+
+useEffect(()=>{
+const handler = e => { if(e.key==="Escape") onClose(); };
+window.addEventListener("keydown", handler);
+return ()=>window.removeEventListener("keydown", handler);
+},[]);
+
+return(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:760,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+{/* Topbar */}
+<div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+<div style={{width:36,height:36,borderRadius:9,background:typeBg[doc.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+{typeIcon[doc.type]||<FileText size={18} color={C.secondary}/>}
+</div>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontSize:14,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.name}</div>
+<div style={{fontSize:10,color:C.secondary}}>{doc.size} · {doc.type} · {doc.date}</div>
+</div>
+<div style={{display:"flex",alignItems:"center",gap:8}}>
+<ReviewChip status={doc.status}/>
+<button onClick={()=>onDownload(doc)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<Download size={13}/> Downloaden
+</button>
+<button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}>
+<X size={16}/>
+</button>
+</div>
+</div>
+
+    {/* Body: preview left, metadata right */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 220px",flex:1,overflow:"hidden"}}>
+      {/* Document preview */}
+      <div style={{padding:"24px",overflowY:"auto",borderRight:`1px solid ${C.border}`,background:"#F8F7F5"}}>
+        <div style={{background:CREAM,borderRadius:12,padding:"32px 36px",boxShadow:"0 2px 16px rgba(58,46,40,.08)",minHeight:360}}>
+          {/* Doc header branding */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,paddingBottom:16,borderBottom:`2px solid ${doc.dept==="TC"?C.crimson:C.taupe}`}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:800,color:doc.dept==="TC"?C.crimson:C.taupe,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:2}}>{doc.dept==="TC"?"TACTIGENT CONSULTANCY":"FISCAL FUSE"}</div>
+              <div style={{fontSize:9,color:C.secondary,letterSpacing:"0.08em"}}>VERTROUWELIJK RAPPORT</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:9,color:C.secondary}}>Referentie:</div>
+              <div style={{fontSize:10,fontWeight:700,color:C.text}}>{doc.engagement}</div>
+            </div>
+          </div>
+          {/* Title */}
+          <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:16,lineHeight:1.3}}>
+            {doc.name.replace(/\.[^.]+$/,"").replace(/_/g," ")}
+          </div>
+          {/* Fake content */}
+          {doc.type==="Excel" && previewLines[0]?.grid ? (
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead>
+                  <tr style={{background:doc.dept==="TC"?C.crimsonFaint:"#F0EDE8"}}>
+                    {previewLines[0].cols.map(c=><th key={c} style={{padding:"8px 12px",textAlign:"left",fontWeight:700,color:C.text,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase"}}>{c}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewLines[0].rows.map((row,i)=>(
+                    <tr key={i} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?"transparent":C.warm50}}>
+                      {row.map((cell,j)=><td key={j} style={{padding:"9px 12px",color:C.text,fontWeight:j===0?600:400}}>{cell}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{marginTop:16,padding:"10px 12px",borderRadius:8,background:C.warm50,fontSize:11,color:C.secondary}}>+ Meerdere tabbladen — download het bestand voor volledige inhoud</div>
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {previewLines.map((l,i)=>l.w==="0%" ? (
+                <div key={i} style={{height:16}}/>
+              ) : (
+                <div key={i} style={{height:l.h,width:l.w,background:l.dark?"#C8BBB2":"#E4DDD5",borderRadius:3,opacity:0.7+(i%3)*0.1}}/>
+              ))}
+              <div style={{marginTop:12,padding:"10px 12px",borderRadius:8,background:C.crimsonFaint,border:`1px solid ${C.crimsonMid}30`,fontSize:11,color:C.crimson,display:"flex",alignItems:"center",gap:6}}>
+                <Lock size={11}/> Download het bestand voor de volledige inhoud
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Metadata sidebar */}
+      <div style={{padding:"24px 20px",overflowY:"auto",display:"flex",flexDirection:"column",gap:20}}>
+        <div>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>BESTANDSINFO</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[
+              ["Grootte", doc.size],
+              ["Type", doc.type+" Document"],
+              ["Geüpload", doc.date],
+              ["Door", doc.uploadedBy],
+              ["Engagement", doc.engagement],
+            ].map(([l,v])=>(
+              <div key={l}>
+                <div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>{l}</div>
+                <div style={{fontSize:12,fontWeight:600,color:C.text}}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{height:1,background:C.border}}/>
+        <div>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>STATUS</div>
+          <ReviewChip status={doc.status}/>
+          {doc.status==="verified"&&<div style={{marginTop:8,fontSize:10,color:C.green,lineHeight:1.5}}>Dit document is geverifieerd door uw adviseur.</div>}
+          {doc.status==="in_review"&&<div style={{marginTop:8,fontSize:10,color:C.amber,lineHeight:1.5}}>Uw adviseur bekijkt dit document momenteel.</div>}
+          {doc.status==="pending"&&<div style={{marginTop:8,fontSize:10,color:C.secondary,lineHeight:1.5}}>Wacht op beoordeling door uw adviseur.</div>}
+        </div>
+        <div style={{height:1,background:C.border}}/>
+        <div>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>ACTIES</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={()=>onDownload(doc)} style={{width:"100%",padding:"9px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <Download size={13}/> Downloaden
+            </button>
+            <button style={{width:"100%",padding:"9px",borderRadius:9,background:"transparent",color:C.text,border:`1.5px solid ${C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <Send size={13}/> Delen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+);
+}
+
+// ─── InvoicePreviewModal ─────────────────────────────────────────
+function InvoicePreviewModal({inv, onClose, onDownload}) {
+const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
+const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
+const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
+
+useEffect(()=>{
+const handler = e => { if(e.key==="Escape") onClose(); };
+window.addEventListener("keydown", handler);
+return ()=>window.removeEventListener("keydown", handler);
+},[]);
+
+const lineItems = [
+{desc:"Adviseursdiensten — Q1 2025", qty:1, unit:"SRD "+Math.round(inv.amount*0.65).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.65).toLocaleString()},
+{desc:"Documentatiebeheer & archivering", qty:1, unit:"SRD "+Math.round(inv.amount*0.20).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.20).toLocaleString()},
+{desc:"Reiskosten & representatie", qty:1, unit:"SRD "+Math.round(inv.amount*0.15).toLocaleString(), total:"SRD "+Math.round(inv.amount*0.15).toLocaleString()},
+];
+
+return(
+<div style={{position:"fixed",inset:0,background:"rgba(58,46,40,.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:20,width:720,maxWidth:"95vw",maxHeight:"90vh",boxShadow:"0 40px 100px rgba(58,46,40,.35)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+{/* Topbar */}
+<div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+<div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:C.greenBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+<Receipt size={18} color={inv.status==="overdue"?C.red:C.green}/>
+</div>
+<div style={{flex:1}}>
+<div style={{fontSize:14,fontWeight:700,color:C.text}}>{inv.ref}</div>
+<div style={{fontSize:10,color:C.secondary}}>{inv.client} · Vervaldatum: {inv.due}</div>
+</div>
+<Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
+<button onClick={()=>onDownload(inv)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<Download size={13}/> PDF
+</button>
+<button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}>
+<X size={16}/>
+</button>
+</div>
+
+    {/* Invoice document */}
+    <div style={{overflowY:"auto",padding:"28px 32px",background:"#F8F7F5"}}>
+      <div style={{background:CREAM,borderRadius:14,padding:"36px 40px",boxShadow:"0 2px 16px rgba(58,46,40,.08)"}}>
+        {/* Invoice header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:800,color:C.crimson,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>
+              {inv.dept==="TC"?"TACTIGENT CONSULTANCY":"FISCAL FUSE"}
+            </div>
+            <div style={{fontSize:11,color:C.secondary}}>Waterkant 45, Paramaribo, Suriname</div>
+            <div style={{fontSize:11,color:C.secondary}}>+597 820-0000 · info@glasexec.sr</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,marginBottom:4}}>FACTUUR</div>
+            <div style={{fontSize:12,fontWeight:700,color:C.secondary}}>{inv.ref}</div>
+            <div style={{marginTop:8,padding:"6px 14px",borderRadius:8,background:sBg[inv.status]||C.warm50,display:"inline-block"}}>
+              <span style={{fontSize:11,fontWeight:700,color:sColor[inv.status]||C.secondary}}>{sLabel[inv.status]||inv.status}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bill to / details */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:28,padding:"16px 20px",borderRadius:10,background:C.warm50}}>
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>FACTUUR AAN</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{inv.client}</div>
+            <div style={{fontSize:11,color:C.secondary}}>Suriname</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {[["Factuurdatum","12 Apr 2025"],["Vervaldatum",inv.due],["Referentie",inv.ref],["QBO ID",inv.qbo||"—"]].map(([l,v])=>(
+              <div key={l}>
+                <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>{l}</div>
+                <div style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Line items */}
+        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:20}}>
+          <thead>
+            <tr style={{background:C.espresso}}>
+              {["OMSCHRIJVING","AANTAL","BEDRAG","TOTAAL"].map(h=>(
+                <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:700,color:CREAM,letterSpacing:"0.1em",textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?CREAM:C.warm50}}>
+                <td style={{padding:"12px 14px",fontSize:12,color:C.text}}>{item.desc}</td>
+                <td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{item.qty}</td>
+                <td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{item.unit}</td>
+                <td style={{padding:"12px 14px",fontSize:12,fontWeight:600,color:C.text}}>{item.total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Totals */}
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:28}}>
+          <div style={{width:260}}>
+            {[["Subtotaal","SRD "+Math.round(inv.amount*0.92).toLocaleString()],["BTW (8%)","SRD "+Math.round(inv.amount*0.08).toLocaleString()]].map(([l,v])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+                <span style={{fontSize:12,color:C.secondary}}>{l}</span>
+                <span style={{fontSize:12,color:C.text}}>{v}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",marginTop:6,borderRadius:10,background:inv.status==="paid"?C.greenBg:inv.status==="overdue"?C.redBg:C.espresso}}>
+              <span style={{fontSize:13,fontWeight:700,color:inv.status==="paid"?C.green:inv.status==="overdue"?C.red:CREAM}}>TOTAAL</span>
+              <span style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:inv.status==="paid"?C.green:inv.status==="overdue"?C.red:CREAM}}>SRD {inv.amount.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment info */}
+        {inv.status!=="paid"&&(
+          <div style={{padding:"16px 20px",borderRadius:10,border:`1.5px solid ${inv.status==="overdue"?C.red:C.border}`,background:inv.status==="overdue"?C.redBg:C.warm50}}>
+            <div style={{fontSize:11,fontWeight:700,color:inv.status==="overdue"?C.red:C.text,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>{inv.status==="overdue"&&<AlertTriangle size={13}/>}{inv.status==="overdue"?"Betaling achterstallig":"Betaalinstructies"}</div>
+            <div style={{fontSize:11,color:C.secondary,lineHeight:1.6}}>Bank: DSB Suriname · IBAN: SR12 3456 7890 1234 · t.n.v. The Glass Executive N.V.</div>
+          </div>
+        )}
+        {inv.status==="paid"&&(
+          <div style={{padding:"16px 20px",borderRadius:10,border:`1.5px solid ${C.green}30`,background:C.greenBg,display:"flex",alignItems:"center",gap:10}}>
+            <CheckCircle size={18} color={C.green}/>
+            <div style={{fontSize:12,fontWeight:700,color:C.green}}>Betaling ontvangen op {inv.paid} — Bedankt!</div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+);
+}
+
+
 function SettingsView({user,language,setLanguage,showToast}){
 const [activeTab,setActiveTab]=useState("profile");
 const [name,setName]=useState(user.name);
@@ -5527,7 +7143,7 @@ return(
             {[["Huidig wachtwoord",""],["Nieuw wachtwoord",""],["Bevestig wachtwoord",""]].map(([label])=>(
               <div key={label} style={{marginBottom:12}}>
                 <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>{label}</div>
-                <input type="password" placeholder="••••••••••••" style={{width:"100%",padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                <input type="password" placeholder="************" style={{width:"100%",padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
               </div>
             ))}
             <button onClick={()=>showToast("Wachtwoord bijgewerkt")} style={{padding:"10px 22px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Wachtwoord wijzigen</button>
@@ -5671,11 +7287,11 @@ return(
 </div>
 <div style={{marginBottom:22}}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase"}}>{t("password")}</span><span style={{fontSize:11,fontWeight:700,color:C.crimson,cursor:"pointer"}}>{t("forgotPw")}</span></div>
-<div style={{position:"relative"}}><Lock size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:C.muted}}/><input type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryLogin()} placeholder="••••••••" style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text,transition:"border-color .15s"}}/></div>
+<div style={{position:"relative"}}><Lock size={14} style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",color:C.muted}}/><input type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryLogin()} placeholder="********" style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:13,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text,transition:"border-color .15s"}}/></div>
 </div>
 {err&&<div style={{fontSize:12,color:C.amber,marginBottom:16,padding:"10px 14px",borderRadius:10,background:C.amberBg,border:`1.5px solid ${C.amber}40`,display:"flex",alignItems:"center",gap:8}}><AlertTriangle size={13} color={C.amber}/>{err}</div>}
-<button onClick={tryLogin} disabled={loading} style={{width:"100%",padding:"13px",borderRadius:11,background:loading?C.walnut:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:loading?"default":"pointer",marginBottom:24,boxShadow:loading?"none":"0 4px 16px rgba(139,26,43,.28)",transition:"background .15s,box-shadow .15s",letterSpacing:"0.02em"}}>{loading?t("loggingIn"):t("login")} {!loading&&"→"}</button>
-<div style={{marginTop:4,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>© {new Date().getFullYear()} The Client Portal · Beheerd door Corporate IT</div>
+<button onClick={tryLogin} disabled={loading} style={{width:"100%",padding:"13px",borderRadius:11,background:loading?C.walnut:C.crimson,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:loading?"default":"pointer",marginBottom:24,boxShadow:loading?"none":"0 4px 16px rgba(139,26,43,.28)",transition:"background .15s,box-shadow .15s",letterSpacing:"0.02em"}}>{loading?t("loggingIn"):t("login")} {!loading&&"->"}</button>
+<div style={{marginTop:4,textAlign:"center",fontSize:10,color:C.muted,letterSpacing:"0.04em"}}>(c) {new Date().getFullYear()} The Client Portal · Beheerd door Corporate IT</div>
 </div>
 </div>
 </div>
@@ -5692,7 +7308,7 @@ subtitle: "Uw beveiligde portaal voor Tactigent & Fiscal Fuse",
 description: "In de volgende stappen stellen we uw profiel in en leggen we uit hoe u het portaal optimaal gebruikt.",
 icon: LayoutDashboard,
 color: C.crimson,
-action: "Aan de slag →",
+action: "Aan de slag ->",
 },
 {
 id: "identity",
@@ -5705,7 +7321,7 @@ fields: [
 { id: "idNumber", label: "Identiteitsbewijs nummer", placeholder: "Bijv. SR-123456789", type: "text" },
 { id: "dob", label: "Geboortedatum", placeholder: "", type: "date" },
 ],
-action: "Identiteit bevestigen →",
+action: "Identiteit bevestigen ->",
 },
 {
 id: "company",
@@ -5720,7 +7336,7 @@ fields: [
 { id: "role", label: "Uw functietitel", placeholder: "Bijv. CFO", type: "text" },
 { id: "phone", label: "Telefoonnummer", placeholder: "+597 8xx-xxxx", type: "tel" },
 ],
-action: "Gegevens opslaan →",
+action: "Gegevens opslaan ->",
 },
 {
 id: "services",
@@ -5733,7 +7349,7 @@ services: [
 { id: "ff", label: "Fiscal Fuse", sub: "Fiscale & Juridische Dienstverlening", Icon: Scale },
 { id: "both", label: "Gecombineerd Pakket", sub: "Volledig geïntegreerde dienstverlening", Icon: Layers },
 ],
-action: "Diensten bevestigen →",
+action: "Diensten bevestigen ->",
 },
 {
 id: "security",
@@ -5746,7 +7362,7 @@ toggles: [
 { id: "emailNotif", label: "E-mailnotificaties", sub: "Ontvang updates over actiepunten en facturen", default: true },
 { id: "smsNotif", label: "SMS-notificaties", sub: "Urgente meldingen via SMS", default: false },
 ],
-action: "Instellingen opslaan →",
+action: "Instellingen opslaan ->",
 },
 {
 id: "done",
@@ -5754,7 +7370,7 @@ title: "Uw portaal is klaar!",
 subtitle: "Onboarding voltooid",
 description: "Alles is ingesteld. U kunt nu volledig gebruik maken van The Client Portal. Uw adviseur wordt automatisch op de hoogte gesteld.",
 icon: CheckCircle, color: C.green,
-action: "Naar mijn dashboard →",
+action: "Naar mijn dashboard ->",
 },
 ];
 
@@ -5950,7 +7566,7 @@ class ErrorBoundary extends React.Component {
         <div style={{minHeight:"100vh",background:C2.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Jost',sans-serif"}}>
           <div style={{background:C2.surface,borderRadius:20,padding:"32px 36px",maxWidth:480,width:"95vw",boxShadow:"0 24px 60px rgba(58,46,40,.15)",textAlign:"center"}}>
             <div style={{width:52,height:52,borderRadius:"50%",background:C2.redBg,border:`2px solid ${C2.red}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
-              <span style={{fontSize:22}}>⚠️</span>
+              <span style={{fontSize:22}}>!</span>
             </div>
             <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",fontSize:22,fontWeight:600,color:C2.text,marginBottom:8}}>Er is iets misgegaan</div>
             <div style={{fontSize:12,color:C2.secondary,marginBottom:6,lineHeight:1.6}}>
