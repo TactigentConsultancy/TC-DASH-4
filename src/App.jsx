@@ -2806,18 +2806,64 @@ useEffect(()=>{
 const submitReview=async()=>{
 if(!decision) return;
 const item=reviewing;
+// Optimistic UI update
 setDocs(ds=>ds.filter(d=>!(d.id===item.id&&d.sourceType===item.sourceType)));
 setProcessedCount(c=>c+1);
-showToast(decision==="verified"?`${item.name} geverifieerd`:`${item.name} afgewezen`);
+const labels={verified:"geverifieerd",rejected:"afgewezen",return:"teruggestuurd naar cliënt"};
+showToast(`"${item.name}" ${labels[decision]} ✓`);
 try{
+  const now=new Date().toISOString();
   if(item.sourceType==="document"){
-    await supabase.from("documents").update({review_status:decision==="verified"?"verified":"rejected"}).eq("id",item.id);
+    const newStatus=decision==="verified"?"verified":decision==="rejected"?"rejected":"pending";
+    await supabase.from("documents").update({
+      review_status:newStatus,
+      review_note:note||null,
+      reviewed_at:now,
+    }).eq("id",item.id);
   } else if(item.sourceType==="engagement"){
-    await supabase.from("engagements").update({status:decision==="verified"?"Actief":"Geblokkeerd"}).eq("id",item.id);
+    // Update the document record
+    const docStatus=decision==="verified"?"verified":decision==="rejected"?"rejected":"pending";
+    await supabase.from("documents").update({
+      review_status:docStatus,
+      review_note:note||null,
+      reviewed_at:now,
+    }).eq("id",item.id);
+    // Update the engagement status
+    const engStatus=decision==="verified"?"Actief":decision==="rejected"?"Geblokkeerd":"Wacht op Cliënt";
+    await supabase.from("engagements").update({
+      status:engStatus,
+      review_note:note||null,
+    }).eq("id",item.sourceId||item.id);
+    // If returning to client — create a client action requesting info
+    if(decision==="return"&&note?.trim()){
+      await supabase.from("client_actions").insert({
+        title:"Feedback op review: "+item.name,
+        description:note,
+        action_type:"review",
+        status:"pending",
+        engagement_id:item.sourceId||item.id,
+        department:item.dept,
+        is_visible_to_client:true,
+      });
+    }
   } else if(item.sourceType==="client_action"){
-    await supabase.from("client_actions").update({status:decision==="verified"?"completed":"overdue"}).eq("id",item.id);
+    const caStatus=decision==="verified"?"completed":decision==="rejected"?"overdue":"pending";
+    await supabase.from("client_actions").update({
+      status:caStatus,
+      review_note:note||null,
+    }).eq("id",item.id);
   }
-}catch(e){ console.warn("reviewSubmit:",e.message); }
+  // Create notification for the team
+  if(note?.trim()){
+    await supabase.from("notifications").insert({
+      title:`Review beslissing: ${item.name}`,
+      body:`${labels[decision].charAt(0).toUpperCase()+labels[decision].slice(1)}${note?`. Toelichting: ${note}`:""}`,
+      action_type:decision==="verified"?"success":decision==="rejected"?"warning":"info",
+      entity_type:item.sourceType,
+      is_read:false,
+    });
+  }
+}catch(e){ console.warn("reviewSubmit:",e.message||e); }
 setReviewing(null); setDecision(""); setNote("");
 };
 
@@ -2901,30 +2947,85 @@ return(
 </div>
 </div>
 {reviewing&&(
-<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={()=>setReviewing(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:520,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.13),0 1px 6px rgba(0,0,0,.08),inset 0 0 0 1px rgba(0,0,0,.05)"}}>
-<div style={{padding:"18px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<div style={{display:"flex",alignItems:"center",gap:9}}><FileText size={15} color={C.crimson}/><span style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>{reviewing.name}</span></div>
-<button onClick={()=>setReviewing(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"rgba(58,46,40,.55)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto"}} onClick={()=>{setReviewing(null);setDecision("");setNote("");}}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.18)",fontFamily:F.body,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+{/* Header */}
+<div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",alignItems:"center",gap:12}}>
+<div style={{width:36,height:36,borderRadius:9,background:typeBgMap[reviewing.reviewType]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+{typeIconMap[reviewing.reviewType]||<FileText size={14} color={C.crimson}/>}
 </div>
-<div style={{padding:"22px"}}>
-<div style={{display:"flex",gap:10,marginBottom:20}}>
-<span style={{fontSize:12,color:C.secondary}}>Cliënt:</span><span style={{fontSize:12,fontWeight:600,color:C.text}}>{reviewing.client}</span>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{reviewing.typeLabel}</div>
+<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{reviewing.name}</div>
 </div>
-<div style={{display:"flex",gap:10,marginBottom:16}}>
-{[{v:"verified",label:"Verifiëren",bg:C.green,Icon:CheckCircle},{v:"rejected",label:"Afwijzen",bg:C.red,Icon:X}].map(opt=>(
-<button key={opt.v} onClick={()=>setDecision(opt.v)} style={{flex:1,padding:"11px",borderRadius:10,border:`2px solid ${decision===opt.v?opt.bg:C.border}`,background:decision===opt.v?opt.bg:"transparent",color:decision===opt.v?CREAM:C.text,fontSize:12,fontWeight:700,cursor:"pointer",transition:"background .15s,color .15s,border-color .15s,opacity .15s"}}>{opt.label}</button>
+<button onClick={()=>{setReviewing(null);setDecision("");setNote("");}} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:4}}><X size={16}/></button>
+</div>
+{/* Context strip */}
+<div style={{display:"flex",borderBottom:`1px solid ${C.border}`,background:C.warm50}}>
+{[["Cliënt",reviewing.client],["Afdeling",reviewing.dept],["Ingediend",reviewing.uploaded]].map(([l,v])=>(
+<div key={l} style={{flex:1,padding:"10px 16px",borderRight:`1px solid ${C.border}`}}>
+<div style={{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{l}</div>
+<div style={{fontSize:12,fontWeight:600,color:C.text}}>{v||"—"}</div>
+</div>
 ))}
 </div>
-<textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Optionele toelichting..." rows={3} style={{width:"100%",padding:"10px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:14}}/>
+{/* Body */}
+<div style={{padding:"20px 22px"}}>
+{/* 3 Decision buttons */}
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>BESLISSING</div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+{[
+{v:"verified",label:"Verifiëren",sub:"Goedkeuren & afsluiten",bg:C.green,Icon:CheckCircle},
+{v:"return",label:"Terugsturen",sub:"Cliënt om actie vragen",bg:"#6366F1",Icon:RefreshCw},
+{v:"rejected",label:"Afwijzen",sub:"Blokkeren & informeren",bg:C.red,Icon:X},
+].map(opt=>{
+const sel=decision===opt.v;
+return(
+<button key={opt.v} onClick={()=>setDecision(opt.v)} style={{padding:"12px 8px",borderRadius:11,border:`2px solid ${sel?opt.bg:C.border}`,background:sel?opt.bg:"transparent",color:sel?CREAM:C.text,cursor:"pointer",textAlign:"center",transition:"all .15s"}}>
+<div style={{display:"flex",justifyContent:"center",marginBottom:6}}><opt.Icon size={18}/></div>
+<div style={{fontSize:12,fontWeight:700,marginBottom:2}}>{opt.label}</div>
+<div style={{fontSize:9,opacity:sel?0.85:0.5,lineHeight:1.3}}>{opt.sub}</div>
+</button>
+);
+})}
+</div>
+{/* Note */}
+<div style={{marginBottom:14}}>
+<div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>
+TOELICHTING {decision==="return"?<span style={{color:C.crimson}}>*</span>:<span style={{color:C.muted,fontWeight:400}}>(optioneel)</span>}
+</div>
+<textarea value={note} onChange={e=>setNote(e.target.value)} rows={3}
+placeholder={decision==="verified"?"Optionele opmerking bij goedkeuring...":decision==="return"?"Beschrijf wat de cliënt moet aanleveren of aanpassen...":decision==="rejected"?"Reden voor afwijzing...":"Selecteer eerst een beslissing..."}
+style={{width:"100%",padding:"10px 13px",borderRadius:9,border:`1.5px solid ${decision==="return"&&!note.trim()?C.amber:C.border}`,fontSize:12,outline:"none",resize:"vertical",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6}}/>
+{decision==="return"&&!note.trim()&&(
+<div style={{fontSize:10,color:C.amber,marginTop:4,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={10}/> Vul in wat de cliënt moet doen</div>
+)}
+</div>
+{/* What happens preview */}
+{decision&&(
+<div style={{padding:"10px 14px",borderRadius:9,background:decision==="verified"?C.greenBg:decision==="return"?C.indigoBg:C.redBg,border:`1px solid ${decision==="verified"?C.green+"40":decision==="return"?"#6366F140":C.red+"40"}`,marginBottom:16,fontSize:11,color:C.text,display:"flex",gap:8,alignItems:"flex-start"}}>
+<Info size={13} color={decision==="verified"?C.green:decision==="return"?C.indigo:C.red} style={{flexShrink:0,marginTop:1}}/>
+<div>
+{decision==="verified"&&<><strong>Verifiëren:</strong> Status wordt <strong>Actief</strong>. Item verdwijnt uit de wachtrij.</>}
+{decision==="return"&&<><strong>Terugsturen:</strong> Status wordt <strong>Wacht op Cliënt</strong>. Er wordt automatisch een cliëntactie aangemaakt met jouw toelichting.</>}
+{decision==="rejected"&&<><strong>Afwijzen:</strong> Status wordt <strong>Geblokkeerd</strong>. Item wordt gemarkeerd als afgewezen.</>}
+</div>
+</div>
+)}
+{/* Footer */}
 <div style={{display:"flex",gap:10}}>
-<button onClick={submitReview} disabled={!decision} style={{flex:1,padding:"11px",borderRadius:10,background:decision?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:decision?"pointer":"default"}}>Bevestigen</button>
-<button onClick={()=>setReviewing(null)} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+<button onClick={submitReview} disabled={!decision||(decision==="return"&&!note.trim())}
+style={{flex:1,padding:"11px",borderRadius:10,border:"none",fontSize:13,fontWeight:700,cursor:(!decision||(decision==="return"&&!note.trim()))?"default":"pointer",background:!decision||(decision==="return"&&!note.trim())?C.mushroom:decision==="verified"?C.green:decision==="return"?"#6366F1":C.red,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"background .15s"}}>
+{decision==="verified"?<CheckCircle size={14}/>:decision==="return"?<RefreshCw size={14}/>:decision==="rejected"?<X size={14}/>:null}
+{!decision?"Selecteer een beslissing":decision==="verified"?"Bevestig — Verifiëren":decision==="return"?"Bevestig — Terugsturen":"Bevestig — Afwijzen"}
+</button>
+<button onClick={()=>{setReviewing(null);setDecision("");setNote("");}} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
 </div>
 </div>
 </div>
 </div>
 )}
+
 </div>
 );
 }
