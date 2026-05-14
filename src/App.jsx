@@ -793,6 +793,7 @@ return(
 {(isTC||isFF||isBOTH)&&<>
 <SideSection label="Documentbeheer" collapsed={collapsed}/>
 <SideBtn icon={ClipboardList} label={t("review")} isActive={view==="review"} onClick={()=>setView("review")} collapsed={collapsed}/>
+<SideBtn icon={Upload} label="Documentverzoeken" isActive={view==="doc_requests"} onClick={()=>setView("doc_requests")} collapsed={collapsed} badge={0}/>
 </>}
 <SideSection label={t("crmLeads")} collapsed={collapsed}/>
 <SideBtn icon={Users} label={t("crm")} isActive={view==="crm"} onClick={()=>setView("crm")} collapsed={collapsed}/>
@@ -895,7 +896,7 @@ return(
 value={q}
 onChange={e=>{runSearch(e.target.value);setShowSearch(true);}}
 onFocus={()=>setShowSearch(true)}
-placeholder={t("search")}
+placeholder={t("search")} onClick={()=>setShowSearch(true)} readOnly
 style={{width:"100%",padding:"8px 34px 8px 36px",borderRadius:10,border:`1.5px solid ${showSearch&&q?C.crimson:C.border}`,fontSize:13,outline:"none",background:C.bg,color:C.text,transition:"border-color .15s",letterSpacing:"0.01em"}}
 />
 {q&&<button onClick={()=>{setQ("");setResults([]);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0,lineHeight:0}}><X size={14}/></button>}
@@ -997,6 +998,206 @@ style={{width:"100%",padding:"8px 34px 8px 36px",borderRadius:10,border:`1.5px s
 );
 }
 
+
+// ─── GLOBAL SEARCH ────────────────────────────────────────────────────────────
+function GlobalSearch({user,engData,companyData,onClose,setView,setDetailEng,setDetailCompany,setDetailLead}){
+const [q,setQ]=useState("");
+const [results,setResults]=useState([]);
+const [loading,setLoading]=useState(false);
+const [selected,setSelected]=useState(0);
+const inputRef=React.useRef(null);
+
+useEffect(()=>{
+  inputRef.current?.focus();
+  const handler=e=>{
+    if(e.key==="Escape") onClose();
+    if(e.key==="ArrowDown") setSelected(s=>Math.min(s+1,results.length-1));
+    if(e.key==="ArrowUp") setSelected(s=>Math.max(s-1,0));
+    if(e.key==="Enter"&&results[selected]) handleSelect(results[selected]);
+  };
+  window.addEventListener("keydown",handler);
+  return()=>window.removeEventListener("keydown",handler);
+},[results,selected]);
+
+useEffect(()=>{
+  setSelected(0);
+  if(q.trim().length<2){ setResults([]); return; }
+  setLoading(true);
+  const term=q.toLowerCase().trim();
+
+  // Search across 5 tables simultaneously
+  Promise.all([
+    // Engagements
+    supabase.from("engagements")
+      .select("id,name,department,status,health,phase")
+      .ilike("name",`%${term}%`)
+      .limit(4),
+    // Companies
+    supabase.from("companies")
+      .select("id,name,department,lifecycle_status,kkf_number")
+      .or(`name.ilike.%${term}%,kkf_number.ilike.%${term}%`)
+      .limit(4),
+    // Documents
+    supabase.from("documents")
+      .select("id,name,file_type,department,review_status")
+      .ilike("name",`%${term}%`)
+      .limit(3),
+    // Invoices
+    supabase.from("invoices")
+      .select("id,reference_code,amount,status,department")
+      .or(`reference_code.ilike.%${term}%,description.ilike.%${term}%`)
+      .limit(3),
+    // Leads
+    supabase.from("leads")
+      .select("id,company_name,contact_name,stage,department")
+      .or(`company_name.ilike.%${term}%,contact_name.ilike.%${term}%`)
+      .limit(3),
+  ]).then(([{data:engs},{data:comps},{data:docs},{data:invs},{data:leads}])=>{
+    const out=[];
+    (engs||[]).forEach(e=>out.push({
+      type:"engagement",id:e.id,label:e.name,
+      sub:`${e.department} · ${e.phase||e.status||"—"}`,
+      icon:"target",dept:e.department,health:e.health,data:e,
+    }));
+    (comps||[]).forEach(c=>out.push({
+      type:"company",id:c.id,label:c.name,
+      sub:c.department+" · "+(c.lifecycle_status||"—")+(c.kkf_number?" · KKF: "+c.kkf_number:""),
+      icon:"building",dept:c.department,data:c,
+    }));
+    (docs||[]).forEach(d=>out.push({
+      type:"document",id:d.id,label:d.name,
+      sub:`${d.department} · ${(d.file_type||"").toUpperCase()} · ${d.review_status||"—"}`,
+      icon:"file",dept:d.department,data:d,
+    }));
+    (invs||[]).forEach(i=>out.push({
+      type:"invoice",id:i.id,label:i.reference_code||"Factuur",
+      sub:`${i.department} · SRD ${Number(i.amount||0).toLocaleString()} · ${i.status||"—"}`,
+      icon:"receipt",dept:i.department,data:i,
+    }));
+    (leads||[]).forEach(l=>out.push({
+      type:"lead",id:l.id,label:l.company_name,
+      sub:`${l.department} · ${l.contact_name||"—"} · ${l.stage||"—"}`,
+      icon:"trending",dept:l.department,data:l,
+    }));
+    setResults(out);
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[q]);
+
+const handleSelect=(item)=>{
+  onClose();
+  switch(item.type){
+    case "engagement":
+      if(setDetailEng){ setDetailEng(item.data); setView("analyses"); }
+      break;
+    case "company":
+      if(setDetailCompany){ setDetailCompany(item.data); setView("crm"); }
+      break;
+    case "document":
+      setView("dms"); break;
+    case "invoice":
+      setView("invoices"); break;
+    case "lead":
+      if(setDetailLead){ setDetailLead(item.data); setView("leads"); }
+      else setView("leads");
+      break;
+  }
+};
+
+const TYPE_CONFIG={
+  engagement:{label:"Engagement",Icon:Target,c:C.crimson,bg:C.crimsonFaint},
+  company:{label:"Cliënt",Icon:Building2,c:C.taupe,bg:"#F5F3F0"},
+  document:{label:"Document",Icon:FileText,c:C.indigo,bg:C.indigoBg},
+  invoice:{label:"Factuur",Icon:Receipt,c:C.amber,bg:C.amberBg},
+  lead:{label:"Lead",Icon:TrendingUp,c:C.green,bg:C.greenBg},
+};
+
+const SHORTCUTS=[
+  {key:"P",label:"Projecten",view:"analyses"},
+  {key:"C",label:"Cliënten",view:"crm"},
+  {key:"F",label:"Facturen",view:"invoices"},
+  {key:"D",label:"Documenten",view:"dms"},
+  {key:"L",label:"Leads",view:"leads"},
+];
+
+return(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:99999,paddingTop:"10vh"}}
+  onClick={onClose}>
+  <div onClick={e=>e.stopPropagation()}
+    style={{width:620,maxWidth:"95vw",background:C.surface,borderRadius:16,boxShadow:"0 8px 48px rgba(0,0,0,.22)",overflow:"hidden",fontFamily:F.body}}>
+
+    {/* Search input */}
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 18px",borderBottom:`1px solid ${C.border}`}}>
+      <Search size={18} color={C.secondary}/>
+      <input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)}
+        placeholder="Zoek engagements, cliënten, facturen, documenten, leads..."
+        style={{flex:1,border:"none",outline:"none",fontSize:15,background:"transparent",color:C.text,fontFamily:F.body}}/>
+      {loading&&<div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${C.crimson}`,borderTopColor:"transparent",animation:"spin 0.8s linear infinite"}}/>}
+      {q&&<button onClick={()=>setQ("")} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={16}/></button>}
+      <div style={{padding:"2px 8px",borderRadius:5,background:C.warm50,border:`1px solid ${C.border}`,fontSize:10,fontWeight:700,color:C.secondary}}>ESC</div>
+    </div>
+
+    {/* Results */}
+    {q.length>=2?(
+      <div style={{maxHeight:420,overflowY:"auto"}}>
+        {results.length===0&&!loading&&(
+          <div style={{padding:"32px 20px",textAlign:"center"}}>
+            <Search size={24} color={C.mushroom} style={{marginBottom:8,display:"block",margin:"0 auto 8px"}}/>
+            <div style={{fontSize:13,fontWeight:600,color:C.secondary}}>Geen resultaten voor "{q}"</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:4}}>Probeer een andere zoekterm</div>
+          </div>
+        )}
+        {results.map((item,i)=>{
+          const cfg=TYPE_CONFIG[item.type]||TYPE_CONFIG.document;
+          const isSelected=i===selected;
+          return(
+            <div key={`${item.type}-${item.id}`}
+              onClick={()=>handleSelect(item)}
+              onMouseEnter={()=>setSelected(i)}
+              style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px",
+                background:isSelected?C.warm50:"transparent",
+                borderLeft:`3px solid ${isSelected?cfg.c:"transparent"}`,
+                cursor:"pointer",transition:"background .1s"}}>
+              <div style={{width:36,height:36,borderRadius:9,background:cfg.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <cfg.Icon size={16} color={cfg.c}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.label}</div>
+                <div style={{fontSize:11,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.sub}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                <span style={{fontSize:9,fontWeight:700,color:cfg.c,background:cfg.bg,padding:"2px 7px",borderRadius:4,textTransform:"uppercase"}}>{cfg.label}</span>
+                {item.dept&&<DeptTag dept={item.dept}/>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ):(
+      /* Quick shortcuts when no query */
+      <div style={{padding:"16px 18px"}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>SNELKOPPELINGEN</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
+          {SHORTCUTS.map(s=>(
+            <button key={s.key} onClick={()=>{onClose();setView(s.view);}}
+              style={{padding:"10px 8px",borderRadius:10,background:C.warm50,border:`1px solid ${C.border}`,cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.text}}>{s.label}</div>
+              <div style={{fontSize:9,color:C.secondary,marginTop:3}}>Ga naar</div>
+            </button>
+          ))}
+        </div>
+        <div style={{marginTop:14,padding:"10px 12px",borderRadius:8,background:C.warm50,display:"flex",gap:16,fontSize:10,color:C.secondary}}>
+          <span><kbd style={{padding:"1px 5px",borderRadius:3,background:C.surface,border:`1px solid ${C.border}`,fontSize:10}}>↑↓</kbd> navigeren</span>
+          <span><kbd style={{padding:"1px 5px",borderRadius:3,background:C.surface,border:`1px solid ${C.border}`,fontSize:10}}>↵</kbd> openen</span>
+          <span><kbd style={{padding:"1px 5px",borderRadius:3,background:C.surface,border:`1px solid ${C.border}`,fontSize:10}}>ESC</kbd> sluiten</span>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+);
+}
+
 function AppShell({user,language,setLanguage,onLogout}){
 const def=user.role==="client"?"c_dash":user.dept==="FF"?"dossiers":"dashboard";
 const [view,setView]=useState(def);
@@ -1005,6 +1206,7 @@ const [detailCompany,setDetailCompany]=useState(null);
 const [detailLead,setDetailLead]=useState(null);
 const [toast,setToast]=useState(null);
 const showToast=msg=>setToast(msg);
+const [showSearch,setShowSearch]=useState(false);
 
 // ── Dark mode ─────────────────────────────────────────────────────────────
 const [darkMode,setDarkMode]=useState(()=>{
@@ -1086,6 +1288,13 @@ useEffect(()=>{
   loadAll();
 },[user.id]);
 const [notifData,setNotifData]=useState([]);
+// Ctrl+K global search
+useEffect(()=>{
+  const h=e=>{ if((e.ctrlKey||e.metaKey)&&e.key==="k"){ e.preventDefault(); setShowSearch(s=>!s); } };
+  window.addEventListener("keydown",h);
+  return()=>window.removeEventListener("keydown",h);
+},[]);
+
 // Load notifications from Supabase + realtime subscription
 useEffect(()=>{
   supabase.from("notifications")
@@ -1175,6 +1384,7 @@ case "settings":     return <SettingsView user={user} language={language} setLan
 case "crm":          return <CRMView user={user} companyData={companyData} setCompanyData={setCompanyData} setDetailCompany={setDetailCompany} showToast={showToast}/>;
 case "leads":        return <LeadsView user={user} setDetailLead={setDetailLead} showToast={showToast}/>;
 case "docs":         return <DMSView user={user} showToast={showToast}/>;
+case "doc_requests":return <DocRequestsPage user={user} engData={engData} showToast={showToast}/>;
 case "invoices":     return <InvoicesView user={user} invData={invData} setInvData={setInvData} showToast={showToast}/>;
 case "notifications":return <NotificationsView notifData={notifData} setNotifData={setNotifData} onNavigate={handleSetView} setDetailEng={setDetailEng} setDetailCompany={setDetailCompany} engData={engData} companyData={companyData}/>;
 case "audit_log":    return <AuditLogView user={user}/>;
@@ -1206,6 +1416,14 @@ return(
 <div className="fu">{renderView()}</div>
 </main>
 </div>
+{showSearch&&<GlobalSearch
+  user={user} engData={engData} companyData={companyData}
+  onClose={()=>setShowSearch(false)}
+  setView={handleSetView}
+  setDetailEng={setDetailEng}
+  setDetailCompany={setDetailCompany}
+  setDetailLead={setDetailLead}
+/>}
 {toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
 {showNewEng&&<NewEngagementModal user={user} onClose={()=>setShowNewEng(false)} onCreated={(eng)=>{setEngData(es=>[eng,...es]);}} showToast={showToast}/>}
 </div>
@@ -2581,6 +2799,7 @@ useEffect(()=>{
         id:tk.id,title:tk.title,priority:tk.priority||"normal",
         status:tk.status||"open",
         due:tk.due_date?new Date(tk.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+        due_date_raw:tk.due_date||null,
         assignee:tk.user_profiles?.avatar_initials||"—",
         assignee_name:tk.user_profiles?.full_name||"",
         assigned_to:tk.assigned_to,
@@ -2687,12 +2906,28 @@ return(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
 <thead><tr style={{background:C.warm50}}>{["","TAAK","PRIO","STATUS","DATUM","MGR",""].map((h,i)=><th key={i} style={{padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
 <tbody>{filtered.map(tk=>(
-<tr key={tk.id} style={{borderTop:`1px solid ${C.border}`,opacity:tk.status==="done"?0.65:1}}>
+<tr key={tk.id} style={{borderTop:`1px solid ${C.border}`,opacity:tk.status==="done"?0.65:1,background:(()=>{
+  if(tk.status==="done") return "transparent";
+  if(!tk.due_date_raw) return "transparent";
+  const days=Math.ceil((new Date(tk.due_date_raw)-new Date())/86400000);
+  if(days<0) return C.redBg;
+  if(days===0) return C.amberBg;
+  return "transparent";
+})()}}>
 <td style={{padding:"12px 14px",width:36}}><div onClick={()=>toggle(tk.id)} style={{width:18,height:18,borderRadius:5,border:`2px solid ${tk.status==="done"?C.green:C.border}`,background:tk.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{tk.status==="done"&&<CheckCircle size={11} color={CREAM}/>}</div></td>
 <td style={{padding:"12px 14px"}}><div style={{fontSize:13,fontWeight:600,color:C.text,textDecoration:tk.status==="done"?"line-through":"none"}}>{tk.title}</div></td>
 <td style={{padding:"12px 14px"}}><PriorityDot level={tk.priority}/></td>
 <td style={{padding:"12px 14px"}}><Badge label={sLabel[tk.status]||tk.status} color={sColor[tk.status]||C.secondary} bg={sBg[tk.status]||C.warm50}/></td>
-<td style={{padding:"12px 14px",fontSize:12,color:C.secondary}}>{tk.due}</td>
+<td style={{padding:"12px 14px"}}>
+{(()=>{
+  if(!tk.due_date_raw||tk.status==="done") return <span style={{fontSize:12,color:C.secondary}}>{tk.due}</span>;
+  const days=Math.ceil((new Date(tk.due_date_raw)-new Date())/86400000);
+  if(days<0) return <span style={{fontSize:11,fontWeight:700,color:C.red,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={10}/>{Math.abs(days)}d achterstallig</span>;
+  if(days===0) return <span style={{fontSize:11,fontWeight:700,color:C.amber,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={10}/>Vandaag</span>;
+  if(days===1) return <span style={{fontSize:11,fontWeight:600,color:C.amber}}>Morgen</span>;
+  return <span style={{fontSize:12,color:C.secondary}}>{tk.due}</span>;
+})()}
+</td>
 <td style={{padding:"12px 14px"}}><Avatar initials={tk.assignee} size={26} bg={C.walnut}/></td>
 <td style={{padding:"12px 14px"}}>
 <button onClick={async()=>{
@@ -3982,6 +4217,8 @@ useEffect(()=>{
         notes:l.notes||"", source:l.source||"",
         priority:l.priority||"normal",
         expectedClose:l.expected_close||null,
+        createdAt:l.created_at||null,
+        daysSinceCreated:l.created_at?Math.floor((new Date()-new Date(l.created_at))/86400000):0,
       })));
       setLoading(false);
     }).catch(()=>setLoading(false));
@@ -4132,7 +4369,16 @@ return(
                   </div>
                   {lead.contact&&<div style={{fontSize:10,color:C.secondary,marginBottom:4}}>{lead.contact}</div>}
                   {/* Value */}
-                  <div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.crimson,marginBottom:8}}>SRD {lead.value.toLocaleString()}</div>
+                  <div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.crimson,marginBottom:6}}>SRD {lead.value.toLocaleString()}</div>
+                  {/* Follow-up reminder */}
+                  {lead.daysSinceCreated>14&&lead.stage!=="won"&&lead.stage!=="lost"&&(
+                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 7px",borderRadius:5,background:lead.daysSinceCreated>30?C.redBg:C.amberBg,marginBottom:6}}>
+                      <Clock size={9} color={lead.daysSinceCreated>30?C.red:C.amber}/>
+                      <span style={{fontSize:9,fontWeight:700,color:lead.daysSinceCreated>30?C.red:C.amber}}>
+                        {lead.daysSinceCreated}d geen activiteit
+                      </span>
+                    </div>
+                  )}
                   {/* Footer */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <DeptTag dept={lead.dept}/>
@@ -4599,7 +4845,328 @@ return(
 
 // ─── INVOICES VIEW ───────────────────────────────────────────────────────────
 
+
+// ─── NEW DOCUMENT REQUEST MODAL ───────────────────────────────────────────────
+function NewDocRequestModal({user,onClose,onCreated,showToast}){
+const [title,setTitle]=useState("");
+const [description,setDescription]=useState("");
+const [docType,setDocType]=useState("");
+const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
+const [companyId,setCompanyId]=useState("");
+const [engId,setEngId]=useState("");
+const [deadline,setDeadline]=useState("");
+const [companies,setCompanies]=useState([]);
+const [engs,setEngs]=useState([]);
+const [saving,setSaving]=useState(false);
+
+useEffect(()=>{
+  supabase.from("companies").select("id,name,department").order("name").then(({data})=>setCompanies(data||[])).catch(()=>{});
+},[]);
+useEffect(()=>{
+  if(!companyId) return;
+  supabase.from("engagements").select("id,name").eq("company_id",companyId).then(({data})=>setEngs(data||[])).catch(()=>{});
+},[companyId]);
+
+useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
+const DOC_TYPES=["Jaarrekening","KKF Uittreksel","Bankafschrift","Identiteitsbewijs","Belastingaangifte","Arbeidscontract","Huurcontract","Verzekering","Uittreksel KvK","Anders"];
+
+const submit=async()=>{
+  if(!title.trim()||!companyId||saving) return;
+  setSaving(true);
+  try{
+    const {data,error}=await supabase.from("document_requests").insert({
+      title:title.trim(),
+      description:description.trim()||null,
+      document_type:docType||null,
+      department:dept,
+      company_id:companyId,
+      engagement_id:engId||null,
+      requested_by:user.id||null,
+      deadline:deadline||null,
+      status:"pending",
+    }).select().single();
+    if(error) throw new Error(error.message);
+    // Create notification for client
+    const company=companies.find(c=>c.id===companyId);
+    if(company?.portal_user_id){
+      await supabase.from("notifications").insert({
+        user_id:company.portal_user_id,
+        title:"Nieuw documentverzoek",
+        body:`Uw adviseur verzoekt: ${title.trim()}${deadline?` — vóór ${new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})}`:""}.`,
+        entity_type:"document_request",
+        entity_id:data.id,
+        action_type:"request",
+      }).catch(()=>{});
+    }
+    if(showToast) showToast("Documentverzoek aangemaakt ✓");
+    onCreated(data);
+    onClose();
+  }catch(e){ if(showToast) showToast("Fout: "+e.message); }
+  setSaving(false);
+};
+
+const filteredCompanies=companies.filter(c=>dept==="BOTH"||c.department===dept);
+
+return(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:560,maxWidth:"95vw",boxShadow:"0 4px 40px rgba(0,0,0,.18)",fontFamily:F.body,overflow:"hidden"}}>
+  {/* Header */}
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div>
+      <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Documentverzoek aanmaken</div>
+      <div style={{fontSize:10,color:C.secondary,marginTop:2}}>Cliënt ontvangt een notificatie en actiepunt in portaal</div>
+    </div>
+    <button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+  </div>
+
+  <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14,maxHeight:"70vh",overflowY:"auto"}}>
+    {/* Dept selector */}
+    {user.dept==="BOTH"&&(
+      <div style={{display:"flex",gap:8}}>
+        {["TC","FF"].map(d=>(
+          <button key={d} onClick={()=>{setDept(d);setCompanyId("");setEngId("");}}
+            style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {d==="TC"?"Tactigent Consultancy":"Fiscal Fuse"}
+          </button>
+        ))}
+      </div>
+    )}
+
+    {/* Title */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>TITEL <span style={{color:C.crimson}}>*</span></div>
+      <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Bijv. Jaarrekening 2025 uploaden"
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${title.length>2?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+    </div>
+
+    {/* Document type */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>DOCUMENTTYPE</div>
+      <select value={docType} onChange={e=>setDocType(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+        <option value="">— Kies type —</option>
+        {DOC_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+      </select>
+    </div>
+
+    {/* Company */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
+      <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${companyId?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+        <option value="">— Selecteer cliënt —</option>
+        {filteredCompanies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </div>
+
+    {/* Engagement (optional) */}
+    {engs.length>0&&(
+      <div>
+        <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>KOPPEL AAN ENGAGEMENT (optioneel)</div>
+        <select value={engId} onChange={e=>setEngId(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+          <option value="">— Geen koppeling —</option>
+          {engs.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+      </div>
+    )}
+
+    {/* Deadline */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>DEADLINE</div>
+      <input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)}
+        min={new Date().toISOString().split("T")[0]}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+    </div>
+
+    {/* Description */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>INSTRUCTIES VOOR CLIËNT</div>
+      <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3}
+        placeholder="Bijv. 'Upload het document ondertekend door de directeur. Maximale bestandsgrootte 10MB.'"
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6}}/>
+    </div>
+  </div>
+
+  {/* Footer */}
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,background:C.warm50}}>
+    <button onClick={submit} disabled={!title.trim()||!companyId||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:title.trim()&&companyId?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:title.trim()&&companyId?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <Upload size={14}/>{saving?"Aanmaken...":"Verzoek aanmaken & cliënt notificeren"}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
+</div>
+</div>
+);
+}
+
+
+// ─── DOCUMENT REQUESTS PAGE ───────────────────────────────────────────────────
+function DocRequestsPage({user,engData,showToast}){
+return(
+<div>
+  <PageHeader kicker="Documentbeheer" title="Documentverzoeken"/>
+  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:9,background:C.indigoBg,border:`1px solid ${C.indigo}30`,marginBottom:16,fontSize:11,color:C.indigo,fontWeight:600}}>
+    <Shield size={13}/>
+    Documentverzoeken verschijnen als actiepunten in het cliëntportaal. De cliënt ontvangt automatisch een notificatie.
+  </div>
+  <DocRequestsPanel user={user} engData={engData} showToast={showToast}/>
+</div>
+);
+}
+
+
+// ─── DOCUMENT REQUESTS VIEW (tab in DMSView) ──────────────────────────────────
+function DocRequestsPanel({user,showToast}){
+const [requests,setRequests]=useState([]);
+const [loading,setLoading]=useState(true);
+const [showNew,setShowNew]=useState(false);
+const [filter,setFilter]=useState("ALL");
+
+const loadRequests=()=>{
+  supabase.from("document_requests")
+    .select("id,title,description,document_type,department,status,deadline,created_at,company_id,engagement_id,companies(name,department)")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{setRequests(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+};
+useEffect(()=>{ loadRequests(); },[]);
+
+const cancelRequest=async(id)=>{
+  await supabase.from("document_requests").update({status:"cancelled"}).eq("id",id);
+  setRequests(rs=>rs.map(r=>r.id===id?{...r,status:"cancelled"}:r));
+  if(showToast) showToast("Verzoek geannuleerd");
+};
+
+const filtered=requests.filter(r=>filter==="ALL"||r.status===filter);
+const pendingCount=requests.filter(r=>r.status==="pending").length;
+const uploadedCount=requests.filter(r=>r.status==="uploaded").length;
+
+const fmtDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const daysUntil=(d)=>{
+  if(!d) return null;
+  return Math.ceil((new Date(d)-new Date())/86400000);
+};
+
+const STATUS_META={
+  pending:{label:"WACHT OP CLIËNT",c:C.amber,bg:C.amberBg},
+  uploaded:{label:"GEÜPLOAD",c:C.green,bg:C.greenBg},
+  overdue:{label:"ACHTERSTALLIG",c:C.red,bg:C.redBg},
+  cancelled:{label:"GEANNULEERD",c:C.secondary,bg:C.warm50},
+};
+
+return(
+<div>
+  {/* Header row */}
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+    <div style={{display:"flex",gap:8}}>
+      {[
+        {v:"ALL",l:`Alle (${requests.length})`},
+        {v:"pending",l:`Wacht (${pendingCount})`},
+        {v:"uploaded",l:`Geüpload (${uploadedCount})`},
+        {v:"cancelled",l:"Geannuleerd"},
+      ].map(f=>(
+        <button key={f.v} onClick={()=>setFilter(f.v)}
+          style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${filter===f.v?C.crimson:C.border}`,background:filter===f.v?C.crimson:"transparent",color:filter===f.v?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+          {f.l}
+        </button>
+      ))}
+    </div>
+    <button onClick={()=>setShowNew(true)}
+      style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+      <Plus size={13}/> Nieuw verzoek
+    </button>
+  </div>
+
+  {/* Info banner */}
+  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:9,background:C.indigoBg,border:`1px solid ${C.indigo}30`,marginBottom:14,fontSize:11,color:C.indigo,fontWeight:600}}>
+    <Shield size={13}/>
+    Documentverzoeken verschijnen als actiepunten in het cliëntportaal. De cliënt wordt automatisch genotificeerd.
+  </div>
+
+  {/* Requests list */}
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+    {loading?(
+      <div style={{padding:"40px",textAlign:"center",color:C.secondary,fontSize:12}}>Laden...</div>
+    ):filtered.length===0?(
+      <div style={{padding:"52px 24px",textAlign:"center"}}>
+        <Upload size={28} color={C.mushroom} style={{marginBottom:12}}/>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen verzoeken</div>
+        <div style={{fontSize:12,color:C.secondary,marginBottom:16}}>Maak een verzoek aan om documenten bij cliënten op te vragen.</div>
+        <button onClick={()=>setShowNew(true)}
+          style={{padding:"9px 18px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+          + Eerste verzoek aanmaken
+        </button>
+      </div>
+    ):(
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr style={{background:C.warm50}}>
+          {["VERZOEK","CLIËNT","TYPE","DEADLINE","STATUS",""].map((h,i)=>(
+            <th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {filtered.map((req,i)=>{
+            const meta=STATUS_META[req.status]||STATUS_META.pending;
+            const days=daysUntil(req.deadline);
+            const overdue=days!==null&&days<0&&req.status==="pending";
+            const urgent=days!==null&&days<=3&&days>=0&&req.status==="pending";
+            return(
+              <tr key={req.id} style={{borderTop:i>0?`1px solid ${C.border}`:"none",background:overdue?"#FFF8F8":"transparent"}}>
+                <td style={{padding:"13px 18px"}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>{req.title}</div>
+                  {req.description&&<div style={{fontSize:10,color:C.secondary,marginTop:2,maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{req.description}</div>}
+                </td>
+                <td style={{padding:"13px 18px"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text}}>{req.companies?.name||"—"}</div>
+                  <DeptTag dept={req.companies?.department||req.department}/>
+                </td>
+                <td style={{padding:"13px 18px"}}>
+                  <span style={{fontSize:10,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4}}>{req.document_type||"—"}</span>
+                </td>
+                <td style={{padding:"13px 18px"}}>
+                  <div style={{fontSize:11,fontWeight:overdue||urgent?700:400,color:overdue?C.red:urgent?C.amber:C.secondary}}>
+                    {req.deadline?fmtDate(req.deadline):"—"}
+                  </div>
+                  {days!==null&&req.status==="pending"&&(
+                    <div style={{fontSize:9,color:overdue?C.red:urgent?C.amber:C.muted,fontWeight:700}}>
+                      {overdue?`${Math.abs(days)}d achterstallig`:days===0?"Vandaag":days===1?"Morgen":`${days}d`}
+                    </div>
+                  )}
+                </td>
+                <td style={{padding:"13px 18px"}}><Badge label={overdue?"ACHTERSTALLIG":meta.label} color={overdue?C.red:meta.c} bg={overdue?C.redBg:meta.bg}/></td>
+                <td style={{padding:"13px 18px"}}>
+                  {req.status==="pending"&&(
+                    <button onClick={()=>cancelRequest(req.id)}
+                      style={{padding:"4px 8px",borderRadius:7,background:C.warm50,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                      Annuleer
+                    </button>
+                  )}
+                  {req.status==="uploaded"&&(
+                    <span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}>
+                      <CheckCircle size={11}/> Ontvangen
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  {showNew&&<NewDocRequestModal user={user} showToast={showToast}
+    onClose={()=>setShowNew(false)}
+    onCreated={req=>{setRequests(rs=>[req,...rs]);}}/>}
+</div>
+);
+}
+
 function DMSView({user,showToast}){
+const [dmsTab,setDmsTab]=useState("documents");
 const t=useT();
 const [docs,setDocs]=useState([]);
 const [loading,setLoading]=useState(true);
@@ -4727,6 +5294,8 @@ return(
     </button>
   </div>
 </div>
+
+{/* Documentverzoeken tab is accessible via sidebar */}
 
 {/* KPI strip */}
 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
@@ -4971,9 +5540,6 @@ return(
 </div>
 );
 }
-
-
-
 function InvoicesView({user,invData,setInvData,showToast}){
 const [invoices,setInvoices]=useState([]);
 const [loading,setLoading]=useState(true);
@@ -7908,19 +8474,45 @@ const [filter,setFilter]=useState("ALL");
 
 useEffect(()=>{
   if(!company?.id) return;
-  supabase.from("client_actions")
-    .select("id,title,description,action_type,status,deadline,department,engagement_id")
-    .eq("company_id",company.id)
-    .eq("is_visible_to_client",true)
-    .order("deadline",{ascending:true})
-    .then(({data})=>{setActions(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+  Promise.all([
+    supabase.from("client_actions")
+      .select("id,title,description,action_type,status,deadline,department,engagement_id")
+      .eq("company_id",company.id)
+      .eq("is_visible_to_client",true)
+      .order("deadline",{ascending:true}),
+    supabase.from("document_requests")
+      .select("id,title,description,document_type,deadline,status")
+      .eq("company_id",company.id)
+      .eq("status","pending")
+      .order("deadline",{ascending:true}),
+  ]).then(([{data:ca},{data:dr}])=>{
+    // Merge doc requests as action items
+    const docActions=(dr||[]).map(r=>({
+      id:"dr_"+r.id, title:r.title,
+      description:r.description||("Upload "+r.document_type+" document"),
+      action_type:"upload", status:"pending",
+      deadline:r.deadline, isDocRequest:true, docRequestId:r.id,
+    }));
+    setActions([...(ca||[]),...docActions]);
+    setLoading(false);
+  }).catch(()=>setLoading(false));
 },[company?.id]);
 
-const markDone=async(id)=>{
-  setActions(as=>as.map(a=>a.id===id?{...a,status:"completed"}:a));
-  await supabase.from("client_actions").update({status:"completed"}).eq("id",id);
-  if(showToast) showToast("Actie gemarkeerd als voltooid ✓");
+const markDone=async(id,actionType)=>{
+  // For sign actions: record signature details
+  const signedAt=new Date().toISOString();
+  const updateData={status:"completed"};
+  if(actionType==="sign"){
+    updateData.review_note=`Ondertekend door ${company?.contact_name||"Cliënt"} op ${new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"long",year:"numeric"})} om ${new Date().toLocaleTimeString("nl-SR",{hour:"2-digit",minute:"2-digit"})}`;
+  }
+  setActions(as=>as.map(a=>a.id===id?{...a,status:"completed",signedAt:actionType==="sign"?signedAt:null}:a));
+  await supabase.from("client_actions").update(updateData).eq("id",id);
+  // Notify staff of signature
+  if(actionType==="sign"){
+    if(showToast) showToast("Document ondertekend ✓ — uw adviseur is notificeerd");
+  } else {
+    if(showToast) showToast("Actie gemarkeerd als voltooid ✓");
+  }
 };
 
 const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
@@ -8013,9 +8605,10 @@ return(
           </div>
           {/* Action button */}
           {!done&&(
-            <button onClick={()=>markDone(a.id)}
-              style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
-              <CheckCircle size={13}/> Markeer voltooid
+            <button onClick={()=>markDone(a.id,a.action_type)}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:9,background:a.action_type==="sign"?C.taupe:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+              {a.action_type==="sign"?<FileText size={13}/>:<CheckCircle size={13}/>}
+              {a.action_type==="sign"?"Bevestig handtekening":"Markeer voltooid"}
             </button>
           )}
         </div>
@@ -8650,6 +9243,26 @@ useEffect(()=>{
   };
   loadAvatar();
 },[user.id]);
+const [pwdNew,setPwdNew]=useState("");
+const [pwdConfirm,setPwdConfirm]=useState("");
+const [pwdSaving,setPwdSaving]=useState(false);
+const [pwdError,setPwdError]=useState("");
+const changePassword=async()=>{
+  if(!pwdNew.trim()) return setPwdError("Voer een nieuw wachtwoord in");
+  if(pwdNew.length<8) return setPwdError("Wachtwoord minimaal 8 tekens");
+  if(pwdNew!==pwdConfirm) return setPwdError("Wachtwoorden komen niet overeen");
+  setPwdSaving(true);setPwdError("");
+  try{
+    const res=await fetch(`${SB_URL}/auth/v1/user`,{method:"PUT",
+      headers:{"Content-Type":"application/json","apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`},
+      body:JSON.stringify({password:pwdNew})});
+    const d=await res.json();
+    if(!res.ok) throw new Error(d.message||d.error_description||"Fout");
+    showToast("Wachtwoord gewijzigd ✓");
+    setPwdNew("");setPwdConfirm("");
+  }catch(e){setPwdError(e.message);}
+  setPwdSaving(false);
+};
 const [secPrefs,setSecPrefs]=useState({twofa:false,sessionTimeout:"30min",loginAlerts:true});
 
 const tabs=[
@@ -8807,13 +9420,20 @@ return(
           <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"22px 24px"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Wachtwoord wijzigen</div>
             <div style={{fontSize:11,color:C.secondary,marginBottom:16}}>Kies een sterk wachtwoord van minimaal 12 tekens</div>
-            {[["Huidig wachtwoord",""],["Nieuw wachtwoord",""],["Bevestig wachtwoord",""]].map(([label])=>(
-              <div key={label} style={{marginBottom:12}}>
-                <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>{label}</div>
-                <input type="password" placeholder="************" style={{width:"100%",padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-              </div>
-            ))}
-            <button onClick={()=>showToast("Wachtwoord bijgewerkt")} style={{padding:"10px 22px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Wachtwoord wijzigen</button>
+            {pwdError&&<div style={{fontSize:11,color:C.red,marginBottom:10,padding:"8px 12px",borderRadius:8,background:C.redBg}}>{pwdError}</div>}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>NIEUW WACHTWOORD</div>
+              <input type="password" value={pwdNew} onChange={e=>setPwdNew(e.target.value)} placeholder="Minimaal 8 tekens"
+                style={{width:"100%",padding:"9px 13px",borderRadius:9,border:`1.5px solid ${pwdNew?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>BEVESTIG WACHTWOORD</div>
+              <input type="password" value={pwdConfirm} onChange={e=>setPwdConfirm(e.target.value)} placeholder="Herhaal nieuw wachtwoord"
+                style={{width:"100%",padding:"9px 13px",borderRadius:9,border:`1.5px solid ${pwdConfirm&&pwdConfirm===pwdNew?C.green:pwdConfirm?C.red:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+            </div>
+            <button onClick={changePassword} disabled={pwdSaving||!pwdNew||!pwdConfirm}
+              style={{padding:"10px 22px",borderRadius:9,background:pwdNew&&pwdConfirm?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:pwdNew&&pwdConfirm?"pointer":"default"}}>
+              {pwdSaving?"Opslaan...":"Wachtwoord wijzigen"}</button>
           </div>
           <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)",padding:"22px 24px"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Beveiligingsinstellingen</div>
