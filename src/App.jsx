@@ -1086,14 +1086,31 @@ useEffect(()=>{
   loadAll();
 },[user.id]);
 const [notifData,setNotifData]=useState([]);
-// Load notifications from Supabase
+// Load notifications from Supabase + realtime subscription
 useEffect(()=>{
   supabase.from("notifications")
-    .select("id,title,body,is_read,created_at,action_type,entity_type,company_id")
+    .select("id,title,body,is_read,created_at,action_type,entity_type,entity_id,company_id,archived")
     .eq("user_id",user.id)
     .order("created_at",{ascending:false})
     .limit(50)
-    .then(({data})=>{ if(data?.length) setNotifData(data.map(n=>({...n,read:n.is_read,type:n.action_type||"info",time:new Date(n.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"})}))); });
+    .then(({data})=>{ if(data?.length) setNotifData(data.map(n=>({...n,read:n.is_read}))); })
+    .catch(()=>{});
+
+  // Realtime: new notifications for this user
+  const channel=supabase
+    .channel("notif_"+user.id)
+    .on("postgres_changes",{
+      event:"INSERT",schema:"public",table:"notifications",
+      filter:`user_id=eq.${user.id}`
+    },(payload)=>{
+      const n=payload.new;
+      setNotifData(prev=>[{...n,read:false},...prev]);
+      // Show toast for new notification
+      if(n.title) showToast("🔔 "+n.title);
+    })
+    .subscribe();
+
+  return ()=>{ supabase.removeChannel(channel); };
 },[user.id]);
 const [dbLoaded,setDbLoaded]=useState(false);
 
@@ -1151,7 +1168,7 @@ case "crm":          return <CRMView user={user} companyData={companyData} setCo
 case "leads":        return <LeadsView user={user} setDetailLead={setDetailLead} showToast={showToast}/>;
 case "docs":         return <DMSView user={user} showToast={showToast}/>;
 case "invoices":     return <InvoicesView user={user} invData={invData} setInvData={setInvData} showToast={showToast}/>;
-case "notifications":return <NotificationsView notifData={notifData} setNotifData={setNotifData}/>;
+case "notifications":return <NotificationsView notifData={notifData} setNotifData={setNotifData} onNavigate={handleSetView} setDetailEng={setDetailEng} setDetailCompany={setDetailCompany} engData={engData} companyData={companyData}/>;
 case "audit_log":    return <AuditLogView user={user}/>;
 case "risk_matrix":  return <RiskMatrixView user={user} engData={engData}/>;
 case "asset_flow":   return (user.role==="super_admin"
@@ -1277,104 +1294,275 @@ const FALLBACK_NEWS=[
 
 function StaffDashboard({user,setView,setDetailEng,engData}){
 const t=useT();
-const src=engData||ENGAGEMENTS_INIT;
-const eng=user.dept==="BOTH"?src:src.filter(e=>e.dept===user.dept);
+const [tasks,setTasks]=useState([]);
+const [queueCount,setQueueCount]=useState(0);
+const [overdueInvoices,setOverdueInvoices]=useState([]);
+const [openActions,setOpenActions]=useState([]);
+const [loading,setLoading]=useState(true);
 const [newsFilter,setNewsFilter]=useState("ALL");
 const [expandedNews,setExpandedNews]=useState(null);
 const {news:allNews,loading:newsLoading}=useRealNews(user.dept);
+
+// Derived from props (already loaded in AppShell)
+const src=engData||[];
+const eng=user.dept==="BOTH"?src:src.filter(e=>e.dept===user.dept);
+const redEngs=eng.filter(e=>e.health==="red");
+const healthPct=eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100;
+
+useEffect(()=>{
+  const dept=user.dept==="BOTH"?null:user.dept;
+  const today=new Date().toISOString().split("T")[0];
+
+  Promise.all([
+    // My tasks due today/soon
+    supabase.from("tasks")
+      .select("id,title,priority,status,due_date,engagement_id")
+      .eq("status","open")
+      .eq("assigned_to",user.id)
+      .lte("due_date", new Date(Date.now()+3*86400000).toISOString())
+      .order("due_date",{ascending:true})
+      .limit(5),
+    // Review queue count
+    supabase.from("documents")
+      .select("id",{count:"exact",head:true})
+      .eq("review_status","pending"),
+    // Overdue invoices
+    supabase.from("invoices")
+      .select("id,reference_code,amount,due_date,company_id")
+      .eq("status","overdue")
+      .order("due_date",{ascending:true})
+      .limit(4),
+    // Open client actions
+    supabase.from("client_actions")
+      .select("id,title,status,deadline,department,company_id")
+      .eq("status","pending")
+      .order("deadline",{ascending:true})
+      .limit(5),
+  ]).then(([{data:tk},{count:qc},{data:inv},{data:ca}])=>{
+    setTasks(tk||[]);
+    setQueueCount(qc||0);
+    setOverdueInvoices(inv||[]);
+    setOpenActions(ca||[]);
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[user.id]);
+
+const fmtDate=(d)=>{
+  if(!d) return "—";
+  const date=new Date(d);
+  const diff=Math.ceil((date-new Date())/86400000);
+  if(diff===0) return "Vandaag";
+  if(diff===1) return "Morgen";
+  if(diff<0) return `${Math.abs(diff)}d achterstallig`;
+  return `${diff}d`;
+};
+const fmtAmt=(n)=>`SRD ${Number(n||0).toLocaleString()}`;
+
 const news=allNews.filter(n=>newsFilter==="ALL"||(newsFilter==="urgent"&&n.urgent)||(newsFilter==="TC"&&(n.dept==="TC"||n.dept==="BOTH"))||(newsFilter==="FF"&&(n.dept==="FF"||n.dept==="BOTH")));
 const tagIcon={WETGEVING:<Scale size={10}/>,MARKT:<TrendingUp size={10}/>,STRATEGIE:<Target size={10}/>,COMPLIANCE:<Shield size={10}/>,OFFSHORE:<Activity size={10}/>,CARICOM:<Globe size={10}/>,BELASTING:<Receipt size={10}/>};
 
 return(
 <div>
-<PageHeader kicker={t("overview")} title={t("cmdCenter")}/>
+  <PageHeader kicker={t("overview")} title={t("cmdCenter")}/>
 
-{/* Premium status strip — varied widths, not identical cards */}
-<div style={{display:"grid",gridTemplateColumns:"1fr 1.2fr 1fr",gap:12,marginBottom:20}}>
-  <div style={{background:C.redBg,borderRadius:14,padding:"20px 22px",border:`1.5px solid ${C.red}20`,position:"relative"}}>
-    <div style={{position:"absolute",top:16,right:18}}><AlertTriangle size={18} color={C.red} opacity={0.4}/></div>
-    <div style={{fontSize:10,fontWeight:700,color:C.red,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12,opacity:0.8}}>{t("healthLabel")}</div>
-    <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:(eng||[]).filter(e=>e.health==="red").length>0?C.red:C.green,lineHeight:1}}>
-        {String(eng.filter(e=>e.health==="red").length).padStart(2,"0")}
-      </span>
-      <span style={{fontSize:12,color:eng.filter(e=>e.health==="red").length>0?C.red:C.green,fontWeight:600,opacity:0.7}}>{t("criticalThresholds")}</span>
+  {/* ── KPI Strip ── */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1.2fr 1fr",gap:12,marginBottom:20}}>
+    {/* Kritieke engagements */}
+    <div style={{background:redEngs.length>0?C.redBg:C.greenBg,borderRadius:14,padding:"20px 22px",border:`1.5px solid ${redEngs.length>0?C.red:C.green}20`,position:"relative"}}>
+      <div style={{position:"absolute",top:16,right:18}}><AlertTriangle size={18} color={redEngs.length>0?C.red:C.green} opacity={0.4}/></div>
+      <div style={{fontSize:10,fontWeight:700,color:redEngs.length>0?C.red:C.green,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12,opacity:0.8}}>{t("healthLabel")}</div>
+      <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+        <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:redEngs.length>0?C.red:C.green,lineHeight:1}}>
+          {String(redEngs.length).padStart(2,"0")}
+        </span>
+        <span style={{fontSize:12,color:redEngs.length>0?C.red:C.green,fontWeight:600,opacity:0.7}}>{t("criticalThresholds")}</span>
+      </div>
+      <div style={{marginTop:12,fontSize:11,fontWeight:700,color:redEngs.length>0?C.red:C.green,letterSpacing:"0.06em",textTransform:"uppercase",opacity:0.9}}>
+        {redEngs.length>0?t("actionRequired"):"Alles stabiel"}
+      </div>
     </div>
-    <div style={{marginTop:12,fontSize:11,fontWeight:700,color:C.red,letterSpacing:"0.06em",textTransform:"uppercase",opacity:0.9}}>{t("actionRequired")}</div>
-  </div>
-  <div style={{background:C.surface,borderRadius:14,padding:"20px 22px",border:`1px solid ${C.border}`}}>
-    <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("exposureLabel")}</div>
-    <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:14}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.text,lineHeight:1}}>
-        {String(eng.length).padStart(2,"0")}
-      </span>
-      <span style={{fontSize:12,color:C.secondary}}>{t("riskyDossiers")}</span>
-    </div>
-    {/* Mini bar chart — not number+label again */}
-    <div style={{display:"flex",gap:3,alignItems:"flex-end",height:24}}>
-      {[40,55,38,62,48,70,58,80,65,72].map((h,i)=>(
-        <div key={i} style={{flex:1,borderRadius:"2px 2px 0 0",background:i>=7?C.amber:`${C.amber}35`,height:`${h}%`}}/>
-      ))}
-    </div>
-    <div style={{fontSize:10,color:C.muted,marginTop:6,fontWeight:600}}>{t("revision")}</div>
-  </div>
-  <div style={{background:C.darkAccent,borderRadius:14,padding:"20px 22px",position:"relative"}}>
-    <div style={{fontSize:10,fontWeight:700,color:"rgba(240,235,228,0.65)",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
-    <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
-      <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.onDark,lineHeight:1}}>
-        {eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}
-      </span>
-      <span style={{fontFamily:F.display,fontSize:24,color:C.onDark,opacity:0.6}}>%</span>
-    </div>
-    {/* Progress arc — different from numbers */}
-    <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3}}>
-      <div style={{width:`${eng.length>0?Math.round((eng.filter(e=>e.health!=="red").length/eng.length)*100):100}%`,height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3}}/>
-    </div>
-    <div style={{fontSize:10,color:"rgba(240,235,228,0.65)",marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
-  </div>
-</div>
 
+    {/* Engagement activiteit */}
+    <div style={{background:C.surface,borderRadius:14,padding:"20px 22px",border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("exposureLabel")}</div>
+      <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:14}}>
+        <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.text,lineHeight:1}}>
+          {String(eng.length).padStart(2,"0")}
+        </span>
+        <span style={{fontSize:12,color:C.secondary}}>{t("riskyDossiers")}</span>
+      </div>
+      {/* Health distribution bar */}
+      <div style={{display:"flex",gap:3,height:8,borderRadius:4,overflow:"hidden",marginBottom:6}}>
+        {eng.length>0?<>
+          <div style={{flex:eng.filter(e=>e.health==="red").length||0.01,background:C.red,borderRadius:2}}/>
+          <div style={{flex:eng.filter(e=>e.health==="amber").length||0.01,background:C.amber,borderRadius:2}}/>
+          <div style={{flex:eng.filter(e=>e.health==="green"||!e.health).length||0.01,background:C.green,borderRadius:2}}/>
+        </>:<div style={{flex:1,background:C.border,borderRadius:2}}/>}
+      </div>
+      <div style={{display:"flex",gap:10,fontSize:9,fontWeight:700}}>
+        <span style={{color:C.red}}>{eng.filter(e=>e.health==="red").length} kritiek</span>
+        <span style={{color:C.amber}}>{eng.filter(e=>e.health==="amber").length} amber</span>
+        <span style={{color:C.green}}>{eng.filter(e=>e.health==="green"||!e.health).length} stabiel</span>
+      </div>
+    </div>
 
+    {/* Gezondheidspercentage */}
+    <div style={{background:C.darkAccent,borderRadius:14,padding:"20px 22px",position:"relative"}}>
+      <div style={{fontSize:10,fontWeight:700,color:"rgba(240,235,228,0.65)",letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>{t("speedLabel")}</div>
+      <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
+        <span style={{fontFamily:F.display,fontSize:44,fontWeight:600,color:C.onDark,lineHeight:1}}>{healthPct}</span>
+        <span style={{fontFamily:F.display,fontSize:24,color:C.onDark,opacity:0.6}}>%</span>
+      </div>
+      <div style={{height:5,background:"rgba(255,255,255,.12)",borderRadius:3}}>
+        <div style={{width:`${healthPct}%`,height:"100%",background:`linear-gradient(90deg,${C.green},#4ADE80)`,borderRadius:3,transition:"width .5s"}}/>
+      </div>
+      <div style={{fontSize:10,color:"rgba(240,235,228,0.65)",marginTop:8,fontWeight:600}}>{t("optimal")} · {t("onTrack")}</div>
+    </div>
+  </div>
+
+  {/* ── Vandaag sectie ── */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:20}}>
+    {[
+      {l:"MIJN TAKEN",v:loading?"…":tasks.length,c:tasks.length>0?C.amber:C.green,bg:tasks.length>0?C.amberBg:C.greenBg,icon:<CheckSquare size={14}/>,click:()=>setView("tasks")},
+      {l:"BEOORDELINGSWACHTRIJ",v:loading?"…":queueCount,c:queueCount>0?C.crimson:C.green,bg:queueCount>0?C.crimsonFaint:C.greenBg,icon:<ClipboardList size={14}/>,click:()=>setView("review_queue")},
+      {l:"ACHTERSTALLIGE FACTUREN",v:loading?"…":overdueInvoices.length,c:overdueInvoices.length>0?C.red:C.green,bg:overdueInvoices.length>0?C.redBg:C.greenBg,icon:<Receipt size={14}/>,click:()=>setView("invoices")},
+      {l:"OPEN CLIËNTACTIES",v:loading?"…":openActions.length,c:openActions.length>0?C.amber:C.green,bg:openActions.length>0?C.amberBg:C.greenBg,icon:<Users size={14}/>,click:()=>setView("client_actions_tc")},
+    ].map(k=>(
+      <div key={k.l} onClick={k.click} style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${k.c}30`,cursor:"pointer",transition:"transform .1s"}}
+        onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
+        onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div style={{color:k.c,opacity:0.7}}>{k.icon}</div>
+          <ChevronRight size={12} color={k.c} opacity={0.5}/>
+        </div>
+        <div style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:k.c,lineHeight:1,marginBottom:4}}>{k.v}</div>
+        <div style={{fontSize:9,fontWeight:700,color:k.c,letterSpacing:"0.1em",textTransform:"uppercase",opacity:0.8}}>{k.l}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* ── Main content row ── */}
   <div style={{display:"grid",gridTemplateColumns:"1fr 260px",gap:14,marginBottom:18}}>
-    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
+    {/* Actieve engagements tabel */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07)"}}>
       <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <h3 style={{margin:0,fontSize:13,fontWeight:700,color:C.text}}>{t("activeDossiers")}</h3>
-        <button onClick={()=>setView("analyses")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,color:C.crimson}}>{t("viewAll")} -></button>
+        <button onClick={()=>setView("analyses")} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,color:C.crimson,display:"flex",alignItems:"center",gap:4}}>
+          {t("viewAll")} <ChevronRight size={11}/>
+        </button>
       </div>
-      <table style={{width:"100%",borderCollapse:"collapse"}}>
-        <thead><tr style={{background:C.warm50}}>{["NAAM",t("dept"),t("phase"),t("health")].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-        <tbody>{eng.slice(0,4).map(e=>(
-          <tr key={e.id} onClick={()=>setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-            <td style={{padding:"14px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref}</div></td>
-            <td style={{padding:"14px 18px"}}><DeptTag dept={e.dept}/></td>
-            <td style={{padding:"14px 18px"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase}</span></td>
-            <td style={{padding:"14px 18px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><HealthDot status={e.health}/><span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>{e.health==="red"?t("critical"):e.health==="amber"?t("amber"):t("stable")}</span></div></td>
-          </tr>
-        ))}</tbody>
-      </table>
+      {eng.length===0?(
+        <div style={{padding:"32px 20px",textAlign:"center",color:C.secondary,fontSize:12}}>Geen actieve engagements</div>
+      ):(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:C.warm50}}>
+            {["NAAM",t("dept"),t("phase"),t("health")].map(h=>(
+              <th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{eng.slice(0,5).map(e=>(
+            <tr key={e.id} onClick={()=>setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+              <td style={{padding:"13px 18px"}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div>
+                <div style={{fontSize:10,color:C.secondary}}>{e.ref}</div>
+              </td>
+              <td style={{padding:"13px 18px"}}><DeptTag dept={e.dept}/></td>
+              <td style={{padding:"13px 18px"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase||"—"}</span></td>
+              <td style={{padding:"13px 18px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <HealthDot status={e.health}/>
+                  <span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>
+                    {e.health==="red"?t("critical"):e.health==="amber"?t("amber"):t("stable")}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
     </div>
-    <div style={{background:C.darkAccent,borderRadius:14,padding:"20px",color:C.onDark,display:"flex",flexDirection:"column",gap:12}}>
-      <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:"rgba(240,235,228,0.65)",textTransform:"uppercase"}}>WERELDWIJDE POLSSLAG</div>
-      <p style={{fontFamily:F.display,fontSize:14,fontWeight:600,lineHeight:1.5,margin:0}}>Geaggregeerd risico momenteel <span style={{color:"#E87B7B"}}>Verhoogd</span>.</p>
-      <div style={{display:"flex",justifyContent:"space-between"}}>
-        {[{l:"TACTIGENT",v:`${eng.filter(e=>e.dept==="TC").length} actief`,up:true},{l:"FISCAL FUSE",v:`${eng.filter(e=>e.dept==="FF").length} actief`,up:false}].map(s=>(
-          <div key={s.l}><div style={{fontSize:8,color:"rgba(240,235,228,0.65)",fontWeight:700,marginBottom:3}}>{s.l}</div>
-          <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:s.up?"#E87B7B":CREAM_DIM}}>{s.v}{s.up?"^":"v"}</div></div>
-        ))}
+
+    {/* Rechter kolom: taken + wachtrij */}
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {/* Mijn taken */}
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",flex:1}}>
+        <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:tasks.length>0?C.amberBg:C.greenBg}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <CheckSquare size={13} color={tasks.length>0?C.amber:C.green}/>
+            <span style={{fontSize:12,fontWeight:700,color:tasks.length>0?C.amber:C.green}}>Mijn Taken</span>
+          </div>
+          <span style={{fontSize:10,fontWeight:700,color:tasks.length>0?C.amber:C.green}}>{loading?"…":tasks.length}</span>
+        </div>
+        {loading?(
+          <div style={{padding:"20px",textAlign:"center",color:C.secondary,fontSize:11}}>Laden...</div>
+        ):tasks.length===0?(
+          <div style={{padding:"20px",textAlign:"center",color:C.secondary,fontSize:11}}>
+            <CheckCircle size={20} color={C.green} style={{marginBottom:6,display:"block",margin:"0 auto 6px"}}/>
+            Geen openstaande taken
+          </div>
+        ):tasks.map((tk,i)=>{
+          const days=tk.due_date?Math.ceil((new Date(tk.due_date)-new Date())/86400000):null;
+          const urgent=days!==null&&days<=1;
+          return(
+            <div key={tk.id} style={{padding:"10px 16px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tk.title}</div>
+                <div style={{fontSize:9,fontWeight:700,color:urgent?C.red:C.secondary,marginTop:2}}>{fmtDate(tk.due_date)}</div>
+              </div>
+              <div style={{width:8,height:8,borderRadius:"50%",background:tk.priority==="high"?C.red:tk.priority==="normal"?C.amber:C.green,flexShrink:0,marginTop:4,marginLeft:8}}/>
+            </div>
+          );
+        })}
       </div>
-      <div style={{borderTop:"1px solid rgba(255,255,255,.1)",paddingTop:10}}>
-        <div style={{fontSize:9,color:C.taupeLight,fontWeight:700,marginBottom:5}}>SYSTEEMVERTRAGING · LIVE</div>
-        <div style={{display:"flex",gap:3,alignItems:"flex-end",height:28}}>
-          {[14,20,28,16,22,38,30,24,34,26].map((h,i)=>(
-            <div key={i} style={{flex:1,borderRadius:"2px 2px 0 0",background:i>=6?C.crimson:"rgba(200,187,178,.25)",height:`${h}px`}}/>
+
+      {/* Wachtrij + TC/FF split */}
+      <div style={{background:C.darkAccent,borderRadius:14,padding:"16px",color:C.onDark}}>
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:"rgba(240,235,228,0.65)",textTransform:"uppercase",marginBottom:10}}>WERELDWIJDE POLSSLAG</div>
+        <p style={{fontFamily:F.display,fontSize:13,fontWeight:600,lineHeight:1.5,margin:"0 0 10px"}}>
+          Geaggregeerd risico momenteel <span style={{color:redEngs.length>3?"#E87B7B":"#86EFAC"}}>{redEngs.length>3?"Verhoogd":"Stabiel"}</span>.
+        </p>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+          {[{l:"TACTIGENT",v:eng.filter(e=>e.dept==="TC").length},{l:"FISCAL FUSE",v:eng.filter(e=>e.dept==="FF").length}].map(s=>(
+            <div key={s.l}>
+              <div style={{fontSize:8,color:"rgba(240,235,228,0.65)",fontWeight:700,marginBottom:3}}>{s.l}</div>
+              <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:CREAM}}>{s.v} <span style={{fontSize:11,opacity:0.6}}>actief</span></div>
+            </div>
           ))}
         </div>
+        {queueCount>0&&(
+          <div onClick={()=>setView("review_queue")} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,.08)",cursor:"pointer",marginTop:4}}>
+            <div style={{display:"flex",alignItems:"center",gap:7}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,animation:"pulse 2s infinite"}}/>
+              <span style={{fontSize:11,fontWeight:700,color:CREAM}}>{queueCount} in wachtrij</span>
+            </div>
+            <ChevronRight size={12} color="rgba(240,235,228,0.5)"/>
+          </div>
+        )}
       </div>
     </div>
   </div>
 
-  {/* ── NEWS FEED ── */}
-  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
+  {/* ── Achterstallige facturen row (if any) ── */}
+  {overdueInvoices.length>0&&(
+    <div style={{background:C.redBg,borderRadius:14,border:`1px solid ${C.red}30`,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <AlertTriangle size={18} color={C.red}/>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.red}}>{overdueInvoices.length} Achterstallige Factuur{overdueInvoices.length!==1?"en":""}</div>
+          <div style={{fontSize:11,color:C.red,opacity:0.8}}>
+            Totaal: {fmtAmt(overdueInvoices.reduce((s,i)=>s+Number(i.amount||0),0))} · Oudste: {fmtDate(overdueInvoices[0]?.due_date)}
+          </div>
+        </div>
+      </div>
+      <button onClick={()=>setView("invoices")}
+        style={{padding:"7px 14px",borderRadius:9,background:C.red,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+        <Receipt size={12}/> Bekijk facturen
+      </button>
+    </div>
+  )}
+
+  {/* ── News Feed ── */}
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07)"}}>
     <div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:30,height:30,borderRadius:8,background:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -1393,12 +1581,13 @@ return(
       </div>
       <div style={{display:"flex",gap:6}}>
         {[["ALL","Alle"],["urgent","Urgent"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
-          <button key={v} onClick={()=>setNewsFilter(v)} style={{padding:"4px 11px",borderRadius:16,border:`1.5px solid ${newsFilter===v?C.crimson:C.border}`,background:newsFilter===v?C.crimson:"transparent",color:newsFilter===v?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>{l}</button>
+          <button key={v} onClick={()=>setNewsFilter(v)}
+            style={{padding:"4px 11px",borderRadius:16,border:`1.5px solid ${newsFilter===v?C.crimson:C.border}`,background:newsFilter===v?C.crimson:"transparent",color:newsFilter===v?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>{l}
+          </button>
         ))}
       </div>
     </div>
 
-    {/* Loading skeleton */}
     {newsLoading&&(
       <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
         {[1,2,3].map(i=>(<div key={i} className="skeleton" style={{height:16,borderRadius:6,width:i===1?"90%":i===2?"70%":"80%"}}/>))}
@@ -1406,7 +1595,6 @@ return(
       </div>
     )}
 
-    {/* Featured article */}
     {!newsLoading&&news[0]&&(
       <div style={{padding:"0 20px"}}>
         <div onClick={()=>setExpandedNews(expandedNews===news[0].id?null:news[0].id)} style={{padding:"18px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer"}}>
@@ -1417,17 +1605,10 @@ return(
                   {tagIcon[news[0].tag]}{news[0].tag}
                 </span>
                 {news[0].urgent&&<span style={{fontSize:9,fontWeight:700,color:C.red,background:C.redBg,padding:"3px 8px",borderRadius:4,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={9}/> URGENT</span>}
-                <span style={{fontSize:10,color:C.muted}}>{news[0].source}</span>
-                <span style={{fontSize:9,color:C.muted}}>·</span>
-                <span style={{fontSize:10,color:C.muted}}>{news[0].time}</span>
+                <span style={{fontSize:10,color:C.muted}}>{news[0].source} · {news[0].time}</span>
               </div>
               <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:8}}>{news[0].title}</div>
               <div style={{fontSize:12,color:C.secondary,lineHeight:1.7,display:expandedNews===news[0].id?"block":"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{news[0].body}</div>
-              {expandedNews===news[0].id&&(
-                <div style={{marginTop:12,padding:"12px 16px",borderRadius:10,background:C.warm50,fontSize:12,color:C.secondary,lineHeight:1.7}}>
-                  Aanbevolen actie: Bespreek met uw adviseur hoe deze ontwikkeling invloed heeft op uw huidige engagements. Neem contact op met de Fiscal Fuse afdeling voor een impactanalyse.
-                </div>
-              )}
             </div>
             <div style={{width:80,height:64,borderRadius:10,background:news[0].dept==="TC"?C.crimsonFaint:news[0].dept==="FF"?"#F0EDE8":C.amberBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
               {news[0].dept==="TC"?<Target size={28} color={C.crimson}/>:news[0].dept==="FF"?<Scale size={28} color={C.taupe}/>:<Layers size={28} color={C.amber}/>}
@@ -1437,10 +1618,10 @@ return(
       </div>
     )}
 
-    {/* Rest of news list */}
     <div style={{padding:"0 20px"}}>
       {!newsLoading&&news.slice(1).map((item,i)=>(
-        <div key={item.id} onClick={()=>setExpandedNews(expandedNews===item.id?null:item.id)} style={{padding:"14px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:14,alignItems:"start"}}>
+        <div key={item.id} onClick={()=>setExpandedNews(expandedNews===item.id?null:item.id)}
+          style={{padding:"14px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:14,alignItems:"start"}}>
           <div style={{width:36,height:36,borderRadius:9,background:`${item.tagColor}15`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
             {item.tag==="WETGEVING"?<Scale size={16} color={item.tagColor}/>:item.tag==="MARKT"?<TrendingUp size={16} color={item.tagColor}/>:item.tag==="STRATEGIE"?<Target size={16} color={item.tagColor}/>:item.tag==="COMPLIANCE"?<Shield size={16} color={item.tagColor}/>:<Activity size={16} color={item.tagColor}/>}
           </div>
@@ -1450,10 +1631,8 @@ return(
               {item.urgent&&<span style={{fontSize:8,fontWeight:700,color:C.red,background:C.redBg,padding:"2px 6px",borderRadius:3}}>URGENT</span>}
               <span style={{fontSize:9,color:C.muted}}>{item.source} · {item.time}</span>
             </div>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:expandedNews===item.id?6:0}}>{item.title}</div>
-            {expandedNews===item.id&&(
-              <div style={{fontSize:12,color:C.secondary,lineHeight:1.7,marginTop:6}}>{item.body}</div>
-            )}
+            <div style={{fontSize:13,fontWeight:600,color:C.text,lineHeight:1.4}}>{item.title}</div>
+            {expandedNews===item.id&&<div style={{fontSize:12,color:C.secondary,lineHeight:1.7,marginTop:6}}>{item.body}</div>}
           </div>
           <div style={{color:C.secondary,marginTop:6}}>
             {expandedNews===item.id?<ChevronLeft size={14} style={{transform:"rotate(90deg)"}}/>:<ChevronRight size={14}/>}
@@ -1463,17 +1642,18 @@ return(
     </div>
 
     <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.warm50}}>
-      <span style={{fontSize:10,color:C.secondary}}>Bijgewerkt: vandaag om 08:42 · Bron: CBvS, KKF, Tactigent Research</span>
-      <button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><RefreshCw size={10}/> Vernieuwen</button>
+      <span style={{fontSize:10,color:C.secondary}}>Bron: CBvS, KKF, Tactigent Research</span>
+      <button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+        <RefreshCw size={10}/> Vernieuwen
+      </button>
     </div>
   </div>
 </div>
-
-
 );
 }
 
-// ─── ANALYSES VIEW ──────────────────────────────────────────────────────────
+
+
 function AnalysesView({user,engData,setDetailEng}){
 const t=useT();
 const [q,setQ]=useState(""); const [healthF,setHealthF]=useState("ALL");
@@ -1837,14 +2017,66 @@ function EngagementDetail({eng,user,onBack,showToast,engData,setEngData}){
 const t=useT();
 const [activeTab,setActiveTab]=useState("tasks");
 const [newMsg,setNewMsg]=useState(""); const [vis,setVis]=useState(false);
-const [messages,setMessages]=useState(MESSAGES_INIT[eng.id]||[]);
-const [localTasks,setLocalTasks]=useState(TASKS_BY_ENG[eng.id]||[]);
-const [localActions,setLocalActions]=useState(CLIENT_ACTIONS_BY_ENG[eng.id]||[]);
+const [messages,setMessages]=useState([]);
+
+// Load messages from DB
+useEffect(()=>{
+  if(!eng.id) return;
+  supabase.from("messages")
+    .select("id,body,author_id,author_name,author_initials,created_at,visible_to_client")
+    .eq("engagement_id",eng.id)
+    .order("created_at",{ascending:true})
+    .then(({data})=>{
+      if(data?.length) setMessages(data.map(m=>({
+        id:m.id,
+        body:m.body,
+        author:m.author_name||"Medewerker",
+        avatar:m.author_initials||"ME",
+        time:new Date(m.created_at).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}),
+        visible:m.visible_to_client,
+        isMe:m.author_id===user.id,
+      })));
+    }).catch(()=>{});
+},[eng.id]);
+const [localTasks,setLocalTasks]=useState([]);
+const [localActions,setLocalActions]=useState([]);
 const [showTaskForm,setShowTaskForm]=useState(false);
 const [showTemplatePicker,setShowTemplatePicker]=useState(false);
 const [showNewAction,setShowNewAction]=useState(false);
 const [expandedTask,setExpandedTask]=useState(null);
 const [newTaskTitle,setNewTaskTitle]=useState(""); const [newTaskPrio,setNewTaskPrio]=useState("normal"); const [newTaskDue,setNewTaskDue]=useState("");
+
+// Load tasks + client actions from DB
+useEffect(()=>{
+  if(!eng.id) return;
+  // Load tasks
+  supabase.from("tasks")
+    .select("id,title,priority,status,due_date,assigned_to,user_profiles(full_name,avatar_initials)")
+    .eq("engagement_id",eng.id)
+    .order("created_at",{ascending:true})
+    .then(({data})=>{
+      if(data?.length) setLocalTasks(data.map(t=>({
+        id:t.id, title:t.title, priority:t.priority||"normal",
+        status:t.status||"open",
+        due:t.due_date?new Date(t.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+        assignee:t.user_profiles?.avatar_initials||"—",
+        subtasks:[],
+      })));
+    }).catch(()=>{});
+  // Load client actions
+  supabase.from("client_actions")
+    .select("id,title,description,action_type,status,deadline,is_visible_to_client")
+    .eq("engagement_id",eng.id)
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      if(data?.length) setLocalActions(data.map(a=>({
+        id:a.id, title:a.title, desc:a.description||"",
+        type:a.action_type, status:a.status,
+        deadline:a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+        visible:a.is_visible_to_client,
+      })));
+    }).catch(()=>{});
+},[eng.id]);
 const liveEng=(engData||[]).find(e=>e.id===eng.id)||eng;
 const updateEng=async(changes)=>{
 if(setEngData) setEngData(es=>es.map(e=>e.id===eng.id?{...e,...changes}:e));
@@ -1881,8 +2113,42 @@ const addToReviewQueue=async()=>{
 };
 const phases=eng.dept==="TC"?TC_PHASES:FF_PHASES;
 const phaseIdx=Math.max(0,phases.indexOf(liveEng.phase));
-const sendMsg=()=>{if(!newMsg.trim())return;setMessages(m=>[...m,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,time:"Nu",body:newMsg,visible:vis}]);setNewMsg("");showToast("Bericht verzonden");};
-const addTask=()=>{if(!newTaskTitle.trim())return;setLocalTasks(ts=>[...ts,{id:`t${Date.now()}`,title:newTaskTitle,priority:newTaskPrio,due:newTaskDue||"—",status:"open",assignee:user.avatar,subtasks:[]}]);setNewTaskTitle("");setNewTaskDue("");setNewTaskPrio("normal");setShowTaskForm(false);showToast("Taak aangemaakt");};
+const sendMsg=async()=>{
+  if(!newMsg.trim()) return;
+  const body=newMsg.trim();
+  const optimistic={id:`m${Date.now()}`,author:user.name||"Medewerker",avatar:user.avatar||"ME",time:"Nu",body,visible:vis};
+  setMessages(m=>[...m,optimistic]);
+  setNewMsg("");
+  try{
+    await supabase.from("messages").insert({
+      body, engagement_id:eng.id,
+      author_id:user.id,
+      author_name:user.name||"Medewerker",
+      author_initials:user.avatar||"ME",
+      visible_to_client:vis,
+    });
+    showToast("Bericht verzonden");
+  }catch(e){ showToast("Verzenden mislukt: "+e.message); }
+};
+const addTask=async()=>{
+  if(!newTaskTitle.trim()) return;
+  const localTask={id:`t${Date.now()}`,title:newTaskTitle,priority:newTaskPrio,
+    due:newTaskDue?new Date(newTaskDue).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
+    status:"open",assignee:user.avatar||"ME",subtasks:[]};
+  setLocalTasks(ts=>[...ts,localTask]);
+  setNewTaskTitle("");setNewTaskDue("");setNewTaskPrio("normal");setShowTaskForm(false);
+  showToast("Taak aangemaakt");
+  try{
+    const {data}=await supabase.from("tasks").insert({
+      title:newTaskTitle.trim(), priority:newTaskPrio, status:"open",
+      engagement_id:eng.id,
+      department:eng.dept||"TC",
+      due_date:newTaskDue||null,
+      assigned_to:user.id||null,
+    }).select("id").single();
+    if(data?.id) setLocalTasks(ts=>ts.map(t=>t.id===localTask.id?{...t,id:data.id}:t));
+  }catch(e){ console.warn("addTask DB:",e.message); }
+};
 const addFromTemplate=(tpl)=>{
   const newTask={
     id:`t${Date.now()}`,
@@ -1899,7 +2165,13 @@ const addFromTemplate=(tpl)=>{
   setExpandedTask(newTask.id);
   showToast(`"${tpl.name}" aangemaakt met ${newTask.subtasks.length} subtaken`);
 };
-const toggleTask=(id)=>setLocalTasks(ts=>ts.map(t=>t.id===id?{...t,status:t.status==="done"?"open":"done"}:t));
+const toggleTask=async(id)=>{
+  const tk=localTasks.find(t=>t.id===id);
+  if(!tk) return;
+  const newStatus=tk.status==="done"?"open":"done";
+  setLocalTasks(ts=>ts.map(t=>t.id===id?{...t,status:newStatus}:t));
+  try{ await supabase.from("tasks").update({status:newStatus}).eq("id",id); }catch(e){}
+};
 const toggleSubtask=(taskId,subId)=>setLocalTasks(ts=>ts.map(t=>t.id===taskId?{...t,subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,status:s.status==="done"?"open":"done"}:s)}:t));
 return(
 <div>
@@ -2101,7 +2373,11 @@ return(
 <div onClick={()=>toggleTask(tk.id)} style={{width:18,height:18,borderRadius:5,border:`2px solid ${tk.status==="done"?C.green:C.border}`,background:tk.status==="done"?C.green:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
 {tk.status==="done"&&<Check size={11} color={CREAM}/>}
 </div>
-<button onClick={()=>{setLocalTasks(ts=>ts.filter(t=>t.id!==tk.id));showToast("Taak verwijderd");}} title="Verwijder taak" style={{width:16,height:16,borderRadius:4,border:"none",background:"transparent",cursor:"pointer",color:C.mushroom,display:"flex",alignItems:"center",justifyContent:"center",padding:0,opacity:0.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>
+<button onClick={async()=>{
+  setLocalTasks(ts=>ts.filter(t=>t.id!==tk.id));
+  showToast("Taak verwijderd");
+  try{ await fetch(`${SB_URL}/rest/v1/tasks?id=eq.${tk.id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}}); }catch(e){}
+}} title="Verwijder taak" style={{width:16,height:16,borderRadius:4,border:"none",background:"transparent",cursor:"pointer",color:C.mushroom,display:"flex",alignItems:"center",justifyContent:"center",padding:0,opacity:0.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>
 <X size={10}/>
 </button>
 </div>
@@ -2173,7 +2449,15 @@ return(
 <Badge label={a.status==="overdue"?"ACHTERSTALLIG":a.status==="completed"?"VOLTOOID":"OPENSTAAND"} color={a.status==="overdue"?C.red:a.status==="completed"?C.green:C.amber} bg={a.status==="overdue"?C.redBg:a.status==="completed"?C.greenBg:C.amberBg}/>
 <span style={{fontSize:10,color:C.secondary}}>Termijn: {a.deadline}</span>
 <div style={{display:"flex",gap:5}}>
-{a.status!=="completed"&&(<button onClick={()=>setLocalActions(as=>as.map(x=>x.id===a.id?{...x,status:"completed"}:x))} style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>Markeer voltooid</button>)}
+{a.status!=="completed"&&(
+<button onClick={async()=>{
+  setLocalActions(as=>as.map(x=>x.id===a.id?{...x,status:"completed"}:x));
+  try{ await supabase.from("client_actions").update({status:"completed"}).eq("id",a.id); }catch(e){}
+  showToast("Actie voltooid ✓");
+}} style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,border:"none",borderRadius:5,padding:"3px 8px",cursor:"pointer"}}>
+Markeer voltooid
+</button>
+)}
 <button onClick={async()=>{
   if(!window.confirm(`Cliëntactie "${a.title}" verwijderen?`)) return;
   setLocalActions(as=>as.filter(x=>x.id!==a.id));
@@ -2505,6 +2789,7 @@ try{
     deadline:deadline||null, engagement_id:eng.id,
     client_id:assignedClient||null, assigned_to:assignedStaff||null,
     department:eng.dept||"TC", is_visible_to_client:true,
+    company_id:eng.company_id||null,
   });
 }catch(e){ console.warn("client_action insert:",e.message); }
 onCreated(newAction);
@@ -2609,8 +2894,28 @@ return(
 const ALL_CLIENT_ACTIONS_DATA=[];
 function ClientActionsView({dept,showToast}){
 const t=useT();
-const [actions,setActions]=useState(ALL_CLIENT_ACTIONS_DATA.filter(a=>a.dept===dept));
+const [actions,setActions]=useState([]);
+const [loading,setLoading]=useState(true);
 const [statusF,setStatusF]=useState("ALL");
+
+// Load from DB
+useEffect(()=>{
+  supabase.from("client_actions")
+    .select("id,title,description,action_type,status,deadline,department,company_id,engagement_id,is_visible_to_client,created_at")
+    .eq("department",dept)
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      setActions((data||[]).map(a=>({
+        ...a,
+        dept:a.department,
+        desc:a.description||"",
+        type:a.action_type,
+        deadline:a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+        client:"—", engagement:"—",
+      })));
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+},[dept]);
 const [q,setQ]=useState("");
 const [showNew,setShowNew]=useState(false);
 const filtered=actions.filter(a=>{
@@ -2663,9 +2968,11 @@ return(
 <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(58,46,40,.07),0 1px 2px rgba(58,46,40,.04)"}}>
 {filtered.length===0?(
 <div style={{padding:"52px 24px",textAlign:"center"}}>
-<CheckCircle size={32} color={C.green} style={{marginBottom:10}}/>
+{loading?<div style={{color:C.secondary,fontSize:12}}>Laden...</div>:(
+<><CheckCircle size={32} color={C.green} style={{marginBottom:10}}/>
 <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Geen acties gevonden</div>
-<div style={{fontSize:12,color:C.secondary,marginTop:4}}>Pas de filters aan of maak een nieuwe actie aan.</div>
+<div style={{fontSize:12,color:C.secondary,marginTop:4}}>Pas de filters aan of maak een nieuwe actie aan.</div></>
+)}
 </div>
 ):(
 <table style={{width:"100%",borderCollapse:"collapse"}}>
@@ -4882,6 +5189,10 @@ return(
                         Betaald
                       </button>
                     )}
+                    <button onClick={e=>{e.stopPropagation();generateInvoicePDF({...inv,client:inv.companyName||""},inv.companyName||"");}}
+                      style={{padding:"4px 9px",borderRadius:7,background:C.crimsonFaint,border:`1px solid ${C.crimson}30`,color:C.crimson,fontSize:9,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:3}}>
+                      <Download size={10}/> PDF
+                    </button>
                     <button onClick={()=>deleteInvoice(inv.id,inv.reference_code||inv.ref)}
                       style={{padding:"4px 8px",borderRadius:7,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
                       <X size={10}/>
@@ -5159,7 +5470,7 @@ return(
 
 
 // ─── NOTIFICATIONS VIEW ──────────────────────────────────────────────────────
-function NotificationsView({notifData,setNotifData}){
+function NotificationsView({notifData,setNotifData,onNavigate,setDetailEng,setDetailCompany,engData,companyData}){
 const [filter,setFilter]=useState("ALL");
 const [q,setQ]=useState("");
 
@@ -5199,6 +5510,30 @@ const formatNotifTime=(d)=>{
   if(diff<3600) return `${Math.floor(diff/60)}m geleden`;
   if(diff<86400) return `${Math.floor(diff/3600)}u geleden`;
   return d.toLocaleDateString("nl-SR",{day:"2-digit",month:"short"});
+};
+
+// Navigate to entity when clicking a notification
+const navigateToEntity=(n)=>{
+  if(!onNavigate) return;
+  const etype=n.entity_type;
+  const eid=n.entity_id;
+  if(etype==="engagement"&&eid&&setDetailEng){
+    const eng=(engData||[]).find(e=>e.id===eid);
+    if(eng){ setDetailEng(eng); onNavigate("engagements"); }
+    else onNavigate("engagements");
+  } else if(etype==="company"&&eid&&setDetailCompany){
+    const comp=(companyData||[]).find(c=>c.id===eid);
+    if(comp){ setDetailCompany(comp); onNavigate("crm"); }
+    else onNavigate("crm");
+  } else if(etype==="invoice"){
+    onNavigate("invoices");
+  } else if(etype==="document"){
+    onNavigate("dms");
+  } else if(etype==="lead"){
+    onNavigate("leads");
+  } else if(etype==="client_action"){
+    onNavigate("client_actions_tc");
+  }
 };
 
 const markRead=async(id)=>{
@@ -5306,10 +5641,10 @@ return(
               const IconComp=meta.Icon;
               return(
                 <div key={n.id}
-                  onClick={()=>markRead(n.id)}
+                  onClick={()=>{ markRead(n.id); navigateToEntity(n); }}
                   style={{
                     padding:"14px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",
-                    display:"flex",alignItems:"flex-start",gap:14,cursor:"pointer",
+                    display:"flex",alignItems:"flex-start",cursor:n.entity_type?"pointer":"default",gap:14,cursor:"pointer",
                     background:!n.read&&!n.is_read?`${meta.color}06`:"transparent",
                     transition:"background .15s",
                   }}>
@@ -5332,7 +5667,11 @@ return(
                   </div>
                   {/* Right: time + archive */}
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
-                    <span style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{n.time}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{n.time}</span>
+                      {!n.read&&!n.is_read&&<div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,flexShrink:0}}/>}
+                    </div>
+                    {n.entity_type&&<span style={{fontSize:9,fontWeight:700,color:C.indigo,background:C.indigoBg,padding:"2px 6px",borderRadius:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>{n.entity_type.replace("_"," ")}</span>}
                     <button
                       onClick={e=>{e.stopPropagation();archiveNotif(n.id);}}
                       title="Archiveer"
@@ -6028,663 +6367,1809 @@ return(
 
 
 // ─── RiskMatrixView ─────────────────────────────────────────
-function RiskMatrixView(){
+// ─── RISK MATRIX VIEW ────────────────────────────────────────────────────────
+function RiskMatrixView({user,engData}){
 const GRID=5;
-const cells=[];
-for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
-const heat=(r+c)/(GRID*2-2);
-cells.push({r,c,heat});
-}
-const sectors=[{l:"Cybersecurity",v:94,red:true},{l:"Financieel Recht",v:82,red:true},{l:"Publieke Sector",v:45},{l:"Infrastructuur",v:31}];
+const [items,setItems]=useState([]);
+const [loading,setLoading]=useState(true);
+const [deptF,setDeptF]=useState(user.dept==="BOTH"?"ALL":user.dept);
+const [statusF,setStatusF]=useState("ALL");
+const [selected,setSelected]=useState(null);
+const [showAdd,setShowAdd]=useState(false);
+
+// Load risk items from DB
+useEffect(()=>{
+  supabase.from("risk_items")
+    .select("id,title,description,probability,impact,department,engagement_id,company_id,status,created_at")
+    .order("created_at",{ascending:false})
+    .then(({data})=>{setItems(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+},[]);
+
+const filtered=items.filter(i=>{
+  const dOk=deptF==="ALL"||i.department===deptF;
+  const sOk=statusF==="ALL"||i.status===statusF;
+  return dOk&&sOk;
+});
+
+// Build matrix: for each cell (prob 1-5, impact 1-5) collect items
+const getCell=(prob,impact)=>filtered.filter(i=>i.probability===prob&&i.impact===impact);
+
+// Risk score = probability * impact (1-25)
+const riskScore=(i)=>i.probability*i.impact;
+const avgScore=filtered.length?Math.round(filtered.reduce((s,i)=>s+riskScore(i),0)/filtered.length):0;
+const criticalCount=filtered.filter(i=>riskScore(i)>=15).length;
+const openCount=filtered.filter(i=>i.status==="open").length;
+
+// Cell background heat: low=green, medium=amber, high=red
+const cellBg=(prob,impact)=>{
+  const score=(prob+impact)/2;
+  if(score>=4) return `rgba(139,26,43,${0.15+(score-4)*0.2})`;
+  if(score>=3) return `rgba(201,123,26,${0.12+(score-3)*0.15})`;
+  return `rgba(21,128,61,${0.08+(score-1)*0.06})`;
+};
+
+const deptColor=(dept)=>dept==="TC"?C.crimson:C.taupe;
+
+const mitigateRisk=async(id)=>{
+  await supabase.from("risk_items").update({status:"mitigated"}).eq("id",id);
+  setItems(is=>is.map(i=>i.id===id?{...i,status:"mitigated"}:i));
+  if(selected?.id===id) setSelected(s=>({...s,status:"mitigated"}));
+};
+
+const deleteRisk=async(id)=>{
+  if(!window.confirm("Risico-item verwijderen?")) return;
+  await fetch(`${SB_URL}/rest/v1/risk_items?id=eq.${id}`,{method:"DELETE",headers:{"apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`}});
+  setItems(is=>is.filter(i=>i.id!==id));
+  if(selected?.id===id) setSelected(null);
+};
+
 return(
 <div>
-<PageHeader kicker="Intelligence" title="Strategische Risicomatrix"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time dreigingsanalyse en sectorale kwetsbaarheden binnen de Tactigent en Fiscal Fuse ecosystemen.</p>
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-<div>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Dreigingsniveau Matrix</div>
-<div style={{fontSize:10,color:C.secondary}}>Visualisatie van Impact vs. Waarschijnlijkheid</div>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+    <PageHeader kicker="Intelligence" title="Strategische Risicomatrix"/>
+    <button onClick={()=>setShowAdd(true)}
+      style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",marginTop:4}}>
+      <Plus size={13}/> Risico toevoegen
+    </button>
+  </div>
+
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+    {[
+      {l:"TOTALE RISICO'S",v:loading?"…":filtered.length,c:C.text,bg:C.surface},
+      {l:"OPEN",v:loading?"…":openCount,c:openCount>0?C.amber:C.green,bg:openCount>0?C.amberBg:C.greenBg},
+      {l:"KRITIEK (≥15)",v:loading?"…":criticalCount,c:criticalCount>0?C.red:C.green,bg:criticalCount>0?C.redBg:C.greenBg},
+      {l:"GEM. RISICOSCORE",v:loading?"…":avgScore+"/25",c:avgScore>=15?C.red:avgScore>=8?C.amber:C.green,bg:avgScore>=15?C.redBg:avgScore>=8?C.amberBg:C.greenBg},
+    ].map(k=>(
+      <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"12px 16px",border:`1px solid ${k.c==="text"?C.border:k.c+"30"}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Filters */}
+  <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}>
+    {user.dept==="BOTH"&&["ALL","TC","FF"].map(d=>(
+      <button key={d} onClick={()=>setDeptF(d)}
+        style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${deptF===d?C.crimson:C.border}`,background:deptF===d?C.crimson:"transparent",color:deptF===d?CREAM:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {d==="ALL"?"Alle":d}
+      </button>
+    ))}
+    {["ALL","open","mitigated"].map(s=>(
+      <button key={s} onClick={()=>setStatusF(s)}
+        style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${statusF===s?C.indigo:C.border}`,background:statusF===s?C.indigoBg:"transparent",color:statusF===s?C.indigo:C.secondary,fontSize:10,fontWeight:600,cursor:"pointer"}}>
+        {s==="ALL"?"Alle statussen":s==="open"?"Open":"Gemitigeerd"}
+      </button>
+    ))}
+    <div style={{marginLeft:"auto",fontSize:10,color:C.secondary}}>{filtered.length} risico's zichtbaar</div>
+  </div>
+
+  <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
+    {/* ── 5x5 Matrix ── */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>Impact × Waarschijnlijkheid</div>
+          <div style={{fontSize:10,color:C.secondary}}>Klik op een cel om risico's te bekijken</div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          {[{c:C.crimson,l:"TC"},{c:C.taupe,l:"FF"},{c:C.green,l:"Gemitigeerd"}].map(b=>(
+            <div key={b.l} style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:9,height:9,borderRadius:"50%",background:b.c}}/>
+              <span style={{fontSize:9,fontWeight:600,color:C.secondary}}>{b.l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Y-axis label */}
+      <div style={{display:"grid",gridTemplateColumns:"28px 1fr",gap:8}}>
+        {/* Impact label rotated */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",writingMode:"vertical-rl",transform:"rotate(180deg)",fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>IMPACT →</div>
+
+        <div>
+          {/* Grid rows: impact 5 (top) to 1 (bottom) */}
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {[5,4,3,2,1].map(impact=>(
+              <div key={impact} style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4}}>
+                {[1,2,3,4,5].map(prob=>{
+                  const cellItems=getCell(prob,impact);
+                  const score=(prob+impact)/2;
+                  const isHigh=score>=4;
+                  const isMed=score>=3&&score<4;
+                  return(
+                    <div key={prob}
+                      onClick={()=>cellItems.length>0&&setSelected({type:"cell",items:cellItems,prob,impact})}
+                      style={{
+                        aspectRatio:"1",borderRadius:8,
+                        background:cellBg(prob,impact),
+                        border:`1px solid ${cellItems.length>0?"rgba(0,0,0,.15)":C.border}`,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        cursor:cellItems.length>0?"pointer":"default",
+                        position:"relative",
+                        transition:"transform .1s",
+                        minHeight:48,
+                      }}
+                      onMouseEnter={e=>{if(cellItems.length>0)e.currentTarget.style.transform="scale(1.05)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
+                      {/* Risk score label */}
+                      <span style={{fontSize:9,fontWeight:700,color:isHigh?"rgba(139,26,43,.8)":isMed?"rgba(120,80,20,.7)":"rgba(21,100,50,.6)",position:"absolute",top:3,right:5}}>{prob*impact}</span>
+                      {/* Item dots */}
+                      {cellItems.length>0&&(
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center",padding:4}}>
+                          {cellItems.slice(0,4).map(item=>(
+                            <div key={item.id} style={{width:10,height:10,borderRadius:"50%",background:item.status==="mitigated"?C.green:deptColor(item.department),border:"1.5px solid rgba(255,255,255,.6)",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+                          ))}
+                          {cellItems.length>4&&<div style={{fontSize:8,fontWeight:700,color:C.text}}>+{cellItems.length-4}</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* X-axis labels */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4,marginTop:6}}>
+            {[1,2,3,4,5].map(p=>(
+              <div key={p} style={{textAlign:"center",fontSize:9,color:C.muted,fontWeight:600}}>{p}</div>
+            ))}
+          </div>
+          <div style={{textAlign:"center",fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>WAARSCHIJNLIJKHEID →</div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{display:"flex",gap:8,marginTop:16,padding:"10px 12px",borderRadius:8,background:C.warm50,border:`1px solid ${C.border}`}}>
+        {[{bg:"rgba(21,128,61,0.2)",l:"Laag (1-4)"},{bg:"rgba(201,123,26,0.2)",l:"Middel (5-9)"},{bg:"rgba(139,26,43,0.2)",l:"Hoog (10-15)"},{bg:"rgba(139,26,43,0.45)",l:"Kritiek (16-25)"}].map(({bg,l})=>(
+          <div key={l} style={{display:"flex",alignItems:"center",gap:5,flex:1}}>
+            <div style={{width:14,height:14,borderRadius:3,background:bg,border:`1px solid rgba(0,0,0,.1)`,flexShrink:0}}/>
+            <span style={{fontSize:9,color:C.secondary,fontWeight:600}}>{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* ── Right sidebar: list + detail ── */}
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {/* Cell detail / item list */}
+      {selected&&selected.type==="cell"?(
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:C.warm50}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.text}}>Impact {selected.impact} × Waarschijnlijkheid {selected.prob}</div>
+              <div style={{fontSize:10,color:C.secondary}}>Score: {selected.prob*selected.impact}/25</div>
+            </div>
+            <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={14}/></button>
+          </div>
+          {selected.items.map((item,i)=>(
+            <div key={item.id} style={{padding:"12px 16px",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.text,flex:1,paddingRight:8}}>{item.title}</div>
+                <DeptTag dept={item.department}/>
+              </div>
+              {item.description&&<div style={{fontSize:11,color:C.secondary,marginBottom:6,lineHeight:1.4}}>{item.description}</div>}
+              <div style={{display:"flex",gap:6}}>
+                {item.status==="open"&&(
+                  <button onClick={()=>mitigateRisk(item.id)}
+                    style={{padding:"4px 10px",borderRadius:6,background:C.greenBg,border:`1px solid ${C.green}40`,color:C.green,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                    Mitigeer
+                  </button>
+                )}
+                {item.status==="mitigated"&&(
+                  <span style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,padding:"3px 8px",borderRadius:6}}>Gemitigeerd</span>
+                )}
+                <button onClick={()=>deleteRisk(item.id)}
+                  style={{padding:"4px 8px",borderRadius:6,background:C.redBg,border:`1px solid ${C.red}30`,color:C.red,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                  <X size={10}/>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ):(
+        /* Top risks list */
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12,fontWeight:700,color:C.text}}>
+            Top Risico's
+          </div>
+          {loading?(
+            <div style={{padding:"32px",textAlign:"center",color:C.secondary,fontSize:12}}>Laden...</div>
+          ):filtered.length===0?(
+            <div style={{padding:"32px 20px",textAlign:"center"}}>
+              <Shield size={24} color={C.mushroom} style={{marginBottom:8}}/>
+              <div style={{fontSize:12,color:C.secondary}}>Geen risico's gevonden</div>
+            </div>
+          ):[...filtered].sort((a,b)=>riskScore(b)-riskScore(a)).slice(0,6).map((item,i)=>{
+            const score=riskScore(item);
+            const color=score>=15?C.red:score>=8?C.amber:C.green;
+            return(
+              <div key={item.id} style={{padding:"11px 16px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",gap:10,alignItems:"flex-start",cursor:"pointer"}}
+                onClick={()=>setSelected({type:"cell",items:[item],prob:item.probability,impact:item.impact})}>
+                <div style={{width:32,height:32,borderRadius:8,background:score>=15?C.redBg:score>=8?C.amberBg:C.greenBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span style={{fontFamily:F.display,fontSize:14,fontWeight:700,color}}>{score}</span>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:item.status==="mitigated"?C.secondary:C.text,textDecoration:item.status==="mitigated"?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</div>
+                  <div style={{display:"flex",gap:6,marginTop:2}}>
+                    <DeptTag dept={item.department}/>
+                    <span style={{fontSize:9,color:C.secondary}}>P{item.probability} × I{item.impact}</span>
+                    {item.status==="mitigated"&&<span style={{fontSize:9,fontWeight:700,color:C.green}}>✓ Gemitigeerd</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Summary stats */}
+      <div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
+        <div style={{fontSize:9,fontWeight:700,color:"rgba(240,235,228,.6)",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>RISICOPROFIEL</div>
+        {[
+          {l:"TC open risico's",v:filtered.filter(i=>i.department==="TC"&&i.status==="open").length},
+          {l:"FF open risico's",v:filtered.filter(i=>i.department==="FF"&&i.status==="open").length},
+          {l:"Gemitigeerd",v:filtered.filter(i=>i.status==="mitigated").length},
+          {l:"Kritiek (score ≥15)",v:criticalCount},
+        ].map(({l,v})=>(
+          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}>
+            <span style={{fontSize:11,color:"rgba(240,235,228,.7)"}}>{l}</span>
+            <span style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:CREAM}}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  {/* ── Add Risk Modal ── */}
+  {showAdd&&<AddRiskModal user={user} engData={engData} onClose={()=>setShowAdd(false)}
+    onCreated={item=>{setItems(is=>[item,...is]);}}/>}
 </div>
-<div style={{display:"flex",gap:12}}>
-{[{c:C.crimson,l:"TACTIGENT"},{c:C.espresso,l:"FISCAL FUSE"}].map(b=>(
-<div key={b.l} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c}}/><span style={{fontSize:9,fontWeight:600,color:C.secondary}}>{b.l}</span></div>
-))}
-</div>
-</div>
-<div style={{position:"relative",aspectRatio:"1",maxHeight:340}}>
-<div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gridTemplateRows:`repeat(${GRID},1fr)`,gap:4,height:"100%"}}>
-{cells.map(({r,c,heat})=>(
-<div key={`${r}-${c}`} style={{borderRadius:6,background:`rgba(139,26,43,${heat*0.35+0.05})`}}/>
-))}
-</div>
-{/* TC bubble row0=top,col4=right (low prob, high impact = row 4, col 4) */}
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"2%",top:"5%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.crimson,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(139,26,43,.4)",right:"18%",bottom:"25%"}}>TC</div>
-<div style={{position:"absolute",width:32,height:32,borderRadius:"50%",background:C.espresso,color:CREAM,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,boxShadow:"0 4px 12px rgba(58,46,40,.4)",left:"28%",top:"38%"}}>FF</div>
-<div style={{position:"absolute",bottom:0,left:0,fontSize:9,color:C.secondary,fontWeight:600}}>LAGE WAARSCHIJNLIJKHEID</div>
-<div style={{position:"absolute",bottom:0,right:0,fontSize:9,color:C.secondary,fontWeight:600}}>HOGE WAARSCHIJNLIJKHEID</div>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Sectorale Analyse</div>
-{sectors.map(s=>(
-<div key={s.l} style={{marginBottom:12}}>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-<span style={{fontSize:11,color:C.text}}>{s.l}</span>
-<span style={{fontSize:11,fontWeight:700,color:s.red?C.crimson:C.text}}>{s.v}% Risico</span>
-</div>
-<div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
-<div style={{height:"100%",width:`${s.v}%`,background:s.red?C.crimson:C.walnut,borderRadius:2}}/>
-</div>
-</div>
-))}
-<div style={{marginTop:14,padding:"12px",borderRadius:9,background:C.warm50,border:`1px solid ${C.border}`}}>
-<div style={{fontSize:9,fontWeight:700,color:C.crimson,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>SYSTEEM ALERT</div>
-<div style={{fontSize:11,color:C.text,lineHeight:1.5}}>Kritieke stijging gedetecteerd in Tactigent Core blootstelling.</div>
-</div>
-</div>
-<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>MAANDELIJKSE TREND</div>
-<div style={{fontFamily:F.display,fontSize:32,fontWeight:600,marginBottom:6}}>+12.4%</div>
-<div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:6,background:"rgba(255,255,255,.1)",fontSize:9,fontWeight:700}}>/ INCREASED VIGILANCE</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-{[{Icon:Shield,label:"VEILIGHEIDS INDEX",value:"88.4"},{Icon:Scale,label:"JURIDISCHE DRUK",value:"Medium"}].map(k=>(
-<div key={k.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`}}>
-<k.Icon size={18} color={C.secondary} style={{marginBottom:4}}/>
-<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:3}}>{k.label}</div>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>{k.value}</div>
-</div>
-))}
-</div>
-</div>
+);
+}
+
+function AddRiskModal({user,engData,onClose,onCreated}){
+const [title,setTitle]=useState("");
+const [description,setDescription]=useState("");
+const [dept,setDept]=useState(user.dept==="BOTH"?"TC":user.dept);
+const [probability,setProbability]=useState(3);
+const [impact,setImpact]=useState(3);
+const [engId,setEngId]=useState("");
+const [saving,setSaving]=useState(false);
+
+useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+
+const score=probability*impact;
+const scoreColor=score>=15?C.red:score>=8?C.amber:C.green;
+
+const submit=async()=>{
+  if(!title.trim()||saving) return;
+  setSaving(true);
+  try{
+    const {data,error}=await supabase.from("risk_items").insert({
+      title:title.trim(), description:description.trim()||null,
+      department:dept, probability, impact,
+      engagement_id:engId||null,
+      status:"open",
+    }).select().single();
+    if(error) throw new Error(error.message);
+    onCreated(data);
+    onClose();
+  }catch(e){ alert("Fout: "+e.message); }
+  setSaving(false);
+};
+
+const LABELS_P=["","Zeer onwaarschijnlijk","Onwaarschijnlijk","Mogelijk","Waarschijnlijk","Zeer waarschijnlijk"];
+const LABELS_I=["","Verwaarloosbaar","Klein","Matig","Groot","Catastrofaal"];
+
+return(
+<div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
+<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:540,maxWidth:"95vw",boxShadow:"0 4px 32px rgba(0,0,0,.18)",fontFamily:F.body,overflow:"hidden"}}>
+  <div style={{padding:"16px 22px",borderBottom:`1px solid ${C.border}`,background:C.crimsonFaint,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>Risico toevoegen</div>
+    <button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}><X size={13}/></button>
+  </div>
+  <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:14}}>
+    {/* Dept */}
+    {user.dept==="BOTH"&&(
+      <div style={{display:"flex",gap:8}}>
+        {["TC","FF"].map(d=>(
+          <button key={d} onClick={()=>setDept(d)}
+            style={{flex:1,padding:"8px",borderRadius:9,border:`2px solid ${dept===d?C.crimson:C.border}`,background:dept===d?C.crimsonFaint:"transparent",color:dept===d?C.crimson:C.secondary,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {d==="TC"?"Tactigent":"Fiscal Fuse"}
+          </button>
+        ))}
+      </div>
+    )}
+    {/* Title */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>RISICOtitel <span style={{color:C.crimson}}>*</span></div>
+      <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Bijv. FATF compliance gap"
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${title.length>2?C.crimson:C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+    </div>
+    {/* Probability + Impact sliders */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      {[
+        {label:"WAARSCHIJNLIJKHEID",val:probability,set:setProbability,labels:LABELS_P},
+        {label:"IMPACT",val:impact,set:setImpact,labels:LABELS_I},
+      ].map(({label,val,set,labels})=>(
+        <div key={label}>
+          <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>{label}</div>
+          <div style={{display:"flex",gap:4}}>
+            {[1,2,3,4,5].map(n=>(
+              <button key={n} onClick={()=>set(n)}
+                style={{flex:1,padding:"8px 0",borderRadius:7,border:`2px solid ${val===n?scoreColor:C.border}`,background:val===n?`${scoreColor}20`:"transparent",color:val===n?scoreColor:C.secondary,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <div style={{fontSize:10,color:C.secondary,marginTop:4}}>{labels[val]}</div>
+        </div>
+      ))}
+    </div>
+    {/* Score preview */}
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:9,background:`${scoreColor}12`,border:`1px solid ${scoreColor}40`}}>
+      <div style={{width:44,height:44,borderRadius:10,background:scoreColor,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <span style={{fontFamily:F.display,fontSize:20,fontWeight:700,color:CREAM}}>{score}</span>
+      </div>
+      <div>
+        <div style={{fontSize:12,fontWeight:700,color:scoreColor}}>
+          {score>=15?"Kritiek risico":score>=8?"Hoog risico":score>=4?"Matig risico":"Laag risico"}
+        </div>
+        <div style={{fontSize:10,color:C.secondary}}>Score {score}/25 — {probability}P × {impact}I</div>
+      </div>
+    </div>
+    {/* Description */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>BESCHRIJVING</div>
+      <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={2}
+        placeholder="Context, oorzaak, gevolgen..."
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:F.body,background:C.bg,color:C.text,lineHeight:1.6}}/>
+    </div>
+    {/* Link to engagement (optional) */}
+    <div>
+      <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>KOPPEL AAN ENGAGEMENT (optioneel)</div>
+      <select value={engId} onChange={e=>setEngId(e.target.value)}
+        style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
+        <option value="">— Geen koppeling —</option>
+        {(engData||[]).filter(e=>dept==="BOTH"||e.dept===dept).map(e=>(
+          <option key={e.id} value={e.id}>{e.name}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+  <div style={{padding:"12px 22px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10}}>
+    <button onClick={submit} disabled={!title.trim()||saving}
+      style={{flex:1,padding:"11px",borderRadius:10,background:title.trim()?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:13,fontWeight:700,cursor:title.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+      <Shield size={14}/>{saving?"Opslaan...":"Risico toevoegen"}
+    </button>
+    <button onClick={onClose} style={{padding:"11px 18px",borderRadius:10,background:"transparent",border:`1.5px solid ${C.border}`,color:C.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>Annuleren</button>
+  </div>
 </div>
 </div>
 );
 }
+
+
 
 // ─── ASSET FLOW VIEW ─────────────────────────────────────────────────────────
+function AssetFlowView({user}){
+const [invoices,setInvoices]=useState([]);
+const [companies,setCompanies]=useState([]);
+const [loading,setLoading]=useState(true);
 
-// ─── AssetFlowView ─────────────────────────────────────────
-function AssetFlowView(){
-const months=["JAN","FEB","MRT","APR","MEI","JUN"];
-const tcBars=[22,28,35,30,42,48];
-const ffBars=[12,16,18,22,20,26];
-const maxBar=Math.max(...tcBars.map((t,i)=>t+ffBars[i]));
-const movements=[
-{date:"14 Jun 2024",desc:"Project Alfa Dividend",dept:"TC",amount:"+SRD 42.500",status:"Afgerond"},
-{date:"12 Jun 2024",desc:"Fiscale Optimalisatie Q2",dept:"FF",amount:"-SRD 12.800",status:"Verwerkt"},
-{date:"08 Jun 2024",desc:"Directie Bonus Pool",dept:"TC",amount:"+SRD 115.000",status:"Geverifieerd"},
-];
+useEffect(()=>{
+  Promise.all([
+    supabase.from("invoices")
+      .select("id,reference_code,amount,status,department,created_at,paid_at,due_date,company_id")
+      .order("created_at",{ascending:false}),
+    supabase.from("companies")
+      .select("id,name,department"),
+  ]).then(([{data:inv},{data:comp}])=>{
+    setInvoices(inv||[]);
+    setCompanies(comp||[]);
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[]);
+
+// ── Derived calculations ──────────────────────────────────────────────────────
+const totalRevenue=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+Number(i.amount||0),0);
+const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+Number(i.amount||0),0);
+const totalOverdue=invoices.filter(i=>i.status==="overdue").reduce((s,i)=>s+Number(i.amount||0),0);
+const totalInvoiced=invoices.reduce((s,i)=>s+Number(i.amount||0),0);
+const tcRevenue=invoices.filter(i=>i.status==="paid"&&i.department==="TC").reduce((s,i)=>s+Number(i.amount||0),0);
+const ffRevenue=invoices.filter(i=>i.status==="paid"&&i.department==="FF").reduce((s,i)=>s+Number(i.amount||0),0);
+const collectionRate=totalInvoiced>0?Math.round((totalRevenue/totalInvoiced)*100):0;
+
+// ── Build 6-month bar chart data ─────────────────────────────────────────────
+const buildMonthlyData=()=>{
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date();
+    d.setMonth(d.getMonth()-i);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    const label=d.toLocaleDateString("nl-SR",{month:"short"}).toUpperCase();
+    const monthInvs=invoices.filter(inv=>(inv.created_at||"").startsWith(key));
+    const tcPaid=monthInvs.filter(inv=>inv.status==="paid"&&inv.department==="TC").reduce((s,inv)=>s+Number(inv.amount||0),0);
+    const ffPaid=monthInvs.filter(inv=>inv.status==="paid"&&inv.department==="FF").reduce((s,inv)=>s+Number(inv.amount||0),0);
+    const open=monthInvs.filter(inv=>["sent","overdue"].includes(inv.status)).reduce((s,inv)=>s+Number(inv.amount||0),0);
+    months.push({key,label,tcPaid,ffPaid,open,total:tcPaid+ffPaid});
+  }
+  return months;
+};
+const monthlyData=buildMonthlyData();
+const maxBar=Math.max(...monthlyData.map(m=>m.tcPaid+m.ffPaid+m.open),1);
+
+// ── Top clients by revenue ────────────────────────────────────────────────────
+const clientRevenue={};
+invoices.filter(i=>i.status==="paid"&&i.company_id).forEach(inv=>{
+  const comp=companies.find(c=>c.id===inv.company_id);
+  if(!comp) return;
+  if(!clientRevenue[comp.id]) clientRevenue[comp.id]={name:comp.name,dept:comp.department,total:0};
+  clientRevenue[comp.id].total+=Number(inv.amount||0);
+});
+const topClients=Object.values(clientRevenue).sort((a,b)=>b.total-a.total).slice(0,5);
+const maxClient=topClients.length?topClients[0].total:1;
+
+// ── Aging buckets ─────────────────────────────────────────────────────────────
+const now=new Date();
+const aging={current:0,d30:0,d60:0,d90:0};
+invoices.filter(i=>["sent","overdue"].includes(i.status)&&i.due_date).forEach(inv=>{
+  const days=Math.floor((now-new Date(inv.due_date))/86400000);
+  const amt=Number(inv.amount||0);
+  if(days<=0) aging.current+=amt;
+  else if(days<=30) aging.d30+=amt;
+  else if(days<=60) aging.d60+=amt;
+  else aging.d90+=amt;
+});
+const totalAging=Object.values(aging).reduce((s,v)=>s+v,0)||1;
+
+// ── Recent transactions ───────────────────────────────────────────────────────
+const recentTx=invoices.slice(0,8).map(inv=>{
+  const comp=companies.find(c=>c.id===inv.company_id);
+  return {...inv,clientName:comp?.name||"—"};
+});
+
+const fmtK=(n)=>n>=1000?`SRD ${(n/1000).toFixed(1)}K`:`SRD ${n.toLocaleString()}`;
+const fmtDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+
+const STATUS_META={
+  paid:{label:"BETAALD",c:C.green,bg:C.greenBg},
+  sent:{label:"OPENSTAAND",c:C.amber,bg:C.amberBg},
+  overdue:{label:"ACHTERSTALLIG",c:C.red,bg:C.redBg},
+  draft:{label:"CONCEPT",c:C.secondary,bg:C.warm50},
+};
+
+if(loading) return <div style={{padding:60,textAlign:"center",color:C.secondary}}>Laden...</div>;
+
 return(
 <div>
-<PageHeader kicker="Intelligence" title="Vermogensstroom"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:20}}>Real-time visualisatie van uw kapitaalallocatie en liquide middelen binnen het Tactigent en Fiscal Fuse ecosysteem.</p>
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
-{[{l:"TOTAAL VERMOGEN",v:"SRD 4.281.090",s:"USD"},{l:"LIQUIDE MIDDELEN",v:"SRD 1.12M",s:"Gedekt door FF Reserves"},{l:"INVESTERINGSRENDEMENT",v:"+12.4% YTD",s:"Gedreven door Tactigent Projects",accent:true}].map(k=>(
-<div key={k.l} style={{background:k.accent?C.crimsonFaint:C.surface,borderRadius:14,padding:"16px 18px",border:`1.5px solid ${k.accent?C.crimson:C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:k.accent?C.crimson:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:6}}>{k.l}</div>
-<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.accent?C.crimson:C.text,marginBottom:3}}>{k.v}</div>
-<div style={{fontSize:10,color:C.secondary}}>{k.s}</div>
-</div>
-))}
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Kapitaalallocatie</div>
-<div style={{display:"flex",alignItems:"center",gap:20}}>
-<div style={{position:"relative",width:120,height:120,flexShrink:0}}>
-<svg viewBox="0 0 120 120" style={{transform:"rotate(-90deg)"}}>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.border} strokeWidth="18"/>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.espresso} strokeWidth="18" strokeDasharray={`${35*3.14} ${65*3.14}`} strokeDashoffset="0"/>
-<circle cx="60" cy="60" r="50" fill="none" stroke={C.crimson} strokeWidth="18" strokeDasharray={`${65*3.14} ${35*3.14}`} strokeDashoffset={`${-35*3.14}`}/>
-</svg>
-<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.text}}>65%</div>
-<div style={{fontSize:9,color:C.secondary}}>TACTIGENT</div>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10}}>
-{[{c:C.crimson,l:"TC PROJECTS",v:"SRD 2.78M"},{c:C.espresso,l:"FF MATTERS",v:"SRD 1.50M"}].map(b=>(
-<div key={b.l} style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:10,height:10,borderRadius:"50%",background:b.c,flexShrink:0}}/><div><div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.07em"}}>{b.l}</div><div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>{b.v}</div></div></div>
-))}
-</div>
-</div>
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Cashflow Trend</div>
-<div style={{display:"flex",gap:6}}>
-{["6 MAANDEN","1 JAAR"].map((l,i)=><button key={l} style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${i===0?C.crimson:C.border}`,background:i===0?C.crimsonFaint:"transparent",color:i===0?C.crimson:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>{l}</button>)}
-</div>
-</div>
-<div style={{display:"flex",gap:6,alignItems:"flex-end",height:80,marginBottom:8}}>
-{months.map((m,i)=>(
-<div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"stretch",gap:2}}>
-<div style={{flex:tcBars[i],background:C.crimson,borderRadius:"3px 3px 0 0",opacity:0.8}}/>
-<div style={{flex:ffBars[i],background:C.espresso,opacity:0.6}}/>
-</div>
-))}
-</div>
-<div style={{display:"flex",gap:6}}>
-{months.map(m=>(<div key={m} style={{flex:1,textAlign:"center",fontSize:8.5,color:C.secondary,fontWeight:600}}>{m}</div>))}
-</div>
-</div>
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Vermogensbewegingen</div>
-<button style={{fontSize:10,fontWeight:700,color:C.crimson,background:"none",border:"none",cursor:"pointer"}}>Exporteren v</button>
-</div>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DATUM","OMSCHRIJVING","AFDELING","BEDRAG","STATUS"].map(h=><th key={h} style={{padding:"8px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{movements.map((m,i)=>(
-<tr key={i} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"13px 18px",fontSize:11,color:C.secondary}}>{m.date}</td>
-<td style={{padding:"13px 18px",fontSize:13,fontWeight:600,color:C.text}}>{m.desc}</td>
-<td style={{padding:"13px 18px"}}><DeptTag dept={m.dept}/></td>
-<td style={{padding:"13px 18px",fontFamily:F.display,fontSize:14,fontWeight:600,color:m.amount.startsWith("+")?C.green:C.red}}>{m.amount}</td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:9,fontWeight:700,color:C.secondary,background:C.warm50,padding:"3px 8px",borderRadius:4}}>{m.status}</span></td>
-</tr>
-))}</tbody>
-</table>
-</div>
+  <PageHeader kicker="Financiën" title="Vermogensstroom"/>
+
+  {/* ── KPI strip ── */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:20}}>
+    {[
+      {l:"TOTAAL GEFACTUREERD",v:fmtK(totalInvoiced),c:C.text,bg:C.surface,border:C.border},
+      {l:"ONTVANGEN",v:fmtK(totalRevenue),c:C.green,bg:C.greenBg,border:C.green+"30"},
+      {l:"OPENSTAAND",v:fmtK(totalOpen),c:totalOpen>0?C.amber:C.green,bg:totalOpen>0?C.amberBg:C.greenBg,border:(totalOpen>0?C.amber:C.green)+"30"},
+      {l:"ACHTERSTALLIG",v:fmtK(totalOverdue),c:totalOverdue>0?C.red:C.green,bg:totalOverdue>0?C.redBg:C.greenBg,border:(totalOverdue>0?C.red:C.green)+"30"},
+      {l:"INCASSORATE",v:collectionRate+"%",c:collectionRate>=80?C.green:collectionRate>=60?C.amber:C.red,bg:collectionRate>=80?C.greenBg:collectionRate>=60?C.amberBg:C.redBg,border:(collectionRate>=80?C.green:collectionRate>=60?C.amber:C.red)+"30"},
+    ].map(k=>(
+      <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"13px 15px",border:`1px solid ${k.border}`}}>
+        <div style={{fontSize:8,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* ── Row 1: Bar chart + TC/FF breakdown ── */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:14,marginBottom:14}}>
+    {/* Monthly bar chart */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"20px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>Maandelijkse Inkomsten</div>
+          <div style={{fontSize:10,color:C.secondary}}>TC vs FF — betaald + openstaand</div>
+        </div>
+        <div style={{display:"flex",gap:12}}>
+          {[{c:C.crimson,l:"TC Betaald"},{c:C.taupe,l:"FF Betaald"},{c:C.amberBg,l:"Openstaand",border:C.amber}].map(b=>(
+            <div key={b.l} style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:10,height:10,borderRadius:2,background:b.c,border:b.border?`1.5px solid ${b.border}`:undefined}}/>
+              <span style={{fontSize:9,fontWeight:600,color:C.secondary}}>{b.l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bars */}
+      <div style={{display:"flex",gap:8,alignItems:"flex-end",height:180}}>
+        {monthlyData.map((m,i)=>{
+          const tcH=Math.round((m.tcPaid/maxBar)*160);
+          const ffH=Math.round((m.ffPaid/maxBar)*160);
+          const opH=Math.round((m.open/maxBar)*160);
+          const hasData=m.tcPaid+m.ffPaid+m.open>0;
+          return(
+            <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              {/* Value label */}
+              {hasData&&<div style={{fontSize:9,fontWeight:700,color:C.text}}>{fmtK(m.total)}</div>}
+              {/* Bar stack */}
+              <div style={{width:"100%",display:"flex",flexDirection:"column-reverse",gap:1,borderRadius:"4px 4px 0 0",overflow:"hidden",minHeight:160,justifyContent:"flex-start",alignItems:"stretch",position:"relative"}}>
+                <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",flexDirection:"column-reverse",gap:1}}>
+                  {m.tcPaid>0&&<div style={{height:tcH,background:C.crimson,transition:"height .3s"}}/>}
+                  {m.ffPaid>0&&<div style={{height:ffH,background:C.taupe,transition:"height .3s"}}/>}
+                  {m.open>0&&<div style={{height:opH,background:C.amberBg,border:`1px solid ${C.amber}`,transition:"height .3s"}}/>}
+                </div>
+                {!hasData&&<div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:C.border}}/>}
+              </div>
+              {/* Month label */}
+              <div style={{fontSize:9,fontWeight:700,color:C.secondary,marginTop:4}}>{m.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    {/* TC vs FF breakdown */}
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {/* TC card */}
+      <div style={{background:C.crimsonFaint,borderRadius:14,border:`1px solid ${C.crimson}30`,padding:"16px 18px",flex:1}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.crimson,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>TACTIGENT</div>
+        <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:C.crimson}}>{fmtK(tcRevenue)}</div>
+        <div style={{fontSize:10,color:C.secondary,marginTop:4}}>Ontvangen omzet</div>
+        <div style={{marginTop:10,height:4,background:`${C.crimson}20`,borderRadius:2}}>
+          <div style={{height:"100%",width:`${totalRevenue>0?Math.round(tcRevenue/totalRevenue*100):50}%`,background:C.crimson,borderRadius:2}}/>
+        </div>
+        <div style={{fontSize:9,color:C.crimson,fontWeight:700,marginTop:4}}>{totalRevenue>0?Math.round(tcRevenue/totalRevenue*100):0}% van totaal</div>
+      </div>
+      {/* FF card */}
+      <div style={{background:"#F5F3F0",borderRadius:14,border:`1px solid ${C.taupe}30`,padding:"16px 18px",flex:1}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.taupe,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>FISCAL FUSE</div>
+        <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:C.taupe}}>{fmtK(ffRevenue)}</div>
+        <div style={{fontSize:10,color:C.secondary,marginTop:4}}>Ontvangen omzet</div>
+        <div style={{marginTop:10,height:4,background:`${C.taupe}20`,borderRadius:2}}>
+          <div style={{height:"100%",width:`${totalRevenue>0?Math.round(ffRevenue/totalRevenue*100):50}%`,background:C.taupe,borderRadius:2}}/>
+        </div>
+        <div style={{fontSize:9,color:C.taupe,fontWeight:700,marginTop:4}}>{totalRevenue>0?Math.round(ffRevenue/totalRevenue*100):0}% van totaal</div>
+      </div>
+    </div>
+  </div>
+
+  {/* ── Row 2: Aging + Top clients + Recent tx ── */}
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1.4fr",gap:14}}>
+    {/* Aging analysis */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Ouderdomsanalyse</div>
+      <div style={{fontSize:10,color:C.secondary,marginBottom:16}}>Openstaande vorderingen</div>
+      {[
+        {l:"Huidig (niet vervallen)",v:aging.current,color:C.green},
+        {l:"1–30 dagen achterstallig",v:aging.d30,color:C.amber},
+        {l:"31–60 dagen achterstallig",v:aging.d60,color:"#E07020"},
+        {l:">60 dagen achterstallig",v:aging.d90,color:C.red},
+      ].map(({l,v,color})=>{
+        const pct=Math.round((v/totalAging)*100);
+        return(
+          <div key={l} style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:11,color:C.text}}>{l}</span>
+              <span style={{fontSize:11,fontWeight:700,color}}>{fmtK(v)}</span>
+            </div>
+            <div style={{height:5,background:C.border,borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:3,transition:"width .4s"}}/>
+            </div>
+            <div style={{fontSize:9,color:C.secondary,marginTop:2}}>{pct}% van openstaand</div>
+          </div>
+        );
+      })}
+      {totalOpen===0&&(
+        <div style={{padding:"20px 0",textAlign:"center"}}>
+          <CheckCircle size={24} color={C.green} style={{marginBottom:6}}/>
+          <div style={{fontSize:12,color:C.secondary}}>Geen openstaande vorderingen</div>
+        </div>
+      )}
+    </div>
+
+    {/* Top clients */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Top Cliënten</div>
+      <div style={{fontSize:10,color:C.secondary,marginBottom:16}}>Op omzet (betaalde facturen)</div>
+      {topClients.length===0?(
+        <div style={{padding:"20px 0",textAlign:"center",color:C.secondary,fontSize:12}}>Nog geen betaalde facturen</div>
+      ):topClients.map((cl,i)=>{
+        const pct=Math.round((cl.total/maxClient)*100);
+        const color=cl.dept==="TC"?C.crimson:C.taupe;
+        return(
+          <div key={cl.name} style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontFamily:F.display,fontSize:13,fontWeight:700,color:C.muted}}>{i+1}</span>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,color:C.text}}>{cl.name}</div>
+                </div>
+              </div>
+              <span style={{fontSize:11,fontWeight:700,color}}>{fmtK(cl.total)}</span>
+            </div>
+            <div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:2,transition:"width .4s"}}/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Recent transactions */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>Recente Transacties</div>
+          <div style={{fontSize:10,color:C.secondary}}>Laatste {recentTx.length} facturen</div>
+        </div>
+        {/* CSV Export */}
+        <button onClick={()=>{
+          const rows=[["Referentie","Cliënt","Bedrag","Status","Afdeling","Datum"],
+            ...recentTx.map(i=>[i.reference_code||"—",i.clientName,i.amount,i.status,i.department,fmtDate(i.created_at)])];
+          const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+          const a=document.createElement("a");
+          a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+          a.download=`vermogensstroom_${new Date().toISOString().slice(0,10)}.csv`;
+          a.click();
+        }} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:7,background:C.bg,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,cursor:"pointer"}}>
+          <Download size={11}/> CSV
+        </button>
+      </div>
+
+      {recentTx.length===0?(
+        <div style={{padding:"40px",textAlign:"center",color:C.secondary,fontSize:12}}>Geen transacties</div>
+      ):(
+        <div style={{overflowY:"auto",maxHeight:320}}>
+          {recentTx.map((inv,i)=>{
+            const meta=STATUS_META[inv.status]||STATUS_META.draft;
+            const isOverdue=inv.due_date&&new Date(inv.due_date)<new Date()&&inv.status!=="paid";
+            const deptColor=inv.department==="TC"?C.crimson:C.taupe;
+            return(
+              <div key={inv.id} style={{padding:"11px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",alignItems:"center",gap:12}}>
+                {/* Dept dot */}
+                <div style={{width:8,height:8,borderRadius:"50%",background:deptColor,flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inv.clientName}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{inv.reference_code||"—"} · {fmtDate(inv.created_at)}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontFamily:F.display,fontSize:14,fontWeight:600,color:inv.status==="paid"?C.green:isOverdue?C.red:C.text}}>
+                    {inv.status==="paid"?"+":""}{fmtK(Number(inv.amount||0))}
+                  </div>
+                  <Badge label={isOverdue?"ACHTERSTALLIG":meta.label} color={isOverdue?C.red:meta.c} bg={isOverdue?C.redBg:meta.bg}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
 </div>
 );
 }
 
-// ─── CLIENT PORTAL VIEWS ─────────────────────────────────────────────────────
 
-// ─── CompanyDetail ─────────────────────────────────────────
+
 function CompanyDetail({company,user,onBack,setDetailEng,engData,invData,showToast}){
 const [activeTab,setActiveTab]=useState("overview");
-const engagements=(engData||ENGAGEMENTS_INIT).filter(e=>e.client===company.name);
-const invoices=invData.filter(i=>i.client===company.name);
-const docs=DOCUMENTS.filter(d=>engagements.some(e=>e.ref===d.engagement));
-const totalBilled=invoices.reduce((s,i)=>s+i.amount,0);
-const openBilled=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const tabs=[
-{id:"overview",label:"Overzicht",icon:Layers},
-{id:"engagements",label:`Engagements (${engagements.length})`,icon:Target},
-{id:"documents",label:`Documenten (${docs.length})`,icon:FileText},
-{id:"invoices",label:`Facturen (${invoices.length})`,icon:Receipt},
+const [engs,setEngs]=useState([]);
+const [invs,setInvs]=useState([]);
+const [docs,setDocs]=useState([]);
+const [actions,setActions]=useState([]);
+const [loading,setLoading]=useState(true);
+const [editing,setEditing]=useState(false);
+const [editForm,setEditForm]=useState({
+  name:company.name||"",
+  contact_name:company.contact||"",
+  contact_email:company.email||"",
+  kkf_number:company.kkf||"",
+  industry:company.industry||"",
+  lifecycle_status:company.lifecycle||"",
+});
+const [saving,setSaving]=useState(false);
+
+// Load all live data for this company
+useEffect(()=>{
+  const id=company.id;
+  if(!id){ setLoading(false); return; }
+
+  Promise.all([
+    supabase.from("engagements")
+      .select("id,name,department,type,status,health,phase,company_id,assigned_to")
+      .eq("company_id",id)
+      .order("created_at",{ascending:false}),
+    supabase.from("invoices")
+      .select("id,reference_code,ref,amount,status,due_date,paid_at,qbo_id,currency")
+      .eq("company_id",id)
+      .order("created_at",{ascending:false}),
+    supabase.from("documents")
+      .select("id,name,file_type,file_size,visibility,review_status,uploaded_at,file_url")
+      .eq("company_id",id)
+      .order("uploaded_at",{ascending:false}),
+    supabase.from("client_actions")
+      .select("id,title,action_type,status,deadline,department")
+      .eq("company_id",id)
+      .order("created_at",{ascending:false})
+      .limit(10),
+  ]).then(([{data:e},{data:i},{data:d},{data:a}])=>{
+    setEngs((e||[]).map(x=>({
+      ...x, dept:x.department,
+      ref:`${x.department}-${x.id.slice(0,4).toUpperCase()}`,
+      client:company.name,
+    })));
+    setInvs(i||[]);
+    setDocs(d||[]);
+    setActions(a||[]);
+    setLoading(false);
+  }).catch(()=>setLoading(false));
+},[company.id]);
+
+const formatBytes=(b)=>{
+  if(!b) return "—";
+  if(b<1024*1024) return (b/1024).toFixed(1)+"KB";
+  return (b/(1024*1024)).toFixed(1)+"MB";
+};
+const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+
+const totalBilled=invs.reduce((s,i)=>s+Number(i.amount||0),0);
+const openBilled=invs.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+Number(i.amount||0),0);
+
+const STATUS_META={
+  paid:{label:"BETAALD",c:C.green,bg:C.greenBg},
+  sent:{label:"VERZONDEN",c:C.indigo,bg:C.indigoBg},
+  overdue:{label:"ACHTERSTALLIG",c:C.red,bg:C.redBg},
+  draft:{label:"CONCEPT",c:C.secondary,bg:C.warm50},
+};
+
+const saveEdit=async()=>{
+  setSaving(true);
+  try{
+    await supabase.from("companies").update({
+      name:editForm.name,
+      contact_name:editForm.contact_name,
+      contact_email:editForm.contact_email,
+      kkf_number:editForm.kkf_number,
+      industry:editForm.industry,
+      lifecycle_status:editForm.lifecycle_status,
+    }).eq("id",company.id);
+    showToast("Bedrijfsgegevens opgeslagen ✓");
+    setEditing(false);
+  }catch(e){ showToast("Fout: "+e.message); }
+  setSaving(false);
+};
+
+const TABS=[
+  {id:"overview",  label:"Overzicht",                Icon:Layers},
+  {id:"engagements",label:`Engagements (${engs.length})`,Icon:Target},
+  {id:"documents", label:`Documenten (${docs.length})`, Icon:FileText},
+  {id:"invoices",  label:`Facturen (${invs.length})`,   Icon:Receipt},
+  {id:"actions",   label:`Acties (${actions.length})`,  Icon:CheckSquare},
 ];
+
 return(
 <div className="fu">
-<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,marginBottom:16,padding:0}}>
-<ChevronLeft size={15}/> Terug naar overzicht
-</button>
-{/* Header */}
-<div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16,display:"flex",alignItems:"center",gap:20}}>
-<div style={{flexShrink:0}}>
-<CompanyLogo name={company.name} size={52} dept={company.dept} logoUrl={company.logoUrl}/>
-</div>
-<div style={{flex:1}}>
-<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-<h1 style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,margin:0}}>{company.name}</h1>
-<DeptTag dept={company.dept}/>
-<HealthDot status={company.health}/>
-</div>
-<div style={{fontSize:12,color:C.secondary}}>KKF {company.kkf} · {company.lifecycle}</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center"}}>
-{[{l:"ENGAGEMENTS",v:engagements.length},{l:"GEFACTUREERD",v:`SRD ${totalBilled.toLocaleString()}`},{l:"OPENSTAAND",v:`SRD ${openBilled.toLocaleString()}`}].map(s=>(
-<div key={s.l} style={{background:C.bg,borderRadius:10,padding:"10px 14px"}}>
-<div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:openBilled>0&&s.l==="OPENSTAAND"?C.amber:C.text}}>{s.v}</div>
-</div>
-))}
-</div>
-</div>
-{/* Tabs */}
-<div style={{display:"flex",gap:4,marginBottom:16,background:C.bg,borderRadius:12,padding:4}}>
-{tabs.map(tb=>(
-<button key={tb.id} onClick={()=>setActiveTab(tb.id)} style={{flex:1,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,fontWeight:activeTab===tb.id?700:400,fontSize:12,transition:"all .15s",boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none"}}>
-<tb.icon size={13}/>{tb.label}
-</button>
-))}
-</div>
-{/* Overview tab */}
-{activeTab==="overview"&&(
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Primair Contact</div>
-<div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-<div style={{position:"relative"}}>
-<Avatar initials={company.contact.split(" ").map(w=>w[0]).join("").slice(0,2)} size={44} bg={company.dept==="TC"?C.crimson:C.taupe} shape="circle"/>
-<div style={{position:"absolute",bottom:-1,right:-1,width:14,height:14,borderRadius:"50%",background:C.green,border:`2px solid ${C.surface}`}}/>
-</div>
-<div>
-<div style={{fontSize:14,fontWeight:700,color:C.text}}>{company.contact}</div>
-<div style={{fontSize:11,color:C.secondary}}>{company.role}</div>
-</div>
-</div>
-{[["Email",`${company.contact.split(" ")[0].toLowerCase()}@${company.name.toLowerCase().replace(/\s+/g,"").replace(/[^a-z]/g,"")}.sr`],["Telefoon","+597 8xx-xxxx"],["Afdeling",company.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Bedrijfsgegevens</div>
-{[["KKF Nummer",company.kkf],["Lifecycle Status",company.lifecycle],["Gezondheidsstatus",company.health==="red"?"Kritiek":company.health==="amber"?"Amber":"Stabiel"],["Afdeling",company.dept==="TC"?"Tactigent":"Fiscal Fuse"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:600,color:company.health==="red"&&l==="Gezondheidsstatus"?C.red:company.health==="amber"&&l==="Gezondheidsstatus"?C.amber:C.text}}>{v}</span>
-</div>
-))}
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Actieve Engagements</div>
-{engagements.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen actieve engagements</div>):
-engagements.map(e=>(
-<div key={e.id} onClick={()=>setDetailEng(e)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<div><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref} · {e.phase}</div></div>
-<div style={{display:"flex",alignItems:"center",gap:8}}><HealthDot status={e.health}/><ChevronRight size={14} color={C.secondary}/></div>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
-<div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Recente Facturen</div>
-{invoices.length===0?(<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen facturen</div>):
-invoices.slice(0,3).map(inv=>(
-<div key={inv.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderTop:`1px solid ${C.border}`}}>
-<div><div style={{fontSize:12,fontWeight:600,color:C.text}}>{inv.ref}</div><div style={{fontSize:10,color:C.secondary}}>{inv.due}</div></div>
-<div style={{display:"flex",alignItems:"center",gap:8}}>
-<span style={{fontFamily:F.display,fontSize:13,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</span>
-<Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERS.":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
-</div>
-</div>
-))}
-</div>
-</div>
-</div>
-)}
-{/* Engagements tab */}
-{activeTab==="engagements"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-{engagements.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Target size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["NAAM","TYPE","FASE","GEZONDHEID","MANAGER","ACTIE"].map(h=><th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{engagements.map(e=>(
-<tr key={e.id} onClick={()=>setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"13px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div><div style={{fontSize:10,color:C.secondary}}>{e.ref}</div></td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:9,padding:"3px 8px",borderRadius:4,background:e.type==="project"?C.crimsonFaint:"#F0EDE8",color:e.type==="project"?C.crimson:C.taupe,fontWeight:700,textTransform:"uppercase"}}>{e.type==="project"?"PROJECT":"DOSSIER"}</span></td>
-<td style={{padding:"13px 18px"}}><span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase}</span></td>
-<td style={{padding:"13px 18px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><HealthDot status={e.health}/><span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>{e.health==="red"?"KRITIEK":e.health==="amber"?"AMBER":"STABIEL"}</span></div></td>
-<td style={{padding:"13px 18px"}}><Avatar initials={e.manager} size={26} bg={e.dept==="TC"?C.crimson:C.taupe}/></td>
-<td style={{padding:"13px 18px"}}><button style={{padding:"5px 12px",borderRadius:7,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}>Openen</button></td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
-{/* Documents tab */}
-{activeTab==="documents"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-{docs.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><FileText size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen documenten voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DOCUMENT","TYPE","DATUM","ZICHTBAARHEID","STATUS"].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{docs.map(d=>(
-<tr key={d.id} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"12px 18px"}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div><div style={{fontSize:10,color:C.secondary}}>{d.size}</div></td>
-<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.type}</td>
-<td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{d.date}</td>
-<td style={{padding:"12px 18px"}}><VisChip vis={d.visibility}/></td>
-<td style={{padding:"12px 18px"}}><ReviewChip status={d.status}/></td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
-{/* Invoices tab */}
-{activeTab==="invoices"&&(
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-{invoices.length===0?(<div style={{padding:"48px 24px",textAlign:"center"}}><Receipt size={28} color={C.mushroom} style={{marginBottom:12}}/><div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen facturen voor dit bedrijf</div></div>):(
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS","QBO"].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{invoices.map(inv=>(
-<tr key={inv.id} style={{borderTop:`1px solid ${C.border}`}}>
-<td style={{padding:"12px 18px",fontSize:12,fontWeight:700,color:C.secondary}}>{inv.ref}</td>
-<td style={{padding:"12px 18px",fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
-<td style={{padding:"12px 18px",fontSize:12,color:C.secondary}}>{inv.due}</td>
-<td style={{padding:"12px 18px"}}><Badge label={inv.status==="paid"?"BETAALD":inv.status==="overdue"?"ACHTERSTALLIG":"VERZONDEN"} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
-<td style={{padding:"12px 18px"}}>{inv.qbo?(<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> SYNC</span>):(<span style={{fontSize:9,color:C.muted}}>—</span>)}</td>
-</tr>
-))}</tbody>
-</table>
-)}
-</div>
-)}
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+    <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:C.secondary,fontSize:12,fontWeight:600,padding:0}}>
+      <ChevronLeft size={15}/> Terug naar overzicht
+    </button>
+    {user.role==="super_admin"&&(
+      <button onClick={()=>setEditing(!editing)}
+        style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,border:`1.5px solid ${editing?C.crimson:C.border}`,background:editing?C.crimsonFaint:"transparent",color:editing?C.crimson:C.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+        <Settings size={12}/> {editing?"Annuleren":"Bewerken"}
+      </button>
+    )}
+  </div>
+
+  {/* Header */}
+  <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px 28px",marginBottom:16}}>
+    <div style={{display:"flex",alignItems:"flex-start",gap:20,marginBottom:16}}>
+      <CompanyLogo name={company.name} size={52} dept={company.dept} logoUrl={company.logoUrl}/>
+      <div style={{flex:1}}>
+        {editing?(
+          <input value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}
+            style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:C.text,border:`1.5px solid ${C.crimson}`,borderRadius:8,padding:"4px 10px",outline:"none",width:"100%",background:C.bg,marginBottom:8}}/>
+        ):(
+          <h1 style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,margin:"0 0 6px"}}>{company.name}</h1>
+        )}
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <DeptTag dept={company.dept}/>
+          <HealthDot status={company.health}/>
+          <span style={{fontSize:11,color:C.secondary}}>
+            {editing?(
+              <input value={editForm.lifecycle_status} onChange={e=>setEditForm(f=>({...f,lifecycle_status:e.target.value}))}
+                placeholder="Lifecycle status" style={{fontSize:11,padding:"2px 8px",borderRadius:6,border:`1px solid ${C.border}`,outline:"none",background:C.bg,color:C.text}}/>
+            ):company.lifecycle}
+          </span>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center"}}>
+        {[
+          {l:"ENGAGEMENTS",v:loading?"…":engs.length},
+          {l:"GEFACTUREERD",v:loading?"…":`SRD ${(totalBilled/1000).toFixed(1)}K`},
+          {l:"OPENSTAAND",v:loading?"…":`SRD ${(openBilled/1000).toFixed(1)}K`,amber:openBilled>0},
+        ].map(s=>(
+          <div key={s.l} style={{background:C.bg,borderRadius:10,padding:"10px 14px"}}>
+            <div style={{fontSize:8,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:3}}>{s.l}</div>
+            <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:s.amber?C.amber:C.text}}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Edit form */}
+    {editing&&(
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"16px",background:C.warm50,borderRadius:10,border:`1px solid ${C.border}`}}>
+        {[
+          ["Contactpersoon","contact_name","text"],
+          ["E-mailadres","contact_email","email"],
+          ["KKF Nummer","kkf_number","text"],
+          ["Industrie","industry","text"],
+        ].map(([label,field,type])=>(
+          <div key={field}>
+            <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{label}</div>
+            <input type={type} value={editForm[field]} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))}
+              style={{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:12,outline:"none",boxSizing:"border-box",background:C.bg,color:C.text}}/>
+          </div>
+        ))}
+        <div style={{gridColumn:"1/-1",display:"flex",gap:8,marginTop:4}}>
+          <button onClick={saveEdit} disabled={saving}
+            style={{padding:"8px 18px",borderRadius:8,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            {saving?"Opslaan...":"Wijzigingen opslaan"}
+          </button>
+          <button onClick={()=>setEditing(false)}
+            style={{padding:"8px 14px",borderRadius:8,background:"transparent",border:`1px solid ${C.border}`,color:C.text,fontSize:12,cursor:"pointer"}}>
+            Annuleren
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* Portal status */}
+    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:editing?12:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:20,background:company.portal_user_id?C.greenBg:C.warm50,border:`1px solid ${company.portal_user_id?C.green:C.border}`}}>
+        <div style={{width:7,height:7,borderRadius:"50%",background:company.portal_user_id?C.green:C.mushroom}}/>
+        <span style={{fontSize:10,fontWeight:700,color:company.portal_user_id?C.green:C.secondary}}>
+          {company.portal_user_id?"Portaal Actief":"Portaal Niet Geactiveerd"}
+        </span>
+      </div>
+      {company.contact_email||company.email?(
+        <span style={{fontSize:10,color:C.secondary}}>{company.contact_email||company.email}</span>
+      ):null}
+      {company.kkf&&<span style={{fontSize:10,color:C.muted}}>KKF: {company.kkf}</span>}
+    </div>
+  </div>
+
+  {/* Tabs */}
+  <div style={{display:"flex",gap:4,marginBottom:16,background:C.bg,borderRadius:12,padding:4}}>
+    {TABS.map(tb=>(
+      <button key={tb.id} onClick={()=>setActiveTab(tb.id)}
+        style={{flex:1,padding:"9px 8px",borderRadius:9,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+          background:activeTab===tb.id?C.surface:"transparent",color:activeTab===tb.id?C.text:C.secondary,
+          fontWeight:activeTab===tb.id?700:400,fontSize:11,boxShadow:activeTab===tb.id?"0 1px 4px rgba(0,0,0,.07)":"none",transition:"all .15s"}}>
+        <tb.Icon size={12}/>{tb.label}
+      </button>
+    ))}
+  </div>
+
+  {/* ── OVERVIEW TAB ── */}
+  {activeTab==="overview"&&(
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      {/* Contact + Info */}
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Primair Contact</div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+            <Avatar initials={(company.contact||"??").split(" ").map(w=>w[0]).join("").slice(0,2)} size={44} bg={company.dept==="TC"?C.crimson:C.taupe}/>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text}}>{company.contact||"Niet opgegeven"}</div>
+              <div style={{fontSize:11,color:C.secondary}}>{company.industry||"—"}</div>
+            </div>
+          </div>
+          {[
+            ["E-mail", company.contact_email||company.email||"—"],
+            ["KKF Nummer", company.kkf||"—"],
+            ["Industrie", company.industry||"—"],
+            ["Afdeling", company.dept==="TC"?"Tactigent Consultancy":"Fiscal Fuse"],
+          ].map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
+              <span style={{fontSize:11,color:C.secondary}}>{l}</span>
+              <span style={{fontSize:11,fontWeight:600,color:C.text}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Live engagements + invoices preview */}
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Actieve Engagements</div>
+          {loading?<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"12px 0"}}>Laden...</div>:
+          engs.length===0?<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen actieve engagements</div>:
+          engs.slice(0,4).map(e=>(
+            <div key={e.id} onClick={()=>setDetailEng&&setDetailEng(e)}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div>
+                <div style={{fontSize:10,color:C.secondary}}>{e.ref} · {e.phase||"—"}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <HealthDot status={e.health}/>
+                <ChevronRight size={14} color={C.secondary}/>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 20px"}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Recente Facturen</div>
+          {loading?<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"12px 0"}}>Laden...</div>:
+          invs.length===0?<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"20px 0"}}>Geen facturen</div>:
+          invs.slice(0,3).map(inv=>{
+            const meta=STATUS_META[inv.status]||STATUS_META.draft;
+            return(
+              <div key={inv.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderTop:`1px solid ${C.border}`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text}}>{inv.reference_code||inv.ref||"—"}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{formatDate(inv.due_date)}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontFamily:F.display,fontSize:13,fontWeight:600,color:C.text}}>SRD {Number(inv.amount||0).toLocaleString()}</span>
+                  <Badge label={meta.label} color={meta.c} bg={meta.bg}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* ── ENGAGEMENTS TAB ── */}
+  {activeTab==="engagements"&&(
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      {loading?<div style={{padding:"40px",textAlign:"center",color:C.secondary}}>Laden...</div>:
+      engs.length===0?
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <Target size={28} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen engagements voor dit bedrijf</div>
+        </div>
+      :(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:C.warm50}}>
+            {["NAAM","TYPE","FASE","GEZONDHEID","ACTIE"].map(h=>(
+              <th key={h} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{engs.map(e=>(
+            <tr key={e.id} onClick={()=>setDetailEng&&setDetailEng(e)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
+              <td style={{padding:"13px 18px"}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.name}</div>
+                <div style={{fontSize:10,color:C.secondary}}>{e.ref}</div>
+              </td>
+              <td style={{padding:"13px 18px"}}>
+                <span style={{fontSize:9,padding:"3px 8px",borderRadius:4,background:e.type==="project"?C.crimsonFaint:"#F0EDE8",color:e.type==="project"?C.crimson:C.taupe,fontWeight:700,textTransform:"uppercase"}}>
+                  {e.type==="project"?"PROJECT":"DOSSIER"}
+                </span>
+              </td>
+              <td style={{padding:"13px 18px"}}>
+                <span style={{fontSize:11,padding:"3px 9px",borderRadius:20,background:C.bg,color:C.text,border:`1px solid ${C.border}`}}>{e.phase||"—"}</span>
+              </td>
+              <td style={{padding:"13px 18px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <HealthDot status={e.health}/>
+                  <span style={{fontSize:10,fontWeight:700,color:e.health==="red"?C.red:e.health==="amber"?C.amber:C.green}}>
+                    {e.health==="red"?"KRITIEK":e.health==="amber"?"AMBER":"STABIEL"}
+                  </span>
+                </div>
+              </td>
+              <td style={{padding:"13px 18px"}}>
+                <button style={{padding:"5px 12px",borderRadius:7,background:C.crimson,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer"}}>Openen</button>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </div>
+  )}
+
+  {/* ── DOCUMENTS TAB ── */}
+  {activeTab==="documents"&&(
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      {loading?<div style={{padding:"40px",textAlign:"center",color:C.secondary}}>Laden...</div>:
+      docs.length===0?
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <FileText size={28} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen documenten voor dit bedrijf</div>
+        </div>
+      :(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:C.warm50}}>
+            {["DOCUMENT","TYPE","GROOTTE","DATUM","ZICHTBAARHEID","STATUS",""].map(h=>(
+              <th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{docs.map(d=>(
+            <tr key={d.id} style={{borderTop:`1px solid ${C.border}`}}>
+              <td style={{padding:"12px 18px",fontSize:12,fontWeight:600,color:C.text}}>{d.name}</td>
+              <td style={{padding:"12px 18px"}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4}}>{(d.file_type||"—").toUpperCase()}</span></td>
+              <td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{formatBytes(d.file_size)}</td>
+              <td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{formatDate(d.uploaded_at)}</td>
+              <td style={{padding:"12px 18px"}}><VisChip vis={d.visibility}/></td>
+              <td style={{padding:"12px 18px"}}><ReviewChip status={d.review_status}/></td>
+              <td style={{padding:"12px 18px"}}>
+                {d.file_url&&(
+                  <a href={d.file_url} target="_blank" rel="noopener"
+                    style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 9px",borderRadius:7,background:C.bg,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,textDecoration:"none"}}>
+                    <Download size={10}/> DL
+                  </a>
+                )}
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </div>
+  )}
+
+  {/* ── INVOICES TAB ── */}
+  {activeTab==="invoices"&&(
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      {loading?<div style={{padding:"40px",textAlign:"center",color:C.secondary}}>Laden...</div>:
+      invs.length===0?
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <Receipt size={28} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen facturen voor dit bedrijf</div>
+        </div>
+      :(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:C.warm50}}>
+            {["REFERENTIE","BEDRAG","VERVALDATUM","BETAALD OP","STATUS","QBO"].map(h=>(
+              <th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{invs.map(inv=>{
+            const meta=STATUS_META[inv.status]||STATUS_META.draft;
+            const isOverdue=inv.due_date&&new Date(inv.due_date)<new Date()&&inv.status!=="paid";
+            return(
+              <tr key={inv.id} style={{borderTop:`1px solid ${C.border}`,background:isOverdue?"#FFF8F8":"transparent"}}>
+                <td style={{padding:"12px 18px",fontSize:12,fontWeight:700,color:C.crimson}}>{inv.reference_code||inv.ref||"—"}</td>
+                <td style={{padding:"12px 18px",fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text}}>SRD {Number(inv.amount||0).toLocaleString()}</td>
+                <td style={{padding:"12px 18px",fontSize:12,color:isOverdue?C.red:C.secondary,fontWeight:isOverdue?700:400}}>{formatDate(inv.due_date)}</td>
+                <td style={{padding:"12px 18px",fontSize:12,color:C.secondary}}>{formatDate(inv.paid_at)}</td>
+                <td style={{padding:"12px 18px"}}><Badge label={isOverdue?"ACHTERSTALLIG":meta.label} color={isOverdue?C.red:meta.c} bg={isOverdue?C.redBg:meta.bg}/></td>
+                <td style={{padding:"12px 18px"}}>{inv.qbo_id?<span style={{fontSize:9,fontWeight:700,color:C.green,display:"flex",alignItems:"center",gap:4}}><CheckCircle size={10}/> QBO</span>:<span style={{fontSize:9,color:C.muted}}>—</span>}</td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      )}
+    </div>
+  )}
+
+  {/* ── ACTIONS TAB ── */}
+  {activeTab==="actions"&&(
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      {loading?<div style={{padding:"40px",textAlign:"center",color:C.secondary}}>Laden...</div>:
+      actions.length===0?
+        <div style={{padding:"52px 24px",textAlign:"center"}}>
+          <CheckSquare size={28} color={C.mushroom} style={{marginBottom:12}}/>
+          <div style={{fontSize:14,fontWeight:600,color:C.secondary}}>Geen openstaande acties voor dit bedrijf</div>
+        </div>
+      :(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:C.warm50}}>
+            {["ACTIE","TYPE","DEADLINE","STATUS"].map(h=>(
+              <th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>{actions.map(a=>{
+            const sColors={pending:{c:C.amber,bg:C.amberBg,l:"OPENSTAAND"},completed:{c:C.green,bg:C.greenBg,l:"VOLTOOID"},overdue:{c:C.red,bg:C.redBg,l:"ACHTERSTALLIG"}};
+            const sm=sColors[a.status]||sColors.pending;
+            return(
+              <tr key={a.id} style={{borderTop:`1px solid ${C.border}`}}>
+                <td style={{padding:"12px 18px",fontSize:12,fontWeight:600,color:C.text}}>{a.title}</td>
+                <td style={{padding:"12px 18px"}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4,textTransform:"uppercase"}}>{a.action_type||"—"}</span></td>
+                <td style={{padding:"12px 18px",fontSize:11,color:C.secondary}}>{a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—"}</td>
+                <td style={{padding:"12px 18px"}}><Badge label={sm.l} color={sm.c} bg={sm.bg}/></td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      )}
+    </div>
+  )}
 </div>
 );
 }
+
+
 
 // ─── LEAD DETAIL ─────────────────────────────────────────────────────────────
 
-// ─── ClientDashboard ─────────────────────────────────────────
+// ─── CLIENT PORTAL HELPER HOOK ────────────────────────────────────────────────
+// Resolves the company_id for the logged-in client user
+function useClientCompany(userId){
+  const [company,setCompany]=useState(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    if(!userId){setLoading(false);return;}
+    supabase.from("companies")
+      .select("id,name,department,health,lifecycle_status,kkf_number,contact_name,contact_email,industry,portal_user_id")
+      .eq("portal_user_id",userId)
+      .limit(1)
+      .single()
+      .then(({data})=>{setCompany(data||null);setLoading(false);})
+      .catch(()=>setLoading(false));
+  },[userId]);
+  return {company,loading};
+}
+
+// ─── CLIENT DASHBOARD ────────────────────────────────────────────────────────
 function ClientDashboard({user}){
 const t=useT();
-const [actions,setActions]=useState(CLIENT_PORTAL_ACTIONS);
-const pending=actions.filter(a=>a.status!=="done");
+const {company,loading:compLoading}=useClientCompany(user.id);
+const [actions,setActions]=useState([]);
+const [engs,setEngs]=useState([]);
+const [invs,setInvs]=useState([]);
+const [docs,setDocs]=useState([]);
+const [dataLoading,setDataLoading]=useState(true);
+
+useEffect(()=>{
+  if(!company?.id) return;
+  Promise.all([
+    supabase.from("client_actions")
+      .select("id,title,action_type,status,deadline,description")
+      .eq("company_id",company.id)
+      .eq("is_visible_to_client",true)
+      .neq("status","completed")
+      .order("deadline",{ascending:true})
+      .limit(5),
+    supabase.from("engagements")
+      .select("id,name,department,type,status,health,phase")
+      .eq("company_id",company.id)
+      .order("created_at",{ascending:false})
+      .limit(4),
+    supabase.from("invoices")
+      .select("id,reference_code,amount,status,due_date")
+      .eq("company_id",company.id)
+      .in("status",["sent","overdue"])
+      .limit(3),
+    supabase.from("documents")
+      .select("id,name,file_type,uploaded_at,file_url")
+      .eq("company_id",company.id)
+      .eq("visibility","client")
+      .order("uploaded_at",{ascending:false})
+      .limit(4),
+  ]).then(([{data:a},{data:e},{data:i},{data:d}])=>{
+    setActions(a||[]);setEngs(e||[]);setInvs(i||[]);setDocs(d||[]);
+    setDataLoading(false);
+  }).catch(()=>setDataLoading(false));
+},[company?.id]);
+
+const pendingActions=actions.filter(a=>a.status!=="completed");
+const openInvoiceTotal=invs.reduce((s,i)=>s+Number(i.amount||0),0);
+const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const daysUntil=(d)=>{
+  if(!d) return null;
+  const diff=Math.ceil((new Date(d)-new Date())/86400000);
+  return diff;
+};
+
+if(compLoading) return <div style={{padding:40,textAlign:"center",color:C.secondary}}>Laden...</div>;
+if(!company) return(
+  <div style={{padding:40,textAlign:"center"}}>
+    <AlertTriangle size={32} color={C.amber} style={{marginBottom:12}}/>
+    <div style={{fontFamily:F.display,fontSize:18,color:C.text,marginBottom:6}}>Geen bedrijfsprofiel gevonden</div>
+    <div style={{fontSize:12,color:C.secondary}}>Neem contact op met uw adviseur.</div>
+  </div>
+);
+
 return(
 <div>
-<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase"}}>STAATSOLIE N.V.</span></div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-<div>
-<h1 style={{fontFamily:F.display,fontSize:28,fontWeight:600,color:C.text,margin:"0 0 4px"}}>Het Ethereal Commando</h1>
-<div style={{fontSize:12,color:C.secondary}}>Huidige Betrokkenheidsfase: <strong style={{color:C.crimson}}>Uitvoeringsfase Alpha</strong></div>
-</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16}}>
-<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-<div style={{fontSize:14,fontWeight:700,color:C.text}}>Belangrijkste Actiepunten</div>
-<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20}}>{pending.length} PRIORITEITEN</span>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-{pending.map((a,i)=>(
-<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${i===0?C.crimson:C.border}`,padding:"16px 20px",display:"flex",alignItems:"center",gap:16}}>
-<div style={{width:40,height:40,borderRadius:10,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-{a.type==="upload"?<Upload size={16}/>:a.type==="approve"?<CheckSquare size={16}/>:<ClipboardList size={16}/>}
-</div>
-<div style={{flex:1}}>
-<div style={{fontFamily:F.display,fontSize:15,fontWeight:600,color:C.text,marginBottom:4}}>{a.title}</div>
-<div style={{fontSize:12,color:C.secondary}}>{a.desc}</div>
-</div>
-<button onClick={()=>setActions(as=>as.map(x=>x.id===a.id?{...x,status:"done"}:x))} style={{padding:"9px 16px",borderRadius:10,background:i===0?C.crimson:C.walnut,color:CREAM,border:"none",fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-{i===0?"NU UITVOEREN":"BEKIJKEN"} ->
-</button>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 20px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Voortgang Dossier</div>
-<div style={{fontFamily:F.display,fontSize:20,fontWeight:600,color:C.crimson}}>68%</div>
-</div>
-<div style={{fontSize:11,color:C.secondary,marginBottom:10}}>Mijlpaal: Strategie Implementatie</div>
-<div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
-<div style={{height:"100%",width:"68%",background:C.crimson,borderRadius:4}}/>
-</div>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:12}}>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>Financieel Overzicht</div>
-<div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:7,height:7,borderRadius:"50%",background:C.green,animation:"pulse 2s infinite"}}/><span style={{fontSize:9,fontWeight:700,color:C.secondary}}>LIVE SYNC</span></div>
-</div>
-<div style={{fontSize:9,color:C.secondary,marginBottom:3}}>BESCHIKBARE LIQUIDITEIT</div>
-<div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:C.text,marginBottom:12}}>SRD 4.281.090</div>
-<div style={{fontSize:9,color:C.secondary,marginBottom:8}}>QBO Sync Status: <span style={{color:C.green,fontWeight:700}}>ACTIEF</span></div>
-{[["Burn Rate","-SRD 142k/md"],[" Runway","30.2 Maanden"],["Netto Marge","18.4%"]].map(([l,v])=>(
-<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:`1px solid ${C.border}`}}>
-<span style={{fontSize:11,color:C.secondary}}>{l}</span>
-<span style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</span>
-</div>
-))}
-<button style={{width:"100%",marginTop:12,padding:"8px",borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,color:C.text,fontSize:10,fontWeight:700,cursor:"pointer"}}>VOLLEDIG GROOTBOEK BEKIJKEN</button>
-</div>
-<div style={{background:C.espresso,borderRadius:14,padding:"18px",color:CREAM}}>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>INVESTERINGSADVIES</div>
-<blockquote style={{fontFamily:F.display,fontSize:13,fontWeight:600,lineHeight:1.6,margin:"0 0 12px"}}>"De sleutel tot portfolioweerbaarheid is de bewuste afwijzing van het onmiddellijke."</blockquote>
-<div style={{fontSize:9,fontWeight:700,color:C.taupeLight}}>TACTIGENT INZICHTEN · Wekelijkse Briefing</div>
-</div>
-</div>
-</div>
+  {/* Welcome header */}
+  <div style={{background:C.darkAccent,borderRadius:16,padding:"24px 28px",marginBottom:20,color:C.onDark}}>
+    <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",opacity:0.6,marginBottom:6}}>
+      {company.department==="TC"?"TACTIGENT CONSULTANCY":"FISCAL FUSE"} — CLIËNTPORTAAL
+    </div>
+    <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,marginBottom:4}}>
+      Welkom, {company.contact_name?.split(" ")[0]||company.name}
+    </div>
+    <div style={{fontSize:12,opacity:0.7}}>{company.name} · {company.lifecycle_status||"Actieve cliënt"}</div>
+  </div>
+
+  {/* KPI strip */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
+    {[
+      {l:"OPENSTAANDE ACTIES",v:pendingActions.length,c:pendingActions.length>0?C.amber:C.green,bg:pendingActions.length>0?C.amberBg:C.greenBg},
+      {l:"ACTIEVE DOSSIERS",v:dataLoading?"…":engs.length,c:C.crimson,bg:C.crimsonFaint},
+      {l:"OPEN FACTUREN",v:dataLoading?"…":`SRD ${(openInvoiceTotal/1000).toFixed(1)}K`,c:invs.length>0?C.red:C.green,bg:invs.length>0?C.redBg:C.greenBg},
+      {l:"DOCUMENTEN",v:dataLoading?"…":docs.length,c:C.indigo,bg:C.indigoBg},
+    ].map(k=>(
+      <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${k.c}30`}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:24,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+    {/* Pending actions */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+      <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:pendingActions.length>0?C.amberBg:C.greenBg}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {pendingActions.length>0?<AlertTriangle size={14} color={C.amber}/>:<CheckCircle size={14} color={C.green}/>}
+          <span style={{fontSize:13,fontWeight:700,color:pendingActions.length>0?C.amber:C.green}}>
+            {pendingActions.length>0?`${pendingActions.length} Actiepunten vereist`:"Alles up-to-date"}
+          </span>
+        </div>
+      </div>
+      {dataLoading?<div style={{padding:"32px",textAlign:"center",color:C.secondary,fontSize:12}}>Laden...</div>:
+      pendingActions.length===0?(
+        <div style={{padding:"32px 24px",textAlign:"center"}}>
+          <CheckCircle size={28} color={C.green} style={{marginBottom:10}}/>
+          <div style={{fontSize:13,color:C.secondary}}>Geen openstaande acties</div>
+        </div>
+      ):pendingActions.map((a,i)=>{
+        const days=daysUntil(a.deadline);
+        const urgent=days!==null&&days<=3;
+        return(
+          <div key={a.id} style={{padding:"14px 18px",borderTop:i>0?`1px solid ${C.border}`:"none",display:"flex",gap:12,alignItems:"flex-start"}}>
+            <div style={{width:34,height:34,borderRadius:8,background:urgent?C.redBg:C.amberBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {a.action_type==="upload"?<Upload size={14} color={urgent?C.red:C.amber}/>:
+               a.action_type==="approve"?<CheckSquare size={14} color={urgent?C.red:C.amber}/>:
+               <ClipboardList size={14} color={urgent?C.red:C.amber}/>}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>{a.title}</div>
+              {a.description&&<div style={{fontSize:11,color:C.secondary,marginBottom:4,lineHeight:1.4}}>{a.description.slice(0,80)}{a.description.length>80?"...":""}</div>}
+              {a.deadline&&(
+                <div style={{fontSize:10,fontWeight:700,color:urgent?C.red:C.secondary}}>
+                  {days===0?"Vandaag":days<0?`${Math.abs(days)} dagen achterstallig`:days===1?"Morgen":`${days} dagen`}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Right: engagements + recent docs */}
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 18px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:12}}>Uw Dossiers</div>
+        {dataLoading?<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"12px 0"}}>Laden...</div>:
+        engs.length===0?<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"16px 0"}}>Geen actieve dossiers</div>:
+        engs.map((e,i)=>(
+          <div key={e.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:C.text}}>{e.name}</div>
+              <div style={{fontSize:10,color:C.secondary}}>{e.phase||"—"}</div>
+            </div>
+            <HealthDot status={e.health}/>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 18px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:12}}>Recente Documenten</div>
+        {dataLoading?<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"12px 0"}}>Laden...</div>:
+        docs.length===0?<div style={{fontSize:12,color:C.secondary,textAlign:"center",padding:"16px 0"}}>Geen documenten beschikbaar</div>:
+        docs.map((d,i)=>(
+          <div key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <FileText size={13} color={C.secondary}/>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:C.text}}>{d.name}</div>
+                <div style={{fontSize:10,color:C.secondary}}>{formatDate(d.uploaded_at)}</div>
+              </div>
+            </div>
+            {d.file_url&&(
+              <a href={d.file_url} target="_blank" rel="noopener"
+                style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",borderRadius:7,background:C.bg,border:`1px solid ${C.border}`,color:C.secondary,fontSize:9,fontWeight:700,textDecoration:"none"}}>
+                <Download size={10}/> DL
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 </div>
 );
 }
 
-// ─── ClientDocsView ─────────────────────────────────────────
+// ─── CLIENT DOCS VIEW ─────────────────────────────────────────────────────────
 function ClientDocsView({user}){
-const [tab,setTab]=useState("ALL");
-const [preview,setPreview]=useState(null);
-const [toast,setToast]=useState(null);
-const docs=DOCUMENTS.filter(d=>d.visibility!=="internal"&&(tab==="ALL"||d.dept===tab));
-const typeIconCmp3={PDF:<FileText size={14} color={C.crimson}/>,Excel:<FileSpreadsheet size={14} color={C.green}/>,Word:<FileType size={14} color={C.blue}/>};
-const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
-const handleDownload=(doc)=>{ setToast(`${doc.name} gedownload`); };
+const {company,loading:compLoading}=useClientCompany(user.id);
+const [docs,setDocs]=useState([]);
+const [loading,setLoading]=useState(true);
+const [q,setQ]=useState("");
+
+useEffect(()=>{
+  if(!company?.id) return;
+  supabase.from("documents")
+    .select("id,name,file_type,file_size,visibility,review_status,uploaded_at,file_url,folder_name")
+    .eq("company_id",company.id)
+    .eq("visibility","client")
+    .order("uploaded_at",{ascending:false})
+    .then(({data})=>{setDocs(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+},[company?.id]);
+
+const formatBytes=(b)=>{
+  if(!b) return "—";
+  if(b<1024*1024) return (b/1024).toFixed(1)+"KB";
+  return (b/(1024*1024)).toFixed(1)+"MB";
+};
+const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+
+const filtered=docs.filter(d=>!q||d.name.toLowerCase().includes(q.toLowerCase()));
+
+if(compLoading||loading) return <div style={{padding:40,textAlign:"center",color:C.secondary}}>Laden...</div>;
 
 return(
 <div>
-<PageHeader kicker="Mijn Portaal" title="Documenten"/>
-<p style={{fontSize:12,color:C.secondary,marginBottom:16}}>Centraal beheer van uw strategische en fiscale dossiers. Alle documenten zijn versleuteld.</p>
-<div style={{display:"grid",gridTemplateColumns:"1fr 240px",gap:16}}>
-<div>
-<div style={{display:"flex",gap:8,marginBottom:12}}>
-{[["ALL","Alle"],["TC","Tactigent"],["FF","Fiscal Fuse"]].map(([v,l])=>(
-<button key={v} onClick={()=>setTab(v)} style={{padding:"6px 14px",borderRadius:20,border:`1.5px solid ${tab===v?C.crimson:C.border}`,background:tab===v?C.crimson:"transparent",color:tab===v?CREAM:C.secondary,fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["DOCUMENT","AFDELING","DATUM","STATUS",""].map(h=><th key={h} style={{padding:"9px 16px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{docs.map(d=>(
-<tr key={d.id} onClick={()=>setPreview(d)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"13px 16px"}}>
-<div style={{display:"flex",alignItems:"center",gap:10}}>
-<div style={{width:36,height:36,borderRadius:9,background:typeBg[d.type]||C.warm50,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-{typeIconCmp3[d.type]||<FileText size={16} color={C.secondary}/>}
-</div>
-<div>
-<div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div>
-<div style={{fontSize:10,color:C.secondary}}>{d.size} · {d.type}</div>
-</div>
-</div>
-</td>
-<td style={{padding:"13px 16px"}}><DeptTag dept={d.dept}/></td>
-<td style={{padding:"13px 16px",fontSize:11,color:C.secondary}}>{d.date}</td>
-<td style={{padding:"13px 16px"}}><ReviewChip status={d.status}/></td>
-<td style={{padding:"13px 16px"}}><ChevronRight size={15} color={C.secondary}/></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-</div>
-<div style={{display:"flex",flexDirection:"column",gap:10}}>
-<div style={{background:C.crimson,borderRadius:14,padding:"16px",color:CREAM,cursor:"pointer"}} onClick={()=>setToast("Upload gestarten")}>
-<div style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,color:"rgba(255,255,255,.7)"}}>Snelle Upload</div>
-<div style={{border:"2px dashed rgba(255,255,255,.4)",borderRadius:10,padding:"20px",textAlign:"center"}}>
-<Upload size={20} color="rgba(255,255,255,.8)" style={{marginBottom:8}}/>
-<div style={{fontSize:11,fontWeight:700,marginBottom:4}}>SELECTEER BESTAND</div>
-<div style={{fontSize:9,color:"rgba(255,255,255,.6)"}}>Sleep bestanden hierheen</div>
-</div>
-</div>
-{[{label:"Tactigent Bestanden",count:DOCUMENTS.filter(d=>d.dept==="TC").length},{label:"Fiscal Fuse Archief",count:DOCUMENTS.filter(d=>d.dept==="FF").length},{label:"Gedeelde Documenten",count:DOCUMENTS.filter(d=>d.visibility==="shared").length}].map(cat=>(
-<div key={cat.label} style={{background:C.surface,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<span style={{fontSize:12,color:C.text,fontWeight:600}}>{cat.label}</span>
-<span style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.crimson}}>{cat.count}</span>
-</div>
-))}
-</div>
-</div>
-{preview&&<DocPreviewModal doc={preview} onClose={()=>setPreview(null)} onDownload={(d)=>{handleDownload(d);setPreview(null);}}/>}
-{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
+  <PageHeader kicker="Portaal" title="Mijn Documenten"/>
+  <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+    <div style={{position:"relative",flex:1,maxWidth:320}}>
+      <Search size={13} style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:C.secondary}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Zoek document..."
+        style={{width:"100%",padding:"7px 30px 7px 32px",borderRadius:9,border:`1.5px solid ${q?C.crimson:C.border}`,fontSize:12,outline:"none",background:C.surface,boxSizing:"border-box"}}/>
+      {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.secondary,padding:0}}><X size={13}/></button>}
+    </div>
+    <div style={{fontSize:11,color:C.secondary,marginLeft:"auto"}}>{filtered.length} document{filtered.length!==1?"en":""}</div>
+  </div>
+
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+    {filtered.length===0?(
+      <div style={{padding:"52px 24px",textAlign:"center"}}>
+        <FileText size={32} color={C.mushroom} style={{marginBottom:12}}/>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>
+          {q?"Geen resultaten":"Geen documenten beschikbaar"}
+        </div>
+        <div style={{fontSize:12,color:C.secondary}}>
+          {q?"Probeer een andere zoekterm.":"Uw adviseur heeft nog geen documenten gedeeld."}
+        </div>
+      </div>
+    ):(
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr style={{background:C.warm50}}>
+          {["DOCUMENT","TYPE","MAP","DATUM",""].map((h,i)=>(
+            <th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>{filtered.map((d,i)=>(
+          <tr key={d.id} style={{borderTop:`1px solid ${C.border}`}}>
+            <td style={{padding:"13px 18px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:8,background:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <FileText size={14} color={C.crimson}/>
+                </div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>{d.name}</div>
+                  <div style={{fontSize:10,color:C.secondary}}>{formatBytes(d.file_size)}</div>
+                </div>
+              </div>
+            </td>
+            <td style={{padding:"13px 18px"}}>
+              <span style={{fontSize:10,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4}}>
+                {(d.file_type||"—").toUpperCase()}
+              </span>
+            </td>
+            <td style={{padding:"13px 18px",fontSize:11,color:C.secondary}}>{d.folder_name||"—"}</td>
+            <td style={{padding:"13px 18px",fontSize:11,color:C.secondary}}>{formatDate(d.uploaded_at)}</td>
+            <td style={{padding:"13px 18px"}}>
+              {d.file_url?(
+                <a href={d.file_url} target="_blank" rel="noopener"
+                  style={{display:"inline-flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,background:C.crimson,color:CREAM,fontSize:10,fontWeight:700,textDecoration:"none"}}>
+                  <Download size={11}/> Downloaden
+                </a>
+              ):<span style={{color:C.muted,fontSize:11}}>—</span>}
+            </td>
+          </tr>
+        ))}</tbody>
+      </table>
+    )}
+  </div>
 </div>
 );
 }
 
-// ─── ClientFinanceView ─────────────────────────────────────────
+// ─── CLIENT FINANCE VIEW ──────────────────────────────────────────────────────
 function ClientFinanceView({user,invData}){
-const invoices=invData.filter(i=>i.client==="Staatsolie N.V.");
-const [preview,setPreview]=useState(null);
-const [toast,setToast]=useState(null);
-const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
-const sBg={paid:C.greenBg,sent:C.amberBg,overdue:C.redBg,draft:C.warm50};
-const sLabel={paid:"BETAALD",sent:"VERZONDEN",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
-const totalOpen=invoices.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+i.amount,0);
-const totalPaid=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+i.amount,0);
+const {company,loading:compLoading}=useClientCompany(user.id);
+const [invs,setInvs]=useState([]);
+const [loading,setLoading]=useState(true);
+
+useEffect(()=>{
+  if(!company?.id) return;
+  supabase.from("invoices")
+    .select("id,reference_code,ref,amount,currency,status,due_date,paid_at,description,file_url")
+    .eq("company_id",company.id)
+    .order("created_at",{ascending:false})
+    .then(({data})=>{setInvs(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+},[company?.id]);
+
+const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const total=invs.reduce((s,i)=>s+Number(i.amount||0),0);
+const paid=invs.filter(i=>i.status==="paid").reduce((s,i)=>s+Number(i.amount||0),0);
+const open=invs.filter(i=>["sent","overdue"].includes(i.status)).reduce((s,i)=>s+Number(i.amount||0),0);
+
+const STATUS={
+  draft:{label:"CONCEPT",c:C.secondary,bg:C.warm50},
+  sent:{label:"OPENSTAAND",c:C.amber,bg:C.amberBg},
+  overdue:{label:"ACHTERSTALLIG",c:C.red,bg:C.redBg},
+  paid:{label:"BETAALD",c:C.green,bg:C.greenBg},
+  cancelled:{label:"GEANNULEERD",c:C.muted,bg:C.warm50},
+};
+
+if(compLoading||loading) return <div style={{padding:40,textAlign:"center",color:C.secondary}}>Laden...</div>;
+
 return(
 <div>
-<PageHeader kicker="Financiën" title="Facturen & Betalingen"/>
-{/* KPI strip */}
-<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
-{[{l:"OPENSTAAND",v:`SRD ${totalOpen.toLocaleString()}`,c:totalOpen>0?C.amber:C.text},{l:"BETAALD",v:`SRD ${totalPaid.toLocaleString()}`,c:C.green},{l:"TOTAAL FACTUREN",v:invoices.length,c:C.text}].map(s=>(
-<div key={s.l} style={{background:C.surface,borderRadius:12,padding:"14px 18px",border:`1px solid ${C.border}`}}>
-<div style={{fontSize:8.5,fontWeight:700,color:C.secondary,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:4}}>{s.l}</div>
-<div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:s.c}}>{s.v}</div>
-</div>
-))}
-</div>
-<div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-<div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,fontSize:11,color:C.secondary}}>
-Klik op een factuur om de volledige factuurdetails te bekijken.
-</div>
-<table style={{width:"100%",borderCollapse:"collapse"}}>
-<thead><tr style={{background:C.warm50}}>{["REF","BEDRAG","VERVALDATUM","STATUS",""].map(h=><th key={h} style={{padding:"9px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.09em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
-<tbody>{invoices.length===0?(
-<tr><td colSpan={5} style={{padding:"40px 18px",textAlign:"center",fontSize:13,color:C.secondary}}>Geen facturen gevonden</td></tr>
-):invoices.map(inv=>(
-<tr key={inv.id} onClick={()=>setPreview(inv)} style={{borderTop:`1px solid ${C.border}`,cursor:"pointer"}}>
-<td style={{padding:"14px 18px"}}>
-<div style={{display:"flex",alignItems:"center",gap:10}}>
-<div style={{width:36,height:36,borderRadius:9,background:inv.status==="overdue"?C.redBg:inv.status==="paid"?C.greenBg:C.amberBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-<Receipt size={16} color={sColor[inv.status]||C.secondary}/>
-</div>
-<div>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>{inv.ref}</div>
-{inv.qbo&&<div style={{fontSize:9,color:C.green,fontWeight:600,display:"flex",alignItems:"center",gap:3,marginTop:2}}><CheckCircle size={9}/> QBO gesynchroniseerd</div>}
-</div>
-</div>
-</td>
-<td style={{padding:"14px 18px",fontFamily:F.display,fontSize:17,fontWeight:600,color:C.text}}>SRD {inv.amount.toLocaleString()}</td>
-<td style={{padding:"14px 18px",fontSize:12,color:inv.status==="overdue"?C.red:C.secondary,fontWeight:inv.status==="overdue"?700:400}}>{inv.due}</td>
-<td style={{padding:"14px 18px"}}><Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/></td>
-<td style={{padding:"14px 18px"}}><ChevronRight size={15} color={C.secondary}/></td>
-</tr>
-))}</tbody>
-</table>
-</div>
-{preview&&<InvoicePreviewModal inv={preview} onClose={()=>setPreview(null)} onDownload={(inv)=>{setToast(`${inv.ref} gedownload als PDF`);setPreview(null);}}/>}
-{toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
+  <PageHeader kicker="Portaal" title="Mijn Facturen"/>
+  {/* KPIs */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+    {[
+      {l:"TOTAAL GEFACTUREERD",v:`SRD ${(total/1000).toFixed(1)}K`,c:C.text,bg:C.surface},
+      {l:"BETAALD",v:`SRD ${(paid/1000).toFixed(1)}K`,c:C.green,bg:C.greenBg},
+      {l:"OPENSTAAND",v:`SRD ${(open/1000).toFixed(1)}K`,c:open>0?C.red:C.green,bg:open>0?C.redBg:C.greenBg},
+    ].map(k=>(
+      <div key={k.l} style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${k.c==="text"?C.border:k.c+"30"}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:22,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+    {invs.length===0?(
+      <div style={{padding:"52px 24px",textAlign:"center"}}>
+        <Receipt size={32} color={C.mushroom} style={{marginBottom:12}}/>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>Geen facturen</div>
+        <div style={{fontSize:12,color:C.secondary}}>Er zijn nog geen facturen aangemaakt voor uw account.</div>
+      </div>
+    ):(
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr style={{background:C.warm50}}>
+          {["REFERENTIE","OMSCHRIJVING","BEDRAG","VERVALDATUM","STATUS",""].map((h,i)=>(
+            <th key={i} style={{padding:"10px 18px",textAlign:"left",fontSize:9,fontWeight:700,letterSpacing:"0.08em",color:C.secondary,textTransform:"uppercase"}}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>{invs.map(inv=>{
+          const isOverdue=inv.due_date&&new Date(inv.due_date)<new Date()&&inv.status!=="paid";
+          const meta=isOverdue?STATUS.overdue:(STATUS[inv.status]||STATUS.sent);
+          return(
+            <tr key={inv.id} style={{borderTop:`1px solid ${C.border}`,background:isOverdue?"#FFF8F8":"transparent"}}>
+              <td style={{padding:"13px 18px",fontSize:12,fontWeight:700,color:C.crimson}}>{inv.reference_code||inv.ref||"—"}</td>
+              <td style={{padding:"13px 18px",fontSize:11,color:C.secondary,maxWidth:200}}>{inv.description||"—"}</td>
+              <td style={{padding:"13px 18px",fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>SRD {Number(inv.amount||0).toLocaleString()}</td>
+              <td style={{padding:"13px 18px",fontSize:12,color:isOverdue?C.red:C.secondary,fontWeight:isOverdue?700:400}}>{formatDate(inv.due_date)}</td>
+              <td style={{padding:"13px 18px"}}><Badge label={meta.label} color={meta.c} bg={meta.bg}/></td>
+              <td style={{padding:"13px 18px"}}>
+                {inv.file_url&&(
+                  <a href={inv.file_url} target="_blank" rel="noopener"
+                    style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,background:C.crimson,color:CREAM,fontSize:9,fontWeight:700,textDecoration:"none"}}>
+                    <Download size={10}/> PDF
+                  </a>
+                )}
+              </td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    )}
+  </div>
 </div>
 );
 }
 
-// ─── ClientActionsPortal ─────────────────────────────────────────
+// ─── CLIENT ACTIONS PORTAL ────────────────────────────────────────────────────
 function ClientActionsPortal({user,showToast}){
 const t=useT();
-const [actions,setActions]=useState(Object.values(CLIENT_ACTIONS_BY_ENG).flat());
-const [uploading,setUploading]=useState(null);
-const complete=(id,type)=>{ if(type==="upload"){setUploading(id);return;} setActions(as=>as.map(a=>a.id===id?{...a,status:"completed"}:a)); showToast("Actie voltooid"); };
-const handleUpload=()=>{ setActions(as=>as.map(a=>a.id===uploading?{...a,status:"completed"}:a)); setUploading(null); showToast("Document succesvol geüpload"); };
-const pending=actions.filter(a=>a.status!=="completed");
-const done=actions.filter(a=>a.status==="completed");
-const typeIconMap={upload:<Upload size={18}/>,approve:<CheckSquare size={18}/>,sign:<Pen size={18}/>,review:<ScanSearch size={18}/>};
-const typeCTA={upload:"UPLOADEN",approve:"GOEDKEUREN",sign:"ONDERTEKENEN",review:"BEOORDELEN"};
-return(
-<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20}}>
-<PageHeader kicker="Mijn Portaal" title={t("myActionItems")}/>
-<span style={{fontSize:9,fontWeight:700,background:C.crimson,color:CREAM,padding:"4px 12px",borderRadius:20,marginBottom:4}}>{pending.length} {t("priorities")}</span>
-</div>
-{pending.length===0&&<div style={{background:C.greenBg,borderRadius:14,padding:"28px 24px",textAlign:"center",marginBottom:16}}><CheckCircle size={32} color={C.green} style={{marginBottom:10}}/><div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Alle acties voltooid</div></div>}
-<div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
-{pending.map((a,i)=>(
-<div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${a.status==="overdue"?C.crimson:i===0?C.walnut:C.border}`,padding:"18px 22px",display:"grid",gridTemplateColumns:"auto 1fr auto",gap:16,alignItems:"center"}}>
-<div style={{width:44,height:44,borderRadius:12,background:i===0?C.crimson:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{typeIconMap[a.type]||<ClipboardList size={18}/>}</div>
-<div>
-<div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text,marginBottom:3}}>{a.title}</div>
-<div style={{fontSize:12,color:C.secondary,marginBottom:4}}>{a.desc}</div>
-<div style={{fontSize:11,color:a.status==="overdue"?C.red:C.secondary,fontWeight:600}}>Termijn: {a.deadline}</div>
-</div>
-<button onClick={()=>complete(a.id,a.type)} style={{padding:"10px 18px",borderRadius:10,background:a.status==="overdue"?C.crimson:i===0?C.walnut:C.bg,color:a.status==="overdue"||i===0?CREAM:C.text,border:i===0||a.status==="overdue"?"none":`1.5px solid ${C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-{typeCTA[a.type]||"UITVOEREN"} ->
-</button>
-</div>
-))}
-</div>
-{done.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10}}>VOLTOOID ({done.length})</div>{done.map(a=>(<div key={a.id} style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,marginBottom:7,opacity:0.7}}><CheckCircle size={16} color={C.green}/><div style={{flex:1,fontSize:13,fontWeight:600,color:C.text,textDecoration:"line-through"}}>{a.title}</div></div>))}</div>}
-{uploading&&(
-<div style={{position:"fixed",inset:0,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setUploading(null)}>
-<div onClick={e=>e.stopPropagation()} className="fu" style={{background:C.surface,borderRadius:18,width:440,maxWidth:"95vw",padding:"28px",boxShadow:"0 32px 80px rgba(58,46,40,.3)"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-<div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text}}>Document Uploaden</div>
-<button onClick={()=>setUploading(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.secondary}}><X size={18}/></button>
-</div>
-<div style={{border:`2px dashed ${C.crimson}`,borderRadius:14,padding:"32px",textAlign:"center",background:C.crimsonFaint,marginBottom:16,cursor:"pointer"}} onClick={handleUpload}>
-<Upload size={28} color={C.crimson} style={{marginBottom:10}}/>
-<div style={{fontSize:14,fontWeight:700,color:C.crimson,marginBottom:4}}>Sleep bestand hierheen</div>
-<div style={{fontSize:10,color:C.muted}}>PDF, Excel, Word — max 25 MB</div>
-</div>
-<button onClick={handleUpload} style={{width:"100%",padding:"11px",borderRadius:10,background:C.crimson,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>Simuleer Upload</button>
-</div>
-</div>
-)}
-</div>
-);
-}
+const {company,loading:compLoading}=useClientCompany(user.id);
+const [actions,setActions]=useState([]);
+const [loading,setLoading]=useState(true);
+const [filter,setFilter]=useState("ALL");
 
-// ─── ClientMessagesView ─────────────────────────────────────────
-function ClientMessagesView({user,showToast}){
-const [threads,setThreads]=useState(CLIENT_THREADS);
-const [active,setActive]=useState(threads[0]);
-const [newMsg,setNewMsg]=useState("");
-const sendMsg=()=>{
-if(!newMsg.trim())return;
-setThreads(ts=>ts.map(t=>t.id===active.id?{...t,messages:[...t.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}:t));
-setActive(a=>({...a,messages:[...a.messages,{id:`m${Date.now()}`,author:user.name,avatar:user.avatar,body:newMsg,time:"Nu",fromMe:true}]}));
-setNewMsg(""); showToast("Bericht verzonden");
+useEffect(()=>{
+  if(!company?.id) return;
+  supabase.from("client_actions")
+    .select("id,title,description,action_type,status,deadline,department,engagement_id")
+    .eq("company_id",company.id)
+    .eq("is_visible_to_client",true)
+    .order("deadline",{ascending:true})
+    .then(({data})=>{setActions(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+},[company?.id]);
+
+const markDone=async(id)=>{
+  setActions(as=>as.map(a=>a.id===id?{...a,status:"completed"}:a));
+  await supabase.from("client_actions").update({status:"completed"}).eq("id",id);
+  if(showToast) showToast("Actie gemarkeerd als voltooid ✓");
 };
+
+const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const daysUntil=(d)=>{
+  if(!d) return null;
+  return Math.ceil((new Date(d)-new Date())/86400000);
+};
+
+const filtered=actions.filter(a=>{
+  if(filter==="ALL") return true;
+  if(filter==="open") return a.status!=="completed";
+  if(filter==="done") return a.status==="completed";
+  return true;
+});
+
+const openCount=actions.filter(a=>a.status!=="completed").length;
+const doneCount=actions.filter(a=>a.status==="completed").length;
+
+if(compLoading||loading) return <div style={{padding:40,textAlign:"center",color:C.secondary}}>Laden...</div>;
+
 return(
-<div style={{display:"flex",height:"calc(100vh - 140px)",gap:0,background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
-<div style={{width:260,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column"}}>
-<div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text}}>Berichten</div>
-<div style={{flex:1,overflowY:"auto"}}>
-{threads.map(th=>(
-<div key={th.id} onClick={()=>{setActive(th);setThreads(ts=>ts.map(t=>t.id===th.id?{...t,unread:false}:t));}} style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:active?.id===th.id?C.crimsonFaint:"transparent"}}>
-<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-<Avatar initials={th.avatar} size={28} bg={C.walnut}/>
-<div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:C.text}}>{th.from}</div><div style={{fontSize:9,color:C.secondary}}>{th.time}</div></div>
-{th.unread&&<div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,flexShrink:0}}/>}
-</div>
-<div style={{fontSize:11,color:C.secondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",paddingLeft:36}}>{th.preview}</div>
-</div>
-))}
-</div>
-</div>
-<div style={{flex:1,display:"flex",flexDirection:"column"}}>
-{active&&<>
-<div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`}}>
-<div style={{fontSize:13,fontWeight:700,color:C.text}}>{active.subject}</div>
-</div>
-<div style={{flex:1,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-{active.messages.map(m=>(
-<div key={m.id} style={{display:"flex",alignItems:"flex-start",gap:10,flexDirection:m.fromMe?"row-reverse":"row"}}>
-<Avatar initials={m.avatar} size={30} bg={m.fromMe?C.crimson:C.walnut}/>
-<div style={{maxWidth:"70%"}}>
-<div style={{fontSize:12,color:m.fromMe?CREAM:C.text,background:m.fromMe?C.crimson:C.bg,borderRadius:12,padding:"10px 14px",lineHeight:1.6}}>{m.body}</div>
-<div style={{fontSize:9,color:C.secondary,marginTop:4,textAlign:m.fromMe?"right":"left"}}>{m.time}</div>
-</div>
-</div>
-))}
-</div>
-<div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
-<input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMsg()} placeholder="Typ een bericht..." style={{flex:1,padding:"9px 13px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none"}}/>
-<button onClick={sendMsg} style={{padding:"9px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",cursor:"pointer"}}><Send size={14}/></button>
-</div>
-</>}
-</div>
+<div>
+  <PageHeader kicker="Portaal" title="Mijn Actiepunten"/>
+
+  {/* KPIs */}
+  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+    {[
+      {l:"OPENSTAAND",v:openCount,c:openCount>0?C.amber:C.green,bg:openCount>0?C.amberBg:C.greenBg,f:"open"},
+      {l:"VOLTOOID",v:doneCount,c:C.green,bg:C.greenBg,f:"done"},
+      {l:"TOTAAL",v:actions.length,c:C.text,bg:C.surface,f:"ALL"},
+    ].map(k=>(
+      <div key={k.l} onClick={()=>setFilter(k.f)}
+        style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${filter===k.f?k.c:k.c+"30"}`,cursor:"pointer",transition:"border-color .15s"}}>
+        <div style={{fontSize:9,fontWeight:700,color:k.c===C.text?C.secondary:k.c,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{k.l}</div>
+        <div style={{fontFamily:F.display,fontSize:26,fontWeight:600,color:k.c}}>{k.v}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Info banner */}
+  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:9,background:C.indigoBg,border:`1px solid ${C.indigo}30`,marginBottom:16,fontSize:11,color:C.indigo,fontWeight:600}}>
+    <Shield size={13}/>
+    Uw actiepunten zijn aangemaakt door uw adviseur. Klik op "Voltooid" zodra u een actie heeft afgerond.
+  </div>
+
+  {/* Actions list */}
+  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+    {filtered.length===0?(
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,padding:"52px 24px",textAlign:"center"}}>
+        <CheckCircle size={32} color={C.green} style={{marginBottom:12}}/>
+        <div style={{fontFamily:F.display,fontSize:18,fontWeight:600,color:C.text,marginBottom:6}}>
+          {filter==="done"?"Voltooide acties":filter==="open"?"Geen openstaande acties":"Geen acties"}
+        </div>
+        <div style={{fontSize:12,color:C.secondary}}>
+          {filter==="open"?"Alle acties zijn afgehandeld. Goed gedaan!":"Uw adviseur heeft nog geen acties aangemaakt."}
+        </div>
+      </div>
+    ):filtered.map(a=>{
+      const done=a.status==="completed";
+      const days=daysUntil(a.deadline);
+      const overdue=days!==null&&days<0&&!done;
+      const urgent=days!==null&&days<=2&&!done;
+      return(
+        <div key={a.id} style={{background:C.surface,borderRadius:14,border:`1.5px solid ${done?C.green+"40":overdue?C.red+"40":urgent?C.amber+"40":C.border}`,padding:"18px 20px",display:"flex",gap:16,alignItems:"flex-start",opacity:done?0.7:1,transition:"opacity .15s"}}>
+          {/* Type icon */}
+          <div style={{width:42,height:42,borderRadius:10,background:done?C.greenBg:overdue?C.redBg:urgent?C.amberBg:C.crimsonFaint,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {a.action_type==="upload"?<Upload size={17} color={done?C.green:overdue?C.red:urgent?C.amber:C.crimson}/>:
+             a.action_type==="approve"?<CheckSquare size={17} color={done?C.green:overdue?C.red:urgent?C.amber:C.crimson}/>:
+             a.action_type==="sign"?<FileText size={17} color={done?C.green:overdue?C.red:urgent?C.amber:C.crimson}/>:
+             <ClipboardList size={17} color={done?C.green:overdue?C.red:urgent?C.amber:C.crimson}/>}
+          </div>
+          {/* Content */}
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+              <span style={{fontSize:14,fontWeight:700,color:done?C.secondary:C.text,textDecoration:done?"line-through":"none"}}>{a.title}</span>
+              {done&&<span style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenBg,padding:"2px 8px",borderRadius:4}}>VOLTOOID</span>}
+              {overdue&&<span style={{fontSize:9,fontWeight:700,color:C.red,background:C.redBg,padding:"2px 8px",borderRadius:4}}>ACHTERSTALLIG</span>}
+              {urgent&&!overdue&&<span style={{fontSize:9,fontWeight:700,color:C.amber,background:C.amberBg,padding:"2px 8px",borderRadius:4}}>URGENT</span>}
+            </div>
+            {a.description&&<div style={{fontSize:12,color:C.secondary,lineHeight:1.6,marginBottom:6}}>{a.description}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:12,fontSize:11,color:C.secondary}}>
+              {a.deadline&&<span style={{color:overdue?C.red:days<=2?C.amber:C.secondary,fontWeight:overdue||days<=2?700:400}}>
+                Deadline: {formatDate(a.deadline)}
+                {!done&&days!==null&&` (${days===0?"vandaag":days<0?`${Math.abs(days)}d achterstallig`:`${days}d`})`}
+              </span>}
+              <span style={{fontSize:9,fontWeight:700,color:C.secondary,background:C.warm50,padding:"2px 7px",borderRadius:4,textTransform:"uppercase"}}>
+                {a.action_type==="upload"?"Upload vereist":a.action_type==="approve"?"Goedkeuring vereist":a.action_type==="sign"?"Handtekening vereist":"Beoordeling vereist"}
+              </span>
+            </div>
+          </div>
+          {/* Action button */}
+          {!done&&(
+            <button onClick={()=>markDone(a.id)}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"9px 16px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+              <CheckCircle size={13}/> Markeer voltooid
+            </button>
+          )}
+        </div>
+      );
+    })}
+  </div>
 </div>
 );
 }
 
-// ─── COMPANY DETAIL ──────────────────────────────────────────────────────────
+// ─── CLIENT MESSAGES VIEW ─────────────────────────────────────────────────────
+function ClientMessagesView({user,showToast}){
+const {company,loading:compLoading}=useClientCompany(user.id);
+const [messages,setMessages]=useState([]);
+const [engagements,setEngagements]=useState([]);
+const [activeEng,setActiveEng]=useState(null);
+const [loading,setLoading]=useState(true);
+const [newMsg,setNewMsg]=useState("");
+const [sending,setSending]=useState(false);
+const messagesEndRef=React.useRef(null);
 
-// ─── DocPreviewModal ─────────────────────────────────────────
+useEffect(()=>{
+  if(!company?.id) return;
+  supabase.from("engagements")
+    .select("id,name,department,status")
+    .eq("company_id",company.id)
+    .order("created_at",{ascending:false})
+    .then(({data})=>{
+      setEngagements(data||[]);
+      if(data?.length>0) setActiveEng(data[0].id);
+    }).catch(()=>{});
+},[company?.id]);
+
+useEffect(()=>{
+  if(!activeEng){setLoading(false);return;}
+  setLoading(true);
+  supabase.from("messages")
+    .select("id,body,author_id,created_at,visible_to_client")
+    .eq("engagement_id",activeEng)
+    .eq("visible_to_client",true)
+    .order("created_at",{ascending:true})
+    .then(({data})=>{setMessages(data||[]);setLoading(false);})
+    .catch(()=>setLoading(false));
+},[activeEng]);
+
+useEffect(()=>{
+  messagesEndRef.current?.scrollIntoView({behavior:"smooth"});
+},[messages]);
+
+const sendMessage=async()=>{
+  if(!newMsg.trim()||!activeEng||sending) return;
+  setSending(true);
+  const optimistic={id:`temp_${Date.now()}`,body:newMsg.trim(),author_id:user.id,created_at:new Date().toISOString(),visible_to_client:true};
+  setMessages(ms=>[...ms,optimistic]);
+  setNewMsg("");
+  try{
+    await supabase.from("messages").insert({
+      body:newMsg.trim(),
+      engagement_id:activeEng,
+      author_id:user.id,
+      visible_to_client:true,
+    });
+    if(showToast) showToast("Bericht verzonden ✓");
+  }catch(e){
+    setMessages(ms=>ms.filter(m=>m.id!==optimistic.id));
+    if(showToast) showToast("Verzenden mislukt");
+  }
+  setSending(false);
+};
+
+const formatTime=(d)=>{
+  const date=new Date(d);
+  const diff=(new Date()-date)/1000;
+  if(diff<60) return "Zojuist";
+  if(diff<3600) return `${Math.floor(diff/60)}m geleden`;
+  if(diff<86400) return `${Math.floor(diff/3600)}u geleden`;
+  return date.toLocaleDateString("nl-SR",{day:"2-digit",month:"short"});
+};
+
+if(compLoading) return <div style={{padding:40,textAlign:"center",color:C.secondary}}>Laden...</div>;
+
+return(
+<div>
+  <PageHeader kicker="Portaal" title="Berichten"/>
+  <div style={{display:"grid",gridTemplateColumns:"220px 1fr",gap:16,height:"calc(100vh - 220px)",minHeight:500}}>
+    {/* Sidebar: engagement list */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.secondary,letterSpacing:"0.08em",textTransform:"uppercase"}}>DOSSIERS</div>
+      <div style={{overflowY:"auto",flex:1}}>
+        {engagements.length===0?(
+          <div style={{padding:"24px",textAlign:"center",color:C.secondary,fontSize:11}}>Geen dossiers</div>
+        ):engagements.map(e=>(
+          <div key={e.id} onClick={()=>setActiveEng(e.id)}
+            style={{padding:"12px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:activeEng===e.id?C.crimsonFaint:"transparent",transition:"background .15s"}}>
+            <div style={{fontSize:12,fontWeight:activeEng===e.id?700:600,color:activeEng===e.id?C.crimson:C.text,marginBottom:2}}>{e.name}</div>
+            <div style={{fontSize:10,color:C.secondary}}>{e.department==="TC"?"Project":"Dossier"}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Messages panel */}
+    <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+        <Send size={14} color={C.crimson}/>
+        <span style={{fontSize:13,fontWeight:700,color:C.text}}>
+          {activeEng?engagements.find(e=>e.id===activeEng)?.name||"Berichten":"Selecteer een dossier"}
+        </span>
+      </div>
+
+      {/* Messages */}
+      <div style={{flex:1,overflowY:"auto",padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+        {!activeEng?(
+          <div style={{textAlign:"center",color:C.secondary,fontSize:12,marginTop:40}}>Selecteer een dossier om berichten te bekijken</div>
+        ):loading?(
+          <div style={{textAlign:"center",color:C.secondary,fontSize:12,marginTop:40}}>Laden...</div>
+        ):messages.length===0?(
+          <div style={{textAlign:"center",color:C.secondary,fontSize:12,marginTop:40}}>
+            <Send size={24} color={C.mushroom} style={{marginBottom:10,display:"block",margin:"0 auto 10px"}}/>
+            Nog geen berichten. Stuur het eerste bericht aan uw adviseur.
+          </div>
+        ):messages.map(m=>{
+          const isMe=m.author_id===user.id;
+          return(
+            <div key={m.id} style={{display:"flex",alignItems:"flex-end",gap:8,flexDirection:isMe?"row-reverse":"row"}}>
+              <Avatar initials={isMe?(user.name||"U").slice(0,2).toUpperCase():"AD"} size={28} bg={isMe?C.crimson:C.taupe}/>
+              <div style={{maxWidth:"70%"}}>
+                <div style={{fontSize:11,color:C.secondary,marginBottom:4,textAlign:isMe?"right":"left"}}>
+                  {isMe?"Ik":"Adviseur"} · {formatTime(m.created_at)}
+                </div>
+                <div style={{background:isMe?C.crimson:C.warm50,color:isMe?CREAM:C.text,borderRadius:isMe?"14px 14px 4px 14px":"14px 14px 14px 4px",padding:"10px 14px",fontSize:13,lineHeight:1.6}}>
+                  {m.body}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef}/>
+      </div>
+
+      {/* Input */}
+      {activeEng&&(
+        <div style={{padding:"12px 16px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
+          <input value={newMsg} onChange={e=>setNewMsg(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendMessage()}
+            placeholder="Typ een bericht aan uw adviseur..."
+            style={{flex:1,padding:"10px 14px",borderRadius:10,border:`1.5px solid ${newMsg?C.crimson:C.border}`,fontSize:12,outline:"none",fontFamily:F.body,background:C.bg,color:C.text}}/>
+          <button onClick={sendMessage} disabled={!newMsg.trim()||sending}
+            style={{padding:"10px 16px",borderRadius:10,background:newMsg.trim()?C.crimson:C.mushroom,color:CREAM,border:"none",fontSize:12,fontWeight:700,cursor:newMsg.trim()?"pointer":"default",display:"flex",alignItems:"center",gap:6}}>
+            <Send size={13}/>{sending?"...":"Stuur"}
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+);
+}
+
+
+
 function DocPreviewModal({doc, onClose, onDownload}) {
 const typeIcon={PDF:<FileText size={40} color={C.crimson}/>,Excel:<FileSpreadsheet size={40} color={C.green}/>,Word:<FileType size={40} color={C.blue}/>};
 const typeBg={PDF:C.crimsonFaint,Excel:C.greenBg,Word:C.blueBg};
@@ -6829,6 +8314,179 @@ return(
 );
 }
 
+
+// ─── INVOICE PDF GENERATOR ───────────────────────────────────────────────────
+function generateInvoicePDF(inv, companyName){
+  const sLabel={paid:"BETAALD",sent:"OPENSTAAND",overdue:"ACHTERSTALLIG",draft:"CONCEPT"};
+  const sColor={paid:"#15803D",sent:"#B45309",overdue:"#DC2626",draft:"#6B7280"};
+  const sBg={paid:"#F0FDF4",sent:"#FFFBEB",overdue:"#FEF2F2",draft:"#F9FAFB"};
+  const status=inv.status||"draft";
+  const ref=inv.reference_code||inv.ref||"—";
+  const amount=Number(inv.amount||0);
+  const subtotal=inv.subtotal||amount*0.85;
+  const tax=inv.tax_amount||amount*0.15;
+  const fmtDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"long",year:"numeric"}):"—";
+  const fmtAmt=(n)=>"SRD "+Number(n).toLocaleString("nl-SR",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // Parse line items if stored as JSON
+  let lineItems=[];
+  try{
+    if(inv.line_items) lineItems=typeof inv.line_items==="string"?JSON.parse(inv.line_items):inv.line_items;
+  }catch(e){}
+  if(!lineItems.length){
+    lineItems=[
+      {desc:inv.description||"Dienstverlening",qty:1,unit:fmtAmt(subtotal),total:fmtAmt(subtotal)},
+      {desc:"BTW (15%)",qty:1,unit:fmtAmt(tax),total:fmtAmt(tax)},
+    ];
+  }
+
+  const html=`<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"/>
+<title>Factuur ${ref}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Helvetica Neue",Arial,sans-serif;color:#1C1917;background:#fff;font-size:12px;line-height:1.5;}
+  .page{max-width:794px;margin:0 auto;padding:48px 52px;}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #8B1A2B;}
+  .logo-block .brand{font-size:22px;font-weight:700;color:#8B1A2B;letter-spacing:-0.5px;}
+  .logo-block .sub{font-size:10px;color:#78716C;letter-spacing:0.12em;text-transform:uppercase;margin-top:2px;}
+  .invoice-title{text-align:right;}
+  .invoice-title h1{font-size:28px;font-weight:300;color:#8B1A2B;letter-spacing:-1px;}
+  .invoice-title .ref{font-size:13px;font-weight:700;color:#1C1917;margin-top:4px;}
+  .invoice-title .date{font-size:11px;color:#78716C;margin-top:2px;}
+  .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:36px;}
+  .meta-block .label{font-size:8px;font-weight:700;color:#78716C;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:5px;}
+  .meta-block .value{font-size:13px;font-weight:600;color:#1C1917;}
+  .meta-block .value-sub{font-size:11px;color:#78716C;margin-top:1px;}
+  .status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.08em;background:${sBg[status]};color:${sColor[status]};border:1px solid ${sColor[status]}40;}
+  table{width:100%;border-collapse:collapse;margin-bottom:28px;}
+  thead tr{background:#8B1A2B;}
+  thead th{padding:10px 14px;text-align:left;font-size:9px;font-weight:700;color:#fff;letter-spacing:0.1em;text-transform:uppercase;}
+  thead th:last-child{text-align:right;}
+  tbody tr{border-bottom:1px solid #F0EDE8;}
+  tbody tr:last-child{border-bottom:none;}
+  tbody td{padding:12px 14px;font-size:12px;color:#1C1917;vertical-align:top;}
+  tbody td:last-child{text-align:right;font-weight:600;}
+  .totals{margin-left:auto;width:260px;}
+  .total-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F0EDE8;font-size:12px;}
+  .total-row.grand{border-bottom:none;padding-top:10px;margin-top:4px;border-top:2px solid #8B1A2B;}
+  .total-row.grand .label{font-weight:700;font-size:14px;color:#1C1917;}
+  .total-row.grand .value{font-weight:700;font-size:16px;color:#8B1A2B;}
+  .total-row .label{color:#78716C;}
+  .total-row .value{font-weight:600;color:#1C1917;}
+  .paid-banner{margin-top:24px;padding:14px 18px;background:#F0FDF4;border:1px solid #15803D30;border-radius:8px;display:flex;align-items:center;gap:10px;}
+  .paid-banner .check{color:#15803D;font-size:18px;}
+  .paid-banner .text{font-size:12px;font-weight:600;color:#15803D;}
+  .footer{margin-top:48px;padding-top:20px;border-top:1px solid #E8E0D8;display:flex;justify-content:space-between;align-items:center;}
+  .footer .left{font-size:10px;color:#78716C;line-height:1.7;}
+  .footer .right{text-align:right;font-size:10px;color:#A8A29E;}
+  .notes{margin-top:20px;padding:14px;background:#FAFAF9;border-radius:6px;font-size:11px;color:#78716C;line-height:1.6;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-block">
+      <div class="brand">The Glass Executive</div>
+      <div class="sub">${status==="sent"||status==="draft"?"Tactigent Consultancy":"Fiscal Fuse"} · Suriname</div>
+    </div>
+    <div class="invoice-title">
+      <h1>Factuur</h1>
+      <div class="ref">${ref}</div>
+      <div class="date">Datum: ${fmtDate(inv.created_at||inv.date||new Date())}</div>
+    </div>
+  </div>
+
+  <!-- Meta -->
+  <div class="meta">
+    <div class="meta-block">
+      <div class="label">Cliënt</div>
+      <div class="value">${companyName||inv.client||"—"}</div>
+    </div>
+    <div class="meta-block">
+      <div class="label">Vervaldatum</div>
+      <div class="value">${fmtDate(inv.due_date)}</div>
+      ${inv.paid_at?`<div class="value-sub">Betaald op: ${fmtDate(inv.paid_at)}</div>`:""}
+    </div>
+    <div class="meta-block">
+      <div class="label">Status</div>
+      <div class="status-badge">${sLabel[status]||"ONBEKEND"}</div>
+    </div>
+  </div>
+
+  <!-- Line items table -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:50%">Omschrijving</th>
+        <th style="width:15%;text-align:center">Aantal</th>
+        <th style="width:17%;text-align:right">Eenheidsprijs</th>
+        <th style="width:18%;text-align:right">Totaal</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lineItems.map(item=>`
+        <tr>
+          <td>${item.desc||item.description||"—"}</td>
+          <td style="text-align:center">${item.qty||1}</td>
+          <td style="text-align:right">${item.unit||fmtAmt(item.unit_price||0)}</td>
+          <td>${item.total||fmtAmt(item.total_price||0)}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals">
+    <div class="total-row">
+      <span class="label">Subtotaal</span>
+      <span class="value">${fmtAmt(subtotal)}</span>
+    </div>
+    <div class="total-row">
+      <span class="label">BTW (15%)</span>
+      <span class="value">${fmtAmt(tax)}</span>
+    </div>
+    <div class="total-row grand">
+      <span class="label">TOTAAL</span>
+      <span class="value">${fmtAmt(amount)}</span>
+    </div>
+  </div>
+
+  ${status==="paid"?`<div class="paid-banner"><span class="check">&#10003;</span><span class="text">Betaling ontvangen op ${fmtDate(inv.paid_at)} — Bedankt!</span></div>`:""}
+
+  ${inv.notes?`<div class="notes"><strong>Notities:</strong> ${inv.notes}</div>`:""}
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="left">
+      The Glass Executive · Paramaribo, Suriname<br/>
+      info@tactigentconsultancy.com<br/>
+      KKF Nr. 12345678
+    </div>
+    <div class="right">
+      Factuur ${ref}<br/>
+      Gegenereerd op ${new Date().toLocaleDateString("nl-SR",{day:"2-digit",month:"long",year:"numeric"})}<br/>
+      Pagina 1 van 1
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  // Open in print window
+  const win=window.open("","_blank","width=900,height=700");
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{
+    win.print();
+  },600);
+}
+
 // ─── InvoicePreviewModal ─────────────────────────────────────────
 function InvoicePreviewModal({inv, onClose, onDownload}) {
 const sColor={paid:C.green,sent:C.amber,overdue:C.red,draft:C.secondary};
@@ -6860,8 +8518,8 @@ return(
 <div style={{fontSize:10,color:C.secondary}}>{inv.client} · Vervaldatum: {inv.due}</div>
 </div>
 <Badge label={sLabel[inv.status]||inv.status} color={sColor[inv.status]||C.secondary} bg={sBg[inv.status]||C.warm50}/>
-<button onClick={()=>onDownload(inv)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-<Download size={13}/> PDF
+<button onClick={()=>generateInvoicePDF(inv, inv.client||"")} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:C.crimson,color:CREAM,border:"none",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+<Download size={13}/> PDF Genereren
 </button>
 <button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.secondary}}>
 <X size={16}/>
