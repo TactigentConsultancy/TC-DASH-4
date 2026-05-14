@@ -1096,21 +1096,29 @@ useEffect(()=>{
     .then(({data})=>{ if(data?.length) setNotifData(data.map(n=>({...n,read:n.is_read}))); })
     .catch(()=>{});
 
-  // Realtime: new notifications for this user
-  const channel=supabase
-    .channel("notif_"+user.id)
-    .on("postgres_changes",{
-      event:"INSERT",schema:"public",table:"notifications",
-      filter:`user_id=eq.${user.id}`
-    },(payload)=>{
-      const n=payload.new;
-      setNotifData(prev=>[{...n,read:false},...prev]);
-      // Show toast for new notification
-      if(n.title) showToast("🔔 "+n.title);
-    })
-    .subscribe();
+  // Poll for new notifications every 30 seconds
+  const poll=setInterval(()=>{
+    supabase.from("notifications")
+      .select("id,title,body,is_read,created_at,action_type,entity_type,entity_id,company_id,archived")
+      .eq("user_id",user.id)
+      .eq("is_read",false)
+      .order("created_at",{ascending:false})
+      .limit(10)
+      .then(({data})=>{
+        if(!data?.length) return;
+        setNotifData(prev=>{
+          const existingIds=new Set(prev.map(n=>n.id));
+          const newOnes=data.filter(n=>!existingIds.has(n.id));
+          if(newOnes.length>0){
+            newOnes.forEach(n=>{ if(n.title) showToast("🔔 "+n.title); });
+            return [...newOnes.map(n=>({...n,read:false})),...prev];
+          }
+          return prev;
+        });
+      }).catch(()=>{});
+  },30000);
 
-  return ()=>{ supabase.removeChannel(channel); };
+  return ()=>{ clearInterval(poll); };
 },[user.id]);
 const [dbLoaded,setDbLoaded]=useState(false);
 
