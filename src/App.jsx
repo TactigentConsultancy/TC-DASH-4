@@ -672,7 +672,7 @@ const CLIENT_PORTAL_ACTIONS=[];
 const CLIENT_THREADS=[];
 
 // ─── SIDEBAR ────────────────────────────────────────────────────────────────
-function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng,collapsed,setCollapsed}){
+function Sidebar({user,view,setView,onLogout,unreadCount,onNewEng,collapsed,setCollapsed,pendingActionsCount=0}){
 const t=useT();
 const isFF=user.dept==="FF",isTC=user.dept==="TC",isBOTH=user.dept==="BOTH";
 const W=collapsed?68:228;
@@ -757,7 +757,7 @@ return(
 {user.role==="client"&&<>
 <SideSection label={t("myPortal")}/>
 <SideBtn icon={Layers} label={t("dashboard")} isActive={view==="c_dash"} onClick={()=>setView("c_dash")}/>
-<SideBtn icon={CheckSquare} label={t("myActions")} isActive={view==="c_actions"} onClick={()=>setView("c_actions")} badge={clientActionsData.filter(a=>a.status==="pending"||a.status==="open").length||0}/>
+<SideBtn icon={CheckSquare} label={t("myActions")} isActive={view==="c_actions"} onClick={()=>setView("c_actions")} badge={pendingActionsCount||0}/>
 <SideBtn icon={FileText} label={t("myDocs")} isActive={view==="c_docs"} onClick={()=>setView("c_docs")}/>
 <SideSection label="Financiën"/>
 <SideBtn icon={Receipt} label={t("financeNav")} isActive={view==="c_finance"} onClick={()=>setView("c_finance")}/>
@@ -1389,7 +1389,7 @@ return(
 <LangCtx.Provider value={language}>
 <div key={themeKey} style={{display:"flex",height:"100vh",background:C.bg}}>
 <GlobalStyles darkMode={darkMode}/>
-<Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)} collapsed={sideCollapsed} setCollapsed={setSideCollapsed}/>
+<Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)} collapsed={sideCollapsed} setCollapsed={setSideCollapsed} pendingActionsCount={clientActionsData.filter(a=>a.status==="pending"||a.status==="open").length}/>
 <div style={{flex:1,display:"flex",flexDirection:"column"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
 <main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}} key={view+(detailEng?.id||"")}>
