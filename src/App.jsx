@@ -1,4 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
 Target, Building2, BarChart3, FileText, TrendingUp, LogOut, Settings,
 Plus, Globe, Bell, Eye, EyeOff, ChevronRight, AlertTriangle,
@@ -114,86 +115,26 @@ const TASK_TEMPLATES_FF = [
 const SB_URL = "https://qjlijtlqtyzytxcmzwvu.supabase.co";
 const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbGlqdGxxdHl6eXR4Y216d3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NTE3MjAsImV4cCI6MjA5MjEyNzcyMH0.EwHl1enE8b5LBXUBQTMSDT4Mv0O6Kkdjbtg1LooH4f8";
 
+// ── Officiële Supabase SDK client ────────────────────────────────
+const supabase = createClient(SB_URL, SB_ANON, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+
+// ── Auth token helper (voor raw DELETE fetches) ──────────────────
+// De SDK beheert de sessie automatisch — we lezen het token
+// uit de sessie wanneer nodig voor de raw fetch DELETE calls.
 let _authToken = SB_ANON;
 const setAuthToken = (t) => { _authToken = t || SB_ANON; };
-
-const sbFetch = async (path, opts={}) => {
-const headers = {
-"apikey": SB_ANON,
-"Authorization": `Bearer ${_authToken}`,
-"Content-Type": "application/json",
-...(opts.headers||{}),
-};
-if(opts.prefer) headers["Prefer"] = opts.prefer;
-const res = await fetch(`${SB_URL}${path}`, { ...opts, headers });
-if (!res.ok) {
-  const e = await res.json().catch(()=>({message:res.statusText}));
-  throw new Error(e.error_description||e.message||e.msg||res.statusText);
-}
-return res.status === 204 ? null : res.json();
+const getAuthToken = () => {
+  const session = supabase.auth.session?.();
+  return session?.access_token || _authToken;
 };
 
-const supabase = {
-auth: {
-signInWithPassword: async ({email,password}) => {
-try {
-const data = await sbFetch("/auth/v1/token?grant_type=password", {
-method:"POST", body: JSON.stringify({email,password}),
-});
-if(!data?.access_token) return { data:null, error:{message:"Invalid login credentials"} };
-setAuthToken(data.access_token);
-return { data: { user: data.user, session: data }, error: null };
-} catch(e) {
-return { data:null, error:{message: e.message.includes("Invalid")||e.message.includes("invalid")?"Invalid login credentials":e.message} };
-}
-},
-signOut: async () => { setAuthToken(null); return {error:null}; },
-},
-from: (table) => ({
-select: (cols="*") => ({
-_table:table, _cols:cols, _filters:[], _order:null, _limit:null, _single:false,
-eq(col,val){ this._filters.push(`${col}=eq.${val}`); return this; },
-neq(col,val){ this._filters.push(`${col}=neq.${val}`); return this; },
-in(col,vals){ this._filters.push(`${col}=in.(${vals.join(",")})`); return this; },
-gte(col,val){ this._filters.push(`${col}=gte.${val}`); return this; },
-lte(col,val){ this._filters.push(`${col}=lte.${val}`); return this; },
-is(col,val){ this._filters.push(`${col}=is.${val}`); return this; },
-order(col,{ascending=true}={}){ this._order=`${col}.${ascending?"asc":"desc"}`; return this; },
-limit(n){ this._limit=n; return this; },
-single(){ this._single=true; return this; },
-async _run(){
-let qs=`select=${this._cols}`;
-this._filters.forEach(f=>{ qs+=`&${f}`; });
-if(this._order) qs+=`&order=${this._order}`;
-if(this._limit) qs+=`&limit=${this._limit}`;
-const data=await sbFetch(`/rest/v1/${this._table}?${qs}`,{headers:{Accept:this._single?"application/vnd.pgrst.object+json":"application/json"}});
-return {data,error:null};
-},
-then(resolve,reject){ return this._run().then(resolve).catch(r=>reject({data:null,error:r})); },
-}),
-insert: (body) => ({
-select(){ return this; },
-single(){ this._single=true; return this; },
-_single:false,
-async _run(){
-const prefer=this._single?"return=representation":"return=representation";
-const data=await sbFetch(`/rest/v1/${table}`,{method:"POST",body:JSON.stringify(body),prefer,headers:{Accept:this._single?"application/vnd.pgrst.object+json":"application/json"}});
-return {data,error:null};
-},
-then(resolve,reject){ return this._run().then(resolve).catch(r=>reject({data:null,error:r})); },
-}),
-update: (body) => ({
-eq(col,val){ this._filter=`${col}=eq.${val}`; return this; },
-_filter:"",
-async _run(){
-await sbFetch(`/rest/v1/${table}?${this._filter}`,{method:"PATCH",body:JSON.stringify(body)});
-return {error:null};
-},
-then(resolve,reject){ return this._run().then(resolve).catch(r=>reject({data:null,error:r})); },
-}),
-}),
-};
-
+// ── ADAPTERS ─────────────────────────────────────────────────────
 // ─── ADAPTERS ────────────────────────────────────────────────────────────────
 const adaptCompanyRow = (row, contacts=[]) => ({
 id:row.id, name:row.name, kkf:row.kkf_number||"", dept:row.department,
@@ -260,15 +201,15 @@ if(changes.health) map.health=changes.health;
 try { await supabase.from("engagements").update(map).eq("id",id); } catch(e){console.warn("updateEng:",e.message);}
 }
 async function createCompanyDB(payload) {
-const row = await sbFetch("/rest/v1/companies",{method:"POST",prefer:"return=representation",
-headers:{Accept:"application/vnd.pgrst.object+json"},
-body:JSON.stringify({name:payload.name,kkf_number:payload.kkf,department:payload.dept,
+const {data:row,error:compErr}=await supabase.from("companies").insert({
+name:payload.name,kkf_number:payload.kkf,department:payload.dept,
 industry:payload.industry,lifecycle_status:payload.lifecycle,health:"green",
-logo_url:payload.logo_url||null,notes:payload.notes||null})});
+logo_url:payload.logo_url||null,notes:payload.notes||null
+}).select().single();
+if(compErr) throw new Error(compErr.message);
 if(payload.contact) {
-await sbFetch("/rest/v1/contacts",{method:"POST",prefer:"return=minimal",
-body:JSON.stringify({company_id:row.id,full_name:payload.contact,role_title:payload.role||null,
-email:payload.email||null,phone:payload.phone||null,is_primary:true})});
+await supabase.from("contacts").insert({company_id:row.id,full_name:payload.contact,role_title:payload.role||null,
+email:payload.email||null,phone:payload.phone||null,is_primary:true});
 }
 return adaptCompanyRow(row);
 }
@@ -291,11 +232,12 @@ try { await supabase.from("documents").update({review_status:status}).eq("id",id
 }
 async function createEngagement(data) {
 try {
-const row = await sbFetch("/rest/v1/engagements",{method:"POST",prefer:"return=representation",
-headers:{Accept:"application/vnd.pgrst.object+json"},
-body:JSON.stringify({name:data.name,department:data.dept,type:data.dept==="TC"?"project":"matter",
+const {data:row,error:engErr}=await supabase.from("engagements").insert({
+name:data.name,department:data.dept,type:data.dept==="TC"?"project":"matter",
 phase:data.phase,status:data.status||"Actief",health:"green",
-company_id:data.company_id,reference_code:data.ref,deadline:data.deadline||null})});
+company_id:data.company_id,reference_code:data.ref,deadline:data.deadline||null
+}).select().single();
+if(engErr) throw new Error(engErr.message);
 return adaptEngRow(row);
 } catch(e){console.warn("createEng:",e.message);}
 }
@@ -846,7 +788,7 @@ const [url,setUrl]=useState(null);
 useEffect(()=>{
   supabase.from("user_profiles").select("avatar_url").eq("id",user.id).single()
     .then(({data})=>{ if(data?.avatar_url) setUrl(data.avatar_url); })
-    .catch(()=>{});
+    .catch(e=>console.warn("DB [companies]:", e?.message||e));
 },[user.id]);
 return(
   <div onClick={clickable?()=>setView("settings"):undefined} style={{width:size,height:size,borderRadius:"50%",border:`2px solid ${C.border}`,overflow:"hidden",cursor:clickable?"pointer":"default",flexShrink:0}}>
@@ -1081,7 +1023,7 @@ useEffect(()=>{
     }));
     setResults(out);
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[q]);
 
 const handleSelect=(item)=>{
@@ -1199,6 +1141,14 @@ return(
 }
 
 function AppShell({user,language,setLanguage,onLogout}){
+// Global unhandled promise rejection handler
+useEffect(()=>{
+  const handler=(e)=>{
+    console.error('Unhandled DB/Promise error:', e.reason?.message || e.reason);
+  };
+  window.addEventListener('unhandledrejection', handler);
+  return ()=>window.removeEventListener('unhandledrejection', handler);
+},[]);
 const def=user.role==="client"?"c_dash":user.dept==="FF"?"dossiers":"dashboard";
 const [view,setView]=useState(def);
 const [detailEng,setDetailEng]=useState(null);
@@ -1303,7 +1253,7 @@ useEffect(()=>{
     .order("created_at",{ascending:false})
     .limit(50)
     .then(({data})=>{ if(data?.length) setNotifData(data.map(n=>({...n,read:n.is_read}))); })
-    .catch(()=>{});
+    .catch(e=>console.warn("DB [engagements]:", e?.message||e));
 
   // Poll for new notifications every 30 seconds
   const poll=setInterval(()=>{
@@ -1324,7 +1274,7 @@ useEffect(()=>{
           }
           return prev;
         });
-      }).catch(()=>{});
+      }).catch(e=>console.warn("DB [notifications]:", e?.message||e));
   },30000);
 
   return ()=>{ clearInterval(poll); };
@@ -1364,7 +1314,7 @@ if(v==="notifications"){
 setNotifData(ns=>ns.map(n=>({...n,read:true,is_read:true})));
     // Mark all read in DB
     supabase.from("notifications").update({is_read:true}).eq("user_id",user?.id||"").then(()=>{});
-markNotificationsRead(user.id).catch(()=>{});
+markNotificationsRead(user.id).catch(e=>console.warn("DB [notifications]:", e?.message||e));
 }
 };  const renderView=()=>{
 if(detailCompany) return <CompanyDetail company={detailCompany} user={user} onBack={()=>setDetailCompany(null)} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)} engData={engData} invData={invData} showToast={showToast}/>;
@@ -1570,7 +1520,7 @@ useEffect(()=>{
     setOverdueInvoices(inv||[]);
     setOpenActions(ca||[]);
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[user.id]);
 
 const fmtDate=(d)=>{
@@ -1650,9 +1600,9 @@ return(
   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:20}}>
     {[
       {l:"MIJN TAKEN",v:loading?"…":tasks.length,c:tasks.length>0?C.amber:C.green,bg:tasks.length>0?C.amberBg:C.greenBg,icon:<CheckSquare size={14}/>,click:()=>setView("tasks")},
-      {l:"BEOORDELINGSWACHTRIJ",v:loading?"…":queueCount,c:queueCount>0?C.crimson:C.green,bg:queueCount>0?C.crimsonFaint:C.greenBg,icon:<ClipboardList size={14}/>,click:()=>setView("review_queue")},
+      {l:"BEOORDELINGSWACHTRIJ",v:loading?"…":queueCount,c:queueCount>0?C.crimson:C.green,bg:queueCount>0?C.crimsonFaint:C.greenBg,icon:<ClipboardList size={14}/>,click:()=>setView("review")},
       {l:"ACHTERSTALLIGE FACTUREN",v:loading?"…":overdueInvoices.length,c:overdueInvoices.length>0?C.red:C.green,bg:overdueInvoices.length>0?C.redBg:C.greenBg,icon:<Receipt size={14}/>,click:()=>setView("invoices")},
-      {l:"OPEN CLIËNTACTIES",v:loading?"…":openActions.length,c:openActions.length>0?C.amber:C.green,bg:openActions.length>0?C.amberBg:C.greenBg,icon:<Users size={14}/>,click:()=>setView("client_actions_tc")},
+      {l:"OPEN CLIËNTACTIES",v:loading?"…":openActions.length,c:openActions.length>0?C.amber:C.green,bg:openActions.length>0?C.amberBg:C.greenBg,icon:<Users size={14}/>,click:()=>setView("ca_tc")},
     ].map(k=>(
       <div key={k.l} onClick={k.click} style={{background:k.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${k.c}30`,cursor:"pointer",transition:"transform .1s"}}
         onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
@@ -1756,7 +1706,7 @@ return(
           ))}
         </div>
         {queueCount>0&&(
-          <div onClick={()=>setView("review_queue")} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,.08)",cursor:"pointer",marginTop:4}}>
+          <div onClick={()=>setView("review")} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,.08)",cursor:"pointer",marginTop:4}}>
             <div style={{display:"flex",alignItems:"center",gap:7}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:C.crimson,animation:"pulse 2s infinite"}}/>
               <span style={{fontSize:11,fontWeight:700,color:CREAM}}>{queueCount} in wachtrij</span>
@@ -2262,7 +2212,7 @@ useEffect(()=>{
         visible:m.visible_to_client,
         isMe:m.author_id===user.id,
       })));
-    }).catch(()=>{});
+    }).catch(e=>console.warn("DB [tasks]:", e?.message||e));
 },[eng.id]);
 const [localTasks,setLocalTasks]=useState([]);
 const [localActions,setLocalActions]=useState([]);
@@ -2288,7 +2238,7 @@ useEffect(()=>{
         assignee:t.user_profiles?.avatar_initials||"—",
         subtasks:[],
       })));
-    }).catch(()=>{});
+    }).catch(e=>console.warn("DB [tasks]:", e?.message||e));
   // Load client actions
   supabase.from("client_actions")
     .select("id,title,description,action_type,status,deadline,is_visible_to_client")
@@ -2301,7 +2251,7 @@ useEffect(()=>{
         deadline:a.deadline?new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
         visible:a.is_visible_to_client,
       })));
-    }).catch(()=>{});
+    }).catch(e=>console.warn("DB [client_actions]:", e?.message||e));
 },[eng.id]);
 const liveEng=(engData||[]).find(e=>e.id===eng.id)||eng;
 const updateEng=async(changes)=>{
@@ -2740,21 +2690,56 @@ function useTeamMembers(dept){
     supabase.from("v_staff_dropdown")
       .select("id,full_name,role,department,avatar_initials")
       .then(({data})=>setMembers((data||[]).filter(m=>dept==="BOTH"||m.department===dept||m.department==="BOTH")));
-      // Load from permanent view — always includes every company
-  supabase.from("v_client_dropdown")
-        .select("company_id,display_name,department,assignable_id,has_portal")
-        .order("display_name")
+      // Load all companies (not just portal ones)
+  supabase.from("companies")
+        .select("id,name,department,portal_user_id")
+        .order("name")
         .then(({data})=>{
-          if(data) setClientList(data.map(c=>({
-            id: c.assignable_id,
-            company_id: c.company_id,
-            full_name: c.display_name,
+          if(data) setClients(data.map(c=>({
+            id: c.id,
+            company_id: c.id,
+            full_name: c.name,
             department: c.department,
-            has_portal: c.has_portal,
+            has_portal: !!c.portal_user_id,
           })));
-        });
+        }).catch(e=>console.warn("DB [documents]:", e?.message||e));
   },[dept]);
   return {members,clients};
+}
+
+
+// ─── useQuery — centralized DB fetch with error handling ─────────────────────
+// Usage: const {data, loading, error} = useQuery(() => supabase.from('x').select('*'))
+function useQuery(queryFn, deps=[], showToast=null){
+  const [data,setData]=React.useState(null);
+  const [loading,setLoading]=React.useState(true);
+  const [error,setError]=React.useState(null);
+  React.useEffect(()=>{
+    let cancelled=false;
+    setLoading(true);
+    queryFn()
+      .then(({data:d,error:e})=>{
+        if(cancelled) return;
+        if(e){ 
+          setError(e.message);
+          console.warn("useQuery error:",e.message);
+          if(showToast) showToast("Laden mislukt: "+e.message);
+        } else {
+          setData(d);
+          setError(null);
+        }
+        setLoading(false);
+      })
+      .catch(e=>{
+        if(cancelled) return;
+        setError(e?.message||"Onbekende fout");
+        console.warn("useQuery catch:",e?.message||e);
+        setLoading(false);
+      });
+    return()=>{cancelled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[...deps]);
+  return {data,loading,error};
 }
 
 // ─── ASSIGNEE SELECT ──────────────────────────────────────────────────────────
@@ -2804,7 +2789,7 @@ useEffect(()=>{
         assignee_name:tk.user_profiles?.full_name||"",
         assigned_to:tk.assigned_to,
       })));
-    }).catch(()=>{});
+    }).catch(e=>console.warn("DB [engagements]:", e?.message||e));
 },[]);
 
 const filtered=tasks.filter(tk=>{
@@ -2819,7 +2804,7 @@ const toggle=async(id)=>{
   if(!tk) return;
   const newStatus=tk.status==="done"?"open":"done";
   setTasks(ts=>ts.map(t=>t.id===id?{...t,status:newStatus}:t));
-  await supabase.from("tasks").update({status:newStatus}).eq("id",id).catch(()=>{});
+  await supabase.from("tasks").update({status:newStatus}).eq("id",id).catch(e=>console.warn("DB [tasks]:", e?.message||e));
 };
 
 const addTask=async()=>{
@@ -2993,18 +2978,19 @@ useEffect(()=>{
   supabase.from("v_staff_dropdown")
     .select("id,full_name,department,avatar_initials,role")
     .then(({data})=>setStaffList(data||[]));
-  // Permanent fix: v_client_dropdown view always includes every company
-  supabase.from("v_client_dropdown")
-    .select("company_id,display_name,department,assignable_id,has_portal")
+  // Load all companies directly (not just portal ones)
+  supabase.from("companies")
+    .select("id,name,department,contact_name,portal_user_id")
+    .order("name")
     .then(({data})=>{
       if(data) setClientList(data.map(c=>({
-        id: c.assignable_id,
-        company_id: c.company_id,
-        full_name: c.display_name,
+        id: c.id,
+        company_id: c.id,
+        full_name: c.name+(c.portal_user_id?" ✓":""),
         department: c.department,
-        has_portal: c.has_portal,
+        has_portal: !!c.portal_user_id,
       })));
-    });
+    }).catch(e=>console.warn("DB [engagements]:", e?.message||e));
   return()=>{ window.removeEventListener("keydown",h); document.body.classList.remove("modal-open"); };
 },[]);
 const ACTION_TYPES=[
@@ -3026,14 +3012,33 @@ const newAction={
 };
 // Save to Supabase
 try{
-  await supabase.from("client_actions").insert({
+  const {data:caData}=await supabase.from("client_actions").insert({
     title:newAction.title, description:newAction.desc,
     action_type:newAction.type, status:"pending",
     deadline:deadline||null, engagement_id:eng.id,
     client_id:assignedClient||null, assigned_to:assignedStaff||null,
     department:eng.dept||"TC", is_visible_to_client:true,
     company_id:eng.company_id||null,
-  });
+  }).select("id").single();
+
+  // Send notification to client if company has portal user
+  if(eng.company_id){
+    const {data:comp}=await supabase.from("companies")
+      .select("portal_user_id,name")
+      .eq("id",eng.company_id)
+      .single();
+    if(comp?.portal_user_id){
+      const typeLabel=newAction.type==="upload"?"Uploadverzoek":newAction.type==="approve"?"Goedkeuring vereist":newAction.type==="sign"?"Handtekening vereist":"Actie vereist";
+      await supabase.from("notifications").insert({
+        user_id:comp.portal_user_id,
+        title:`${typeLabel}: ${newAction.title}`,
+        body:`Uw adviseur heeft een nieuw actiepunt aangemaakt${deadline?` — deadline: ${new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})}`:""}.`,
+        entity_type:"client_action",
+        entity_id:caData?.id||null,
+        action_type:newAction.type,
+      }).catch(e=>console.warn("DB [client_actions]:", e?.message||e));
+    }
+  }
 }catch(e){ console.warn("client_action insert:",e.message); }
 onCreated(newAction);
 showToast(`Cliëntactie "${title}" aangemaakt`);
@@ -3157,7 +3162,7 @@ useEffect(()=>{
         client:"—", engagement:"—",
       })));
       setLoading(false);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[dept]);
 const [q,setQ]=useState("");
 const [showNew,setShowNew]=useState(false);
@@ -3285,7 +3290,7 @@ useEffect(()=>{
     .then(({data})=>{
       setLogs(data||[]);
       setLoading(false);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const ACTION_META={
@@ -4221,7 +4226,7 @@ useEffect(()=>{
         daysSinceCreated:l.created_at?Math.floor((new Date()-new Date(l.created_at))/86400000):0,
       })));
       setLoading(false);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const stages=deptF==="FF"?FF_STAGES:TC_STAGES;
@@ -4674,7 +4679,7 @@ const [currentLead,setCurrentLead]=useState(lead);
 
 useEffect(()=>{
   supabase.from("lead_activities").select("*").eq("lead_id",lead.id).order("created_at",{ascending:false})
-    .then(({data})=>setActivities(data||[])).catch(()=>{});
+    .then(({data})=>setActivities(data||[])).catch(e=>console.warn("DB [client_actions]:", e?.message||e));
 },[lead.id]);
 
 const moveStage=async(newStageId)=>{
@@ -4860,11 +4865,15 @@ const [engs,setEngs]=useState([]);
 const [saving,setSaving]=useState(false);
 
 useEffect(()=>{
-  supabase.from("companies").select("id,name,department").order("name").then(({data})=>setCompanies(data||[])).catch(()=>{});
+  supabase.from("companies")
+    .select("id,name,department,contact_name,portal_user_id")
+    .order("name")
+    .then(({data})=>setCompanies(data||[]))
+    .catch(e=>console.warn("DB [leads]:", e?.message||e));
 },[]);
 useEffect(()=>{
   if(!companyId) return;
-  supabase.from("engagements").select("id,name").eq("company_id",companyId).then(({data})=>setEngs(data||[])).catch(()=>{});
+  supabase.from("engagements").select("id,name").eq("company_id",companyId).then(({data})=>setEngs(data||[])).catch(e=>console.warn("DB [engagements]:", e?.message||e));
 },[companyId]);
 
 useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
@@ -4897,7 +4906,7 @@ const submit=async()=>{
         entity_type:"document_request",
         entity_id:data.id,
         action_type:"request",
-      }).catch(()=>{});
+      }).catch(e=>console.warn("DB [document_requests]:", e?.message||e));
     }
     if(showToast) showToast("Documentverzoek aangemaakt ✓");
     onCreated(data);
@@ -4906,7 +4915,10 @@ const submit=async()=>{
   setSaving(false);
 };
 
-const filteredCompanies=companies.filter(c=>dept==="BOTH"||c.department===dept);
+const filteredCompanies=companies.filter(c=>{
+  const deptMatch=dept==="BOTH"||c.department===dept;
+  return deptMatch;
+});
 
 return(
 <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
@@ -4956,7 +4968,7 @@ return(
       <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${companyId?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
         <option value="">— Selecteer cliënt —</option>
-        {filteredCompanies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        {filteredCompanies.map(c=><option key={c.id} value={c.id}>{c.name}{c.portal_user_id?" (portaal)":""}</option>)}
       </select>
     </div>
 
@@ -5026,7 +5038,7 @@ const loadRequests=()=>{
     .select("id,title,description,document_type,department,status,deadline,created_at,company_id,engagement_id,companies(name,department)")
     .order("created_at",{ascending:false})
     .then(({data})=>{setRequests(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+    .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 };
 useEffect(()=>{ loadRequests(); },[]);
 
@@ -5194,7 +5206,7 @@ useEffect(()=>{
         folder:d.folder_name||"Geen map",
       })));
       setLoading(false);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const formatBytes=(b)=>{
@@ -5570,7 +5582,7 @@ useEffect(()=>{
       isOverdue:i.due_date&&new Date(i.due_date)<new Date()&&i.status!=="paid"&&i.status!=="cancelled",
     })));
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const filtered=invoices.filter(i=>{
@@ -6071,7 +6083,7 @@ useEffect(()=>{
         time:formatNotifTime(new Date(n.created_at)),
       })));
       setLoading(false);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const formatNotifTime=(d)=>{
@@ -6287,7 +6299,7 @@ useEffect(()=>{
     })));
     setPosts((socials||[]).map(p=>({...p,dept:p.department})));
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const userCamps=user.dept==="BOTH"?campaigns:campaigns.filter(c=>c.department===user.dept||c.department==="BOTH");
@@ -6953,7 +6965,7 @@ useEffect(()=>{
     .select("id,title,description,probability,impact,department,engagement_id,company_id,status,created_at")
     .order("created_at",{ascending:false})
     .then(({data})=>{setItems(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+    .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 const filtered=items.filter(i=>{
@@ -7248,7 +7260,7 @@ const submit=async()=>{
     if(error) throw new Error(error.message);
     onCreated(data);
     onClose();
-  }catch(e){ alert("Fout: "+e.message); }
+  }catch(e){ if(showToast) showToast("Fout: "+e.message); else console.error(e.message); }
   setSaving(false);
 };
 
@@ -7362,7 +7374,7 @@ useEffect(()=>{
     setInvoices(inv||[]);
     setCompanies(comp||[]);
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[]);
 
 // ── Derived calculations ──────────────────────────────────────────────────────
@@ -7696,7 +7708,7 @@ useEffect(()=>{
     setDocs(d||[]);
     setActions(a||[]);
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company.id]);
 
 const formatBytes=(b)=>{
@@ -8094,7 +8106,7 @@ function useClientCompany(userId){
       .limit(1)
       .single()
       .then(({data})=>{setCompany(data||null);setLoading(false);})
-      .catch(()=>setLoading(false));
+      .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
   },[userId]);
   return {company,loading};
 }
@@ -8138,7 +8150,7 @@ useEffect(()=>{
   ]).then(([{data:a},{data:e},{data:i},{data:d}])=>{
     setActions(a||[]);setEngs(e||[]);setInvs(i||[]);setDocs(d||[]);
     setDataLoading(false);
-  }).catch(()=>setDataLoading(false));
+  }).catch(e=>{setDataLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
 
 const pendingActions=actions.filter(a=>a.status!=="completed");
@@ -8288,7 +8300,7 @@ useEffect(()=>{
     .eq("visibility","client")
     .order("uploaded_at",{ascending:false})
     .then(({data})=>{setDocs(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+    .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
 
 const formatBytes=(b)=>{
@@ -8383,7 +8395,7 @@ useEffect(()=>{
     .eq("company_id",company.id)
     .order("created_at",{ascending:false})
     .then(({data})=>{setInvs(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+    .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
 
 const formatDate=(d)=>d?new Date(d).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—";
@@ -8491,7 +8503,7 @@ useEffect(()=>{
     }));
     setActions([...(ca||[]),...docActions]);
     setLoading(false);
-  }).catch(()=>setLoading(false));
+  }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
 
 const markDone=async(id,actionType)=>{
@@ -8635,7 +8647,7 @@ useEffect(()=>{
     .then(({data})=>{
       setEngagements(data||[]);
       if(data?.length>0) setActiveEng(data[0].id);
-    }).catch(()=>{});
+    }).catch(e=>console.warn("DB [document_requests]:", e?.message||e));
 },[company?.id]);
 
 useEffect(()=>{
@@ -8647,7 +8659,7 @@ useEffect(()=>{
     .eq("visible_to_client",true)
     .order("created_at",{ascending:true})
     .then(({data})=>{setMessages(data||[]);setLoading(false);})
-    .catch(()=>setLoading(false));
+    .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[activeEng]);
 
 useEffect(()=>{
@@ -9249,11 +9261,9 @@ const changePassword=async()=>{
   if(pwdNew!==pwdConfirm) return setPwdError("Wachtwoorden komen niet overeen");
   setPwdSaving(true);setPwdError("");
   try{
-    const res=await fetch(`${SB_URL}/auth/v1/user`,{method:"PUT",
-      headers:{"Content-Type":"application/json","apikey":SB_ANON,"Authorization":`Bearer ${_authToken}`},
-      body:JSON.stringify({password:pwdNew})});
-    const d=await res.json();
-    if(!res.ok) throw new Error(d.message||d.error_description||"Fout");
+    const {error:pwdErr}=await supabase.auth.updateUser({password:pwdNew});
+    if(pwdErr) throw new Error(pwdErr.message||"Fout bij wijzigen");
+    const d={};
     showToast("Wachtwoord gewijzigd ✓");
     setPwdNew("");setPwdConfirm("");
   }catch(e){setPwdError(e.message);}
@@ -9355,7 +9365,7 @@ return(
                         await supabase.from("user_profiles").update({avatar_url:publicUrl}).eq("id",user.id);
                         showToast("Profielfoto bijgewerkt ✓");
                       } else {
-                        const err=await res.json().catch(()=>({}));
+                        const err=await res.json().catch(e=>console.warn("auth error:",e?.message||e));
                         showToast(`Upload mislukt: ${err.message||res.statusText}`);
                       }
                     }catch(ex){showToast("Upload mislukt. Probeer opnieuw.");}
@@ -9518,6 +9528,8 @@ if(!profile){
     language:'NL',
   };
 }
+// Update _authToken for raw DELETE fetch calls
+setAuthToken(data.session?.access_token || data.user?.id);
 onLogin({
   id:profile.id, name:profile.full_name, email:profile.email,
   role:profile.role, dept:profile.department, company_id:profile.company_id,
@@ -9876,5 +9888,5 @@ const [language,setLanguage]=useState("NL");
 const handleLogin=(u)=>{ setUser(u); };
 
 if(!user) return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage}/>;
-return <ErrorBoundary><AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setUser(null);}}/></ErrorBoundary>;
+return <ErrorBoundary><AppShell user={user} language={language} setLanguage={setLanguage} onLogout={async()=>{try{await supabase.auth.signOut();}catch(e){}setAuthToken(null);setUser(null);}}/></ErrorBoundary>;
 }
