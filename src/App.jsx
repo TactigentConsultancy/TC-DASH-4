@@ -5008,10 +5008,6 @@ function DocRequestsPage({user,engData,showToast}){
 return(
 <div>
   <PageHeader kicker="Documentbeheer" title="Documentverzoeken"/>
-  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:9,background:C.indigoBg,border:`1px solid ${C.indigo}30`,marginBottom:16,fontSize:11,color:C.indigo,fontWeight:600}}>
-    <Shield size={13}/>
-    Documentverzoeken verschijnen als actiepunten in het cliëntportaal. De cliënt ontvangt automatisch een notificatie.
-  </div>
   <DocRequestsPanel user={user} engData={engData} showToast={showToast}/>
 </div>
 );
