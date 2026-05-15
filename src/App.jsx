@@ -757,7 +757,7 @@ return(
 {user.role==="client"&&<>
 <SideSection label={t("myPortal")}/>
 <SideBtn icon={Layers} label={t("dashboard")} isActive={view==="c_dash"} onClick={()=>setView("c_dash")}/>
-<SideBtn icon={CheckSquare} label={t("myActions")} isActive={view==="c_actions"} onClick={()=>setView("c_actions")}/>
+<SideBtn icon={CheckSquare} label={t("myActions")} isActive={view==="c_actions"} onClick={()=>setView("c_actions")} badge={clientActionsData.filter(a=>a.status==="pending"||a.status==="open").length||0}/>
 <SideBtn icon={FileText} label={t("myDocs")} isActive={view==="c_docs"} onClick={()=>setView("c_docs")}/>
 <SideSection label="Financiën"/>
 <SideBtn icon={Receipt} label={t("financeNav")} isActive={view==="c_finance"} onClick={()=>setView("c_finance")}/>
@@ -1232,6 +1232,34 @@ useEffect(()=>{
         amount:i.amount||0, status:i.status, due:i.due_date,
       })));
 
+      // Load client portal data if user is a client
+      if(user.role==='client'){
+        try{
+          const {data:myCompany}=await supabase.from('companies')
+            .select('id,name,department,health,lifecycle_status,kkf_number,contact_name,contact_email,portal_user_id')
+            .eq('portal_user_id',user.id).single();
+          if(myCompany){
+            setClientCompany(myCompany);
+            const [{data:ca},{data:dr}]=await Promise.all([
+              supabase.from('client_actions')
+                .select('id,title,description,action_type,status,deadline,department,engagement_id')
+                .eq('company_id',myCompany.id).eq('is_visible_to_client',true)
+                .order('deadline',{ascending:true}),
+              supabase.from('document_requests')
+                .select('id,title,description,document_type,deadline,status')
+                .eq('company_id',myCompany.id).eq('status','pending')
+                .order('deadline',{ascending:true}),
+            ]);
+            const docActions=(dr||[]).map(r=>({
+              id:'dr_'+r.id,title:r.title,
+              description:r.description||('Upload '+r.document_type),
+              action_type:'upload',status:'pending',
+              deadline:r.deadline,isDocRequest:true,docRequestId:r.id,
+            }));
+            setClientActionsData([...(ca||[]),...docActions]);
+          }
+        }catch(e){console.warn('Client portal load:',e?.message||e);}
+      }
       setDbReady(true);
     }catch(e){ console.warn("loadAll error:",e.message); setDbReady(true); }
   };
@@ -1307,6 +1335,8 @@ return()=>{active=false;};
 },[user.id]);
 
 const [showNewEng,setShowNewEng]=useState(false);
+const [clientActionsData,setClientActionsData]=useState([]);
+const [clientCompany,setClientCompany]=useState(null);
 const unreadCount=notifData.filter(n=>!n.read&&!n.is_read).length;
 const handleSetView=(v)=>{
 setView(v);setDetailEng(null);setDetailCompany(null);setDetailLead(null);
@@ -1347,10 +1377,10 @@ case "asset_flow":   return (user.role==="super_admin"
       <div style={{fontSize:12,color:C.secondary}}>Vermogensstroom is alleen beschikbaar voor de CEO.</div>
     </div>
 );
-case "c_dash":       return <ClientDashboard user={user}/>;
+case "c_dash":       return <ClientDashboard user={user} actionsData={clientActionsData} onNavigate={(v)=>setView(v)}/>;
 case "c_docs":       return <ClientDocsView user={user}/>;
 case "c_finance":    return <ClientFinanceView user={user} invData={invData}/>;
-case "c_actions":    return <ClientActionsPortal user={user} showToast={showToast}/>;
+case "c_actions":    return <ClientActionsPortal user={user} showToast={showToast} initialActions={clientActionsData} initialCompany={clientCompany} onActionsChange={setClientActionsData}/>;
 case "c_messages":   return <ClientMessagesView user={user} showToast={showToast}/>;
 default: return <div style={{padding:40,color:C.secondary,fontStyle:"italic",display:"flex",alignItems:"center",gap:10}}><ClipboardList size={20}/> {view} — beschikbaar in volgende sprint</div>;
 }
@@ -8112,7 +8142,7 @@ function useClientCompany(userId){
 }
 
 // ─── CLIENT DASHBOARD ────────────────────────────────────────────────────────
-function ClientDashboard({user}){
+function ClientDashboard({user,actionsData=[],onNavigate=null}){
 const t=useT();
 const {company,loading:compLoading}=useClientCompany(user.id);
 const [actions,setActions]=useState([]);
@@ -8281,8 +8311,43 @@ return(
       </div>
     </div>
   </div>
+
+{/* Openstaande Actiepunten preview */}
+{actionsData.filter(a=>a.status==="pending"||a.status==="open").length>0&&(
+<div style={{marginTop:20}}>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+    <div style={{fontFamily:F.display,fontSize:16,fontWeight:600,color:C.text}}>Openstaande Actiepunten</div>
+    {onNavigate&&<button onClick={()=>onNavigate("c_actions")}
+      style={{fontSize:11,color:C.crimson,fontWeight:700,background:"none",border:"none",cursor:"pointer"}}>
+      Alle bekijken →
+    </button>}
+  </div>
+  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+    {actionsData.filter(a=>a.status==="pending"||a.status==="open").slice(0,3).map(a=>{
+      const overdue=a.deadline&&new Date(a.deadline)<new Date();
+      return(
+        <div key={a.id} onClick={()=>onNavigate&&onNavigate("c_actions")}
+          style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:12,
+            background:C.surface,border:`1px solid ${overdue?C.red:C.border}`,cursor:"pointer",
+            boxShadow:"0 1px 4px rgba(58,46,40,.06)"}}>
+          <div style={{width:32,height:32,borderRadius:8,background:overdue?C.redBg:C.crimsonFaint,
+            display:"flex",alignItems:"center",justifyContent:"center",color:overdue?C.red:C.crimson,flexShrink:0}}>
+            {a.action_type==="upload"?<Upload size={13}/>:a.action_type==="sign"?<FileText size={13}/>:<CheckSquare size={13}/>}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.title}</div>
+            {a.deadline&&<div style={{fontSize:10,color:overdue?C.red:C.secondary,marginTop:2,fontWeight:overdue?700:400}}>
+              {overdue?"Achterstallig — ":""}{new Date(a.deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})}
+            </div>}
+          </div>
+          <ChevronRight size={14} color={C.secondary}/>
+        </div>
+      );
+    })}
+  </div>
 </div>
-);
+)}
+</div>);
 }
 
 // ─── CLIENT DOCS VIEW ─────────────────────────────────────────────────────────
@@ -8473,11 +8538,21 @@ return(
 }
 
 // ─── CLIENT ACTIONS PORTAL ────────────────────────────────────────────────────
-function ClientActionsPortal({user,showToast}){
+function ClientActionsPortal({user,showToast,initialActions=[],initialCompany=null,onActionsChange=null}){
 const t=useT();
-const {company,loading:compLoading}=useClientCompany(user.id);
-const [actions,setActions]=useState([]);
-const [loading,setLoading]=useState(true);
+const {company:hookCompany,loading:compLoading}=useClientCompany(user.id);
+const company=initialCompany||hookCompany;
+const [actions,setActions]=useState(initialActions);
+const [loading,setLoading]=useState(initialActions.length===0);
+
+// Sync parent state when actions change locally
+const updateActions=(fn)=>{
+  setActions(prev=>{
+    const next=typeof fn==='function'?fn(prev):fn;
+    if(onActionsChange) onActionsChange(next);
+    return next;
+  });
+};
 const [filter,setFilter]=useState("ALL");
 
 useEffect(()=>{
