@@ -8555,8 +8555,18 @@ const updateActions=(fn)=>{
 };
 const [filter,setFilter]=useState("ALL");
 
+// Sync from AppShell prop when loadAll() finishes after component mounted
+useEffect(()=>{
+  if(initialActions.length>0){
+    setActions(initialActions);
+    setLoading(false);
+  }
+},[initialActions]);
+
+// Fetch fresh from DB when company is known
 useEffect(()=>{
   if(!company?.id) return;
+  setLoading(true);
   Promise.all([
     supabase.from("client_actions")
       .select("id,title,description,action_type,status,deadline,department,engagement_id")
@@ -8569,14 +8579,15 @@ useEffect(()=>{
       .eq("status","pending")
       .order("deadline",{ascending:true}),
   ]).then(([{data:ca},{data:dr}])=>{
-    // Merge doc requests as action items
     const docActions=(dr||[]).map(r=>({
       id:"dr_"+r.id, title:r.title,
       description:r.description||("Upload "+r.document_type+" document"),
       action_type:"upload", status:"pending",
       deadline:r.deadline, isDocRequest:true, docRequestId:r.id,
     }));
-    setActions([...(ca||[]),...docActions]);
+    const merged=[...(ca||[]),...docActions];
+    setActions(merged);
+    if(onActionsChange) onActionsChange(merged);
     setLoading(false);
   }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
