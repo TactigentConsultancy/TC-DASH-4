@@ -8563,9 +8563,11 @@ useEffect(()=>{
   }
 },[initialActions]);
 
-// Fetch fresh from DB when company is known
+// Fetch from DB only if prop data hasn't arrived yet
+// (fallback for when loadAll() fails or client navigates before it completes)
 useEffect(()=>{
   if(!company?.id) return;
+  if(actions.length>0) return; // already have data — don't overwrite
   setLoading(true);
   Promise.all([
     supabase.from("client_actions")
@@ -8586,8 +8588,10 @@ useEffect(()=>{
       deadline:r.deadline, isDocRequest:true, docRequestId:r.id,
     }));
     const merged=[...(ca||[]),...docActions];
-    setActions(merged);
-    if(onActionsChange) onActionsChange(merged);
+    if(merged.length>0){ // only update if we actually got data
+      setActions(merged);
+      if(onActionsChange) onActionsChange(merged);
+    }
     setLoading(false);
   }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
