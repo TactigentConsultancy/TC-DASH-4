@@ -1207,28 +1207,30 @@ useEffect(()=>{
         health:c.health||"green", contact:c.contact_name, email:c.contact_email,
         logoUrl:c.logo_url, avatar:(c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
       })));
+      const compNameMap={};
+      (cos||[]).forEach(c=>{compNameMap[c.id]=c.name;});
 
-      // Load engagements with company name
+      // Load engagements (no join — fetch company name from map)
       const {data:engs}=await supabase
         .from("engagements")
-        .select("id,name,department,type,status,health,phase,company_id,assigned_to,created_at,companies(name)")
+        .select("id,name,department,type,status,health,phase,company_id,assigned_to,created_at")
         .order("created_at",{ascending:false});
       if(engs?.length) setEngData(engs.map(e=>({
         id:e.id, name:e.name, dept:e.department, type:e.type,
         status:e.status||"active", health:e.health||"green", phase:e.phase,
-        company_id:e.company_id, client:e.companies?.name||"—",
+        company_id:e.company_id, client:compNameMap[e.company_id]||"—",
         ref:`${e.department}-${e.id.slice(0,4).toUpperCase()}`,
         assignee:"—",
       })));
 
-      // Load invoices
+      // Load invoices (no join — fetch company name from map)
       const {data:invs}=await supabase
         .from("invoices")
-        .select("id,ref,company_id,amount,status,due_date,companies(name)")
+        .select("id,ref,company_id,amount,status,due_date")
         .order("created_at",{ascending:false});
       if(invs?.length) setInvData(invs.map(i=>({
         id:i.id, ref:i.ref, company_id:i.company_id,
-        client:i.companies?.name||"—",
+        client:compNameMap[i.company_id]||"—",
         amount:i.amount||0, status:i.status, due:i.due_date,
       })));
 
@@ -1351,7 +1353,7 @@ if(detailCompany) return <CompanyDetail company={detailCompany} user={user} onBa
 if(detailEng) return <EngagementDetail eng={detailEng} user={user} onBack={()=>setDetailEng(null)} showToast={showToast} engData={engData} setEngData={setEngData}/>;
 if(detailLead) return <LeadDetail lead={detailLead} onBack={()=>setDetailLead(null)} showToast={showToast}/>;
 switch(view){
-case "dashboard":    return <StaffDashboard user={user} setView={v=>setView(v)} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)} engData={engData}/>;
+case "dashboard":    return <StaffDashboard user={user} setView={v=>setView(v)} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)} engData={engData} dbReady={dbReady}/>;
 case "analyses":     return <AnalysesView user={user} engData={engData} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)}/>;
 case "projects":     return <EngagementList user={user} dept="TC" engData={engData} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)}/>;
 case "dossiers":     return <EngagementList user={user} dept="FF" engData={engData} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)}/>;
@@ -1498,7 +1500,7 @@ const FALLBACK_NEWS=[
 {id:"5",tag:"OFFSHORE",tagColor:"#4A3C35",title:"Offshore kansen voor lokale toeleveranciers",body:"Nieuwe offshore ontdekkingen bieden groeikansen voor MKB-bedrijven.",time:"Recent",dept:"TC",urgent:false,source:"Energie Rapport"},
 ];
 
-function StaffDashboard({user,setView,setDetailEng,engData}){
+function StaffDashboard({user,setView,setDetailEng,engData,dbReady}){
 const t=useT();
 const [tasks,setTasks]=useState([]);
 const [queueCount,setQueueCount]=useState(0);
@@ -1566,6 +1568,13 @@ const fmtAmt=(n)=>`SRD ${Number(n||0).toLocaleString()}`;
 
 const news=allNews.filter(n=>newsFilter==="ALL"||(newsFilter==="urgent"&&n.urgent)||(newsFilter==="TC"&&(n.dept==="TC"||n.dept==="BOTH"))||(newsFilter==="FF"&&(n.dept==="FF"||n.dept==="BOTH")));
 const tagIcon={WETGEVING:<Scale size={10}/>,MARKT:<TrendingUp size={10}/>,STRATEGIE:<Target size={10}/>,COMPLIANCE:<Shield size={10}/>,OFFSHORE:<Activity size={10}/>,CARICOM:<Globe size={10}/>,BELASTING:<Receipt size={10}/>};
+
+if(!dbReady) return (
+  <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",flexDirection:"column",gap:12}}>
+    <div style={{width:32,height:32,border:`3px solid ${C.crimson}30`,borderTopColor:C.crimson,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+    <div style={{fontSize:13,color:C.secondary}}>Laden...</div>
+  </div>
+);
 
 return(
 <div>
@@ -1941,25 +1950,31 @@ const [staff,setStaff]=useState([]);
 const [clients,setClients]=useState([]);
 const [templates,setTemplates]=useState([]);
 const [selectedTemplate,setSelectedTemplate]=useState("");
+const [dropLoading,setDropLoading]=useState(true);
 
 // Load staff and clients from Supabase
 useEffect(()=>{
   const load=async()=>{
+    setDropLoading(true);
     try{
       // Load staff from permanent view
       const {data:staffData}=await supabase
         .from("v_staff_dropdown")
         .select("id,full_name,department,title,avatar_initials");
       setStaff(staffData||[]);
-      // Load from permanent view — always shows every company
+      // Load clients directly from companies (no view)
       const {data:compData}=await supabase
-        .from("v_client_dropdown")
-        .select("company_id,display_name,department,assignable_id");
+        .from("companies")
+        .select("id,name,department,portal_user_id")
+        .order("name");
       setClients((compData||[]).map(c=>({
-        id: c.assignable_id,
-        company_id: c.company_id,
-        full_name: c.display_name,
-        avatar_initials: (c.display_name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
+        id: c.id,
+        company_id: c.id,
+        full_name: c.name+(c.portal_user_id?" ✓":""),
+        department: c.department,
+        has_portal: !!c.portal_user_id,
+        portal_user_id: c.portal_user_id,
+        avatar_initials: (c.name||"??").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(),
       })));
       // Load task templates
       const {data:tmplData}=await supabase
@@ -1968,6 +1983,7 @@ useEffect(()=>{
         .order("name");
       setTemplates(tmplData||[]);
     }catch(e){ console.warn("load error",e); }
+    finally{ setDropLoading(false); }
   };
   load();
 },[]);
@@ -1984,10 +2000,7 @@ const submit=async()=>{
     // company_id for engagement (required NOT NULL)
     const companyId=selectedClient?.company_id||'00000000-0000-0000-0000-000000000000';
     // client_id = portal_user_id only (must be a user_profiles UUID or null)
-    // assignable_id can be company_id when no portal account exists — don't use it as client_id
-    const portalUserId=selectedClient?.has_portal!==false ? (
-      selectedClient?.id === selectedClient?.company_id ? null : clientId||null
-    ) : null;
+    const portalUserId=selectedClient?.portal_user_id||null;
 
     const {data,error}=await supabase
       .from("engagements")
@@ -2173,10 +2186,15 @@ return(
     {/* Assign client */}
     <div>
       <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>KOPPEL AAN CLIËNT <span style={{color:C.muted,fontWeight:400,textTransform:"none",fontSize:9}}>(optioneel)</span></div>
-      <select value={clientId} onChange={e=>setClientId(e.target.value)}
+      <select value={clientId} onChange={e=>setClientId(e.target.value)} disabled={dropLoading}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
-        <option value="">— Geen cliënt koppelen —</option>
-        {clients.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+        {dropLoading
+          ? <option disabled>Laden...</option>
+          : <>
+              <option value="">— Geen cliënt koppelen —</option>
+              {clients.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+            </>
+        }
       </select>
     </div>
   </div>
@@ -2255,17 +2273,27 @@ const [newTaskTitle,setNewTaskTitle]=useState(""); const [newTaskPrio,setNewTask
 // Load tasks + client actions from DB
 useEffect(()=>{
   if(!eng.id) return;
-  // Load tasks
+  // Load tasks (no join — fetch assignee profiles separately)
   supabase.from("tasks")
-    .select("id,title,priority,status,due_date,assigned_to,user_profiles(full_name,avatar_initials)")
+    .select("id,title,priority,status,due_date,assigned_to")
     .eq("engagement_id",eng.id)
     .order("created_at",{ascending:true})
-    .then(({data})=>{
-      if(data?.length) setLocalTasks(data.map(t=>({
+    .then(async ({data})=>{
+      const tasks=data||[];
+      const assignedIds=[...new Set(tasks.map(t=>t.assigned_to).filter(Boolean))];
+      let nameMap={};
+      if(assignedIds.length>0){
+        const {data:profiles}=await supabase
+          .from("user_profiles")
+          .select("id,full_name,avatar_initials")
+          .in("id",assignedIds);
+        (profiles||[]).forEach(p=>{nameMap[p.id]=p;});
+      }
+      if(tasks.length) setLocalTasks(tasks.map(t=>({
         id:t.id, title:t.title, priority:t.priority||"normal",
         status:t.status||"open",
         due:t.due_date?new Date(t.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
-        assignee:t.user_profiles?.avatar_initials||"—",
+        assignee:nameMap[t.assigned_to]?.avatar_initials||"—",
         subtasks:[],
       })));
     }).catch(e=>console.warn("DB [tasks]:", e?.message||e));
@@ -2804,19 +2832,29 @@ const [newEngId,setNewEngId]=useState("");
 const [engList,setEngList]=useState([]);
 useEffect(()=>{ supabase.from("engagements").select("id,name,department").then(({data})=>setEngList(data||[])); },[]);
 
-// Load tasks from DB
+// Load tasks from DB (no join — fetch assignee profiles separately)
 useEffect(()=>{
   supabase.from("tasks")
-    .select("id,title,priority,status,due_date,assigned_to,engagement_id,user_profiles(full_name,avatar_initials)")
+    .select("id,title,priority,status,due_date,assigned_to,engagement_id")
     .order("created_at",{ascending:false})
-    .then(({data})=>{
-      if(data?.length) setTasks(data.map(tk=>({
+    .then(async ({data})=>{
+      const tasks=data||[];
+      const assignedIds=[...new Set(tasks.map(t=>t.assigned_to).filter(Boolean))];
+      let nameMap={};
+      if(assignedIds.length>0){
+        const {data:profiles}=await supabase
+          .from("user_profiles")
+          .select("id,full_name,avatar_initials")
+          .in("id",assignedIds);
+        (profiles||[]).forEach(p=>{nameMap[p.id]=p;});
+      }
+      if(tasks.length) setTasks(tasks.map(tk=>({
         id:tk.id,title:tk.title,priority:tk.priority||"normal",
         status:tk.status||"open",
         due:tk.due_date?new Date(tk.due_date).toLocaleDateString("nl-SR",{day:"2-digit",month:"short"}):"—",
         due_date_raw:tk.due_date||null,
-        assignee:tk.user_profiles?.avatar_initials||"—",
-        assignee_name:tk.user_profiles?.full_name||"",
+        assignee:nameMap[tk.assigned_to]?.avatar_initials||"—",
+        assignee_name:nameMap[tk.assigned_to]?.full_name||"",
         assigned_to:tk.assigned_to,
       })));
     }).catch(e=>console.warn("DB [engagements]:", e?.message||e));
@@ -2967,24 +3005,36 @@ return(
 
 function ClientAssignSelect({engId,value,onChange}){
   const [clients,setClients]=useState([]);
+  const [dropLoading,setDropLoading]=useState(true);
   useEffect(()=>{
-    supabase.from("v_client_dropdown")
-      .select("company_id,display_name,department,assignable_id")
-      .order("display_name")
+    setDropLoading(true);
+    supabase.from("companies")
+      .select("id,name,department,portal_user_id")
+      .order("name")
       .then(({data})=>{
-        if(data) setClients(data.map(c=>({
-          id: c.assignable_id,
-          company_id: c.company_id,
-          full_name: c.display_name,
+        setClients((data||[]).map(c=>({
+          id: c.id,
+          company_id: c.id,
+          full_name: c.name+(c.portal_user_id?" ✓":""),
+          department: c.department,
+          has_portal: !!c.portal_user_id,
+          portal_user_id: c.portal_user_id,
         })));
-      });
+        setDropLoading(false);
+      })
+      .catch(e=>{console.warn("companies load:",e?.message||e); setDropLoading(false);});
   },[]);
   return(
-    <select value={value||""} onChange={e=>onChange(e.target.value)}
+    <select value={value||""} onChange={e=>onChange(e.target.value)} disabled={dropLoading}
       style={{width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${C.border}`,
         fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,fontFamily:F.body}}>
-      <option value="">— Geen specifieke cliënt —</option>
-      {clients.map(c=>(<option key={c.id} value={c.id}>{c.full_name}</option>))}
+      {dropLoading
+        ? <option disabled>Laden...</option>
+        : <>
+            <option value="">— Geen specifieke cliënt —</option>
+            {clients.map(c=>(<option key={c.id} value={c.id}>{c.full_name}</option>))}
+          </>
+      }
     </select>
   );
 }
@@ -2999,15 +3049,20 @@ const [assignedClient,setAssignedClient]=useState("");
 const [staffList,setStaffList]=useState([]);
 const [clientList,setClientList]=useState([]);
 const [assignedStaff,setAssignedStaff]=useState("");
+const [dropLoading,setDropLoading]=useState(true);
 
 useEffect(()=>{
   const h=e=>{if(e.key==="Escape")onClose();};
   window.addEventListener("keydown",h);
   document.body.classList.add("modal-open");
   // Load staff and clients
+  setDropLoading(true);
+  let staffDone=false, clientsDone=false;
+  const checkDone=()=>{ if(staffDone&&clientsDone) setDropLoading(false); };
   supabase.from("v_staff_dropdown")
     .select("id,full_name,department,avatar_initials,role")
-    .then(({data})=>setStaffList(data||[]));
+    .then(({data})=>{setStaffList(data||[]); staffDone=true; checkDone();})
+    .catch(e=>{console.warn("staff load:",e?.message||e); staffDone=true; checkDone();});
   // Load all companies directly (not just portal ones)
   supabase.from("companies")
     .select("id,name,department,contact_name,portal_user_id")
@@ -3020,7 +3075,8 @@ useEffect(()=>{
         department: c.department,
         has_portal: !!c.portal_user_id,
       })));
-    }).catch(e=>console.warn("DB [engagements]:", e?.message||e));
+      clientsDone=true; checkDone();
+    }).catch(e=>{console.warn("DB [engagements]:", e?.message||e); clientsDone=true; checkDone();});
   return()=>{ window.removeEventListener("keydown",h); document.body.classList.remove("modal-open"); };
 },[]);
 const ACTION_TYPES=[
@@ -3134,18 +3190,28 @@ return(
 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
 <div>
 <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
-<select value={assignedClient} onChange={e=>setAssignedClient(e.target.value)}
+<select value={assignedClient} onChange={e=>setAssignedClient(e.target.value)} disabled={dropLoading}
   style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${assignedClient?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-  <option value="">— Selecteer —</option>
-  {clientList.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+  {dropLoading
+    ? <option disabled>Laden...</option>
+    : <>
+        <option value="">— Selecteer —</option>
+        {clientList.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+      </>
+  }
 </select>
 </div>
 <div>
 <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>MEDEWERKER</div>
-<select value={assignedStaff} onChange={e=>setAssignedStaff(e.target.value)}
+<select value={assignedStaff} onChange={e=>setAssignedStaff(e.target.value)} disabled={dropLoading}
   style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-  <option value="">— Optioneel —</option>
-  {staffList.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}
+  {dropLoading
+    ? <option disabled>Laden...</option>
+    : <>
+        <option value="">— Optioneel —</option>
+        {staffList.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}
+      </>
+  }
 </select>
 </div>
 </div>
@@ -4545,6 +4611,7 @@ const [saving,setSaving]=useState(false);
 
 const stages=dept==="FF"?FF_STAGES:TC_STAGES;
 const isValid=name.trim().length>1;
+const dropLoading=!Array.isArray(members)||members.length===0;
 
 useEffect(()=>{
   const h=e=>{if(e.key==="Escape")onClose();};
@@ -4669,10 +4736,15 @@ return(
     {/* Assign */}
     <div>
       <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>TOEWIJZEN AAN</div>
-      <select value={assignedTo} onChange={e=>setAssignedTo(e.target.value)}
+      <select value={assignedTo} onChange={e=>setAssignedTo(e.target.value)} disabled={dropLoading}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-        <option value="">— Selecteer adviseur —</option>
-        {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+        {dropLoading
+          ? <option disabled>Laden...</option>
+          : <>
+              <option value="">— Selecteer adviseur —</option>
+              {members.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+            </>
+        }
       </select>
     </div>
     {/* Notes */}
@@ -4893,13 +4965,15 @@ const [deadline,setDeadline]=useState("");
 const [companies,setCompanies]=useState([]);
 const [engs,setEngs]=useState([]);
 const [saving,setSaving]=useState(false);
+const [dropLoading,setDropLoading]=useState(true);
 
 useEffect(()=>{
+  setDropLoading(true);
   supabase.from("companies")
     .select("id,name,department,contact_name,portal_user_id")
     .order("name")
-    .then(({data})=>setCompanies(data||[]))
-    .catch(e=>console.warn("DB [leads]:", e?.message||e));
+    .then(({data})=>{setCompanies(data||[]); setDropLoading(false);})
+    .catch(e=>{console.warn("DB [leads]:", e?.message||e); setDropLoading(false);});
 },[]);
 useEffect(()=>{
   if(!companyId) return;
@@ -4995,10 +5069,15 @@ return(
     {/* Company */}
     <div>
       <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
-      <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
+      <select value={companyId} onChange={e=>setCompanyId(e.target.value)} disabled={dropLoading}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${companyId?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-        <option value="">— Selecteer cliënt —</option>
-        {filteredCompanies.map(c=><option key={c.id} value={c.id}>{c.name}{c.portal_user_id?" (portaal)":""}</option>)}
+        {dropLoading
+          ? <option disabled>Laden...</option>
+          : <>
+              <option value="">— Selecteer cliënt —</option>
+              {filteredCompanies.map(c=><option key={c.id} value={c.id}>{c.name}{c.portal_user_id?" (portaal)":""}</option>)}
+            </>
+        }
       </select>
     </div>
 
@@ -5065,9 +5144,22 @@ const [filter,setFilter]=useState("ALL");
 
 const loadRequests=()=>{
   supabase.from("document_requests")
-    .select("id,title,description,document_type,department,status,deadline,created_at,company_id,engagement_id,companies(name,department)")
+    .select("id,title,description,document_type,department,status,deadline,created_at,company_id,engagement_id")
     .order("created_at",{ascending:false})
-    .then(({data})=>{setRequests(data||[]);setLoading(false);})
+    .then(async ({data})=>{
+      const reqs=data||[];
+      const companyIds=[...new Set(reqs.map(r=>r.company_id).filter(Boolean))];
+      let compMap={};
+      if(companyIds.length>0){
+        const {data:comps}=await supabase
+          .from("companies")
+          .select("id,name,department")
+          .in("id",companyIds);
+        (comps||[]).forEach(c=>{compMap[c.id]={name:c.name,department:c.department};});
+      }
+      setRequests(reqs.map(r=>({...r, companies:compMap[r.company_id]||null})));
+      setLoading(false);
+    })
     .catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 };
 useEffect(()=>{ loadRequests(); },[]);
@@ -5977,6 +6069,7 @@ const submit=async()=>{
 
 const filtCos=companies.filter(c=>dept==="BOTH"||c.department===dept);
 const filtEngs=engagements.filter(e=>dept==="BOTH"||e.department===dept);
+const dropLoading=!Array.isArray(companies)||companies.length===0;
 
 return(
 <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
@@ -6001,18 +6094,28 @@ return(
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
       <div>
         <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>CLIËNT <span style={{color:C.crimson}}>*</span></div>
-        <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
+        <select value={companyId} onChange={e=>setCompanyId(e.target.value)} disabled={dropLoading}
           style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${companyId?C.crimson:C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-          <option value="">— Selecteer cliënt —</option>
-          {filtCos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          {dropLoading
+            ? <option disabled>Laden...</option>
+            : <>
+                <option value="">— Selecteer cliënt —</option>
+                {filtCos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </>
+          }
         </select>
       </div>
       <div>
         <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>ENGAGEMENT</div>
-        <select value={engId} onChange={e=>setEngId(e.target.value)}
+        <select value={engId} onChange={e=>setEngId(e.target.value)} disabled={dropLoading}
           style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-          <option value="">— Optioneel —</option>
-          {filtEngs.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+          {dropLoading
+            ? <option disabled>Laden...</option>
+            : <>
+                <option value="">— Optioneel —</option>
+                {filtEngs.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </>
+          }
         </select>
       </div>
     </div>
@@ -7296,6 +7399,7 @@ const submit=async()=>{
 
 const LABELS_P=["","Zeer onwaarschijnlijk","Onwaarschijnlijk","Mogelijk","Waarschijnlijk","Zeer waarschijnlijk"];
 const LABELS_I=["","Verwaarloosbaar","Klein","Matig","Groot","Catastrofaal"];
+const dropLoading=!Array.isArray(engData)||engData.length===0;
 
 return(
 <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}} onClick={onClose}>
@@ -7364,12 +7468,17 @@ return(
     {/* Link to engagement (optional) */}
     <div>
       <div style={{fontSize:9,fontWeight:700,color:C.secondary,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>KOPPEL AAN ENGAGEMENT (optioneel)</div>
-      <select value={engId} onChange={e=>setEngId(e.target.value)}
+      <select value={engId} onChange={e=>setEngId(e.target.value)} disabled={dropLoading}
         style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:12,outline:"none",cursor:"pointer",background:C.bg,color:C.text,boxSizing:"border-box"}}>
-        <option value="">— Geen koppeling —</option>
-        {(engData||[]).filter(e=>dept==="BOTH"||e.dept===dept).map(e=>(
-          <option key={e.id} value={e.id}>{e.name}</option>
-        ))}
+        {dropLoading
+          ? <option disabled>Laden...</option>
+          : <>
+              <option value="">— Geen koppeling —</option>
+              {(engData||[]).filter(e=>dept==="BOTH"||e.dept===dept).map(e=>(
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </>
+        }
       </select>
     </div>
   </div>
