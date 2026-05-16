@@ -8651,8 +8651,8 @@ function ClientActionsPortal({user,showToast,initialActions=[],initialCompany=nu
 const t=useT();
 const {company:hookCompany,loading:compLoading}=useClientCompany(user.id);
 const company=initialCompany||hookCompany;
-const [actions,setActions]=useState(initialActions);
-const [loading,setLoading]=useState(initialActions.length===0);
+const [actions,setActions]=useState([]);
+const [loading,setLoading]=useState(true);
 
 // Sync parent state when actions change locally
 const updateActions=(fn)=>{
@@ -8664,19 +8664,10 @@ const updateActions=(fn)=>{
 };
 const [filter,setFilter]=useState("ALL");
 
-// Sync from AppShell prop when loadAll() finishes after component mounted
-useEffect(()=>{
-  if(initialActions.length>0){
-    setActions(initialActions);
-    setLoading(false);
-  }
-},[initialActions]);
-
-// Fetch from DB only if prop data hasn't arrived yet
-// (fallback for when loadAll() fails or client navigates before it completes)
+// Always load fresh from DB when company is known
+// Simple, no stale closure bugs, always correct
 useEffect(()=>{
   if(!company?.id) return;
-  if(actions.length>0) return; // already have data — don't overwrite
   setLoading(true);
   Promise.all([
     supabase.from("client_actions")
@@ -8697,10 +8688,8 @@ useEffect(()=>{
       deadline:r.deadline, isDocRequest:true, docRequestId:r.id,
     }));
     const merged=[...(ca||[]),...docActions];
-    if(merged.length>0){ // only update if we actually got data
-      setActions(merged);
-      if(onActionsChange) onActionsChange(merged);
-    }
+    setActions(merged);
+    if(onActionsChange) onActionsChange(merged);
     setLoading(false);
   }).catch(e=>{setLoading(false);console.warn("DB load error:",e?.message||e)});
 },[company?.id]);
