@@ -3101,7 +3101,12 @@ const selectedCompany=clientList.find(x=>x.id===assignedClient);
 const companyId=assignedClient||null;
 const portalUserId=selectedCompany?.portal_user_id||null;
 // Bepaal department: gebruik eng.dept als het beschikbaar is, anders TC als fallback
-const department=(eng.dept&&eng.dept!=="standalone")?eng.dept:"TC";
+// Department bepalen — meerdere fallbacks om null te voorkomen
+const department=(()=>{
+  const d=eng.dept||eng.department;
+  if(d&&d!=="standalone"&&["TC","FF","BOTH"].includes(d)) return d;
+  return "TC"; // safe fallback
+})();
 try{
   // DB insert met correcte velden
   const {data:caData,error:insertErr}=await supabase.from("client_actions").insert({
