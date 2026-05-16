@@ -3074,6 +3074,7 @@ useEffect(()=>{
         full_name: c.name+(c.portal_user_id?" ✓":""),
         department: c.department,
         has_portal: !!c.portal_user_id,
+        portal_user_id: c.portal_user_id||null,
       })));
       clientsDone=true; checkDone();
     }).catch(e=>{console.warn("DB [engagements]:", e?.message||e); clientsDone=true; checkDone();});
@@ -3101,10 +3102,19 @@ try{
   const {data:caData}=await supabase.from("client_actions").insert({
     title:newAction.title, description:newAction.desc,
     action_type:newAction.type, status:"pending",
-    deadline:deadline||null, engagement_id:eng.id,
-    client_id:assignedClient||null, assigned_to:assignedStaff||null,
-    department:eng.dept||"TC", is_visible_to_client:true,
-    company_id:eng.company_id||null,
+    deadline:deadline||null,
+    // Fix: use null instead of "standalone" when no real engagement selected
+    engagement_id:(eng.id&&eng.id!=="standalone")?eng.id:null,
+    // Fix: client_id = portal_user_id of the selected company
+    // Look up from clientList which has portal_user_id
+    client_id:(()=>{
+      const c=clientList.find(x=>x.id===assignedClient||x.company_id===assignedClient);
+      return c?.portal_user_id||null;
+    })(),
+    assigned_to:assignedStaff||null,
+    department:eng.dept||dept||"TC", is_visible_to_client:true,
+    // Fix: company_id = the selected company UUID (assignedClient)
+    company_id:assignedClient||eng.company_id||null,
   }).select("id").single();
 
   // Send notification to client if company has portal user
