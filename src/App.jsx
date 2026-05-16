@@ -1394,7 +1394,7 @@ return(
 <Sidebar user={user} view={view} setView={handleSetView} onLogout={onLogout} unreadCount={unreadCount} onNewEng={()=>setShowNewEng(true)} collapsed={sideCollapsed} setCollapsed={setSideCollapsed} pendingActionsCount={clientActionsData.filter(a=>a.status==="pending"||a.status==="open").length}/>
 <div style={{flex:1,display:"flex",flexDirection:"column"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
-<main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}} key={view+(detailEng?.id||"")}>
+<main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}}>
 <div className="fu">{renderView()}</div>
 </main>
 </div>
