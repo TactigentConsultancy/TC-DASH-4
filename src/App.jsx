@@ -3090,55 +3090,66 @@ const isValid=title.trim().length>2&&assignedClient;
 const submit=async()=>{
 if(!isValid||saving)return;
 setSaving(true);
-const newAction={
-  id:`ca${Date.now()}`,title:title.trim(),desc:desc.trim(),type,status:"pending",
-  deadline:deadline?new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
-  engagement_id:eng.id,
-  client_id:assignedClient||null,
-  assigned_to:assignedStaff||null,
-};
-// Save to Supabase
+// Zoek de geselecteerde cliënt op in de lijst
+const selectedCompany=clientList.find(x=>x.id===assignedClient);
+const companyId=assignedClient||null;
+const portalUserId=selectedCompany?.portal_user_id||null;
+// Bepaal department: gebruik eng.dept als het beschikbaar is, anders TC als fallback
+const department=(eng.dept&&eng.dept!=="standalone")?eng.dept:"TC";
 try{
-  const {data:caData}=await supabase.from("client_actions").insert({
-    title:newAction.title, description:newAction.desc,
-    action_type:newAction.type, status:"pending",
+  // DB insert met correcte velden
+  const {data:caData,error:insertErr}=await supabase.from("client_actions").insert({
+    title:title.trim(),
+    description:desc.trim()||null,
+    action_type:type,
+    status:"pending",
     deadline:deadline||null,
-    // Fix: use null instead of "standalone" when no real engagement selected
+    // engagement_id: null als standalone (geen echte engagement geselecteerd)
     engagement_id:(eng.id&&eng.id!=="standalone")?eng.id:null,
-    // Fix: client_id = portal_user_id of the selected company
-    // Look up from clientList which has portal_user_id
-    client_id:(()=>{
-      const c=clientList.find(x=>x.id===assignedClient||x.company_id===assignedClient);
-      return c?.portal_user_id||null;
-    })(),
+    // client_id = portal_user_id van de cliënt (voor RLS)
+    client_id:portalUserId,
     assigned_to:assignedStaff||null,
-    department:eng.dept||dept||"TC", is_visible_to_client:true,
-    // Fix: company_id = the selected company UUID (assignedClient)
-    company_id:assignedClient||eng.company_id||null,
+    department:department,
+    is_visible_to_client:true,
+    // company_id = de UUID van het geselecteerde bedrijf
+    company_id:companyId,
   }).select("id").single();
 
-  // Send notification to client if company has portal user
-  if(eng.company_id){
-    const {data:comp}=await supabase.from("companies")
-      .select("portal_user_id,name")
-      .eq("id",eng.company_id)
-      .single();
-    if(comp?.portal_user_id){
-      const typeLabel=newAction.type==="upload"?"Uploadverzoek":newAction.type==="approve"?"Goedkeuring vereist":newAction.type==="sign"?"Handtekening vereist":"Actie vereist";
-      await supabase.from("notifications").insert({
-        user_id:comp.portal_user_id,
-        title:`${typeLabel}: ${newAction.title}`,
-        body:`Uw adviseur heeft een nieuw actiepunt aangemaakt${deadline?` — deadline: ${new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})}`:""}.`,
-        entity_type:"client_action",
-        entity_id:caData?.id||null,
-        action_type:newAction.type,
-      }).catch(e=>console.warn("DB [client_actions]:", e?.message||e));
-    }
+  if(insertErr) throw new Error(insertErr.message);
+
+  // Stuur notificatie naar cliënt als het bedrijf een portaalaccount heeft
+  if(portalUserId){
+    const typeLabel=type==="upload"?"Uploadverzoek":type==="approve"?"Goedkeuring vereist":type==="sign"?"Handtekening vereist":"Actie vereist";
+    await supabase.from("notifications").insert({
+      user_id:portalUserId,
+      title:`${typeLabel}: ${title.trim()}`,
+      body:`Uw adviseur heeft een nieuw actiepunt aangemaakt${deadline?` — deadline: ${new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"})}`:""}.`,
+      entity_type:"client_action",
+      entity_id:caData?.id||null,
+      action_type:type,
+    }).catch(e=>console.warn("notificatie fout:",e?.message||e));
   }
-}catch(e){ console.warn("client_action insert:",e.message); }
-onCreated(newAction);
-showToast(`Cliëntactie "${title}" aangemaakt`);
-onClose();
+
+  // Alleen bij succes: callback + toast + sluiten
+  const newAction={
+    id:caData?.id||`ca${Date.now()}`,
+    title:title.trim(),desc:desc.trim(),type,status:"pending",
+    deadline:deadline?new Date(deadline).toLocaleDateString("nl-SR",{day:"2-digit",month:"short",year:"numeric"}):"—",
+    engagement_id:(eng.id&&eng.id!=="standalone")?eng.id:null,
+    client_id:portalUserId,
+    company_id:companyId,
+    assigned_to:assignedStaff||null,
+    dept:department,
+    client:selectedCompany?.full_name||"—",
+  };
+  onCreated(newAction);
+  showToast(`Cliëntactie "${title.trim()}" aangemaakt`);
+  onClose();
+}catch(e){
+  console.warn("client_action insert fout:",e.message);
+  showToast("Fout bij aanmaken actie: "+e.message);
+  setSaving(false);
+}
 };
 return(
 <div style={{position:"fixed",inset:0,width:"100vw",height:"100vh",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,pointerEvents:"auto",}} onClick={onClose}>
