@@ -1358,8 +1358,8 @@ case "analyses":     return <AnalysesView user={user} engData={engData} setDetai
 case "projects":     return <EngagementList user={user} dept="TC" engData={engData} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)}/>;
 case "dossiers":     return <EngagementList user={user} dept="FF" engData={engData} setDetailEng={e=>setDetailEng(engData.find(x=>x.id===e.id)||e)}/>;
 case "tasks":        return <TasksView user={user}/>;
-case "ca_tc":        return <ClientActionsView user={user} dept="TC"/>;
-case "ca_ff":        return <ClientActionsView user={user} dept="FF"/>;
+case "ca_tc":        return <ClientActionsView user={user} dept="TC" showToast={showToast}/>;
+case "ca_ff":        return <ClientActionsView user={user} dept="FF" showToast={showToast}/>;
 case "review":       return <ReviewQueue showToast={showToast}/>;
 case "marketing":    return <MarketingView user={user} showToast={showToast}/>;
 case "settings":     return <SettingsView user={user} language={language} setLanguage={setLanguage} showToast={showToast}/>;
@@ -1382,7 +1382,7 @@ case "asset_flow":   return (user.role==="super_admin"
 case "c_dash":       return <ClientDashboard user={user} actionsData={clientActionsData} onNavigate={(v)=>setView(v)}/>;
 case "c_docs":       return <ClientDocsView user={user}/>;
 case "c_finance":    return <ClientFinanceView user={user} invData={invData}/>;
-case "c_actions":    return <ClientActionsPortal user={user} showToast={showToast} initialActions={clientActionsData} initialCompany={clientCompany} onActionsChange={setClientActionsData}/>;
+case "c_actions":    return null; // Wordt persistent buiten switch gerenderd
 case "c_messages":   return <ClientMessagesView user={user} showToast={showToast}/>;
 default: return <div style={{padding:40,color:C.secondary,fontStyle:"italic",display:"flex",alignItems:"center",gap:10}}><ClipboardList size={20}/> {view} — beschikbaar in volgende sprint</div>;
 }
@@ -1395,7 +1395,13 @@ return(
 <div style={{flex:1,display:"flex",flexDirection:"column"}}>
 <Topbar user={user} language={language} setLanguage={setLanguage} setView={handleSetView} unreadCount={unreadCount} onLogout={onLogout} darkMode={darkMode} toggleDark={toggleDark}/>
 <main style={{flex:1,overflow:"auto",padding:"28px 32px",background:C.bg,color:C.text}}>
-<div className="fu">{renderView()}</div>
+{/* ClientActionsPortal altijd gemount om state te bewaren bij navigatie */}
+<div style={{display:view==="c_actions"?"block":"none"}}>
+  <ClientActionsPortal user={user} showToast={showToast}
+    initialActions={clientActionsData} initialCompany={clientCompany}
+    onActionsChange={setClientActionsData}/>
+</div>
+<div className="fu" style={{display:view==="c_actions"?"none":"block"}}>{renderView()}</div>
 </main>
 </div>
 {showSearch&&<GlobalSearch
